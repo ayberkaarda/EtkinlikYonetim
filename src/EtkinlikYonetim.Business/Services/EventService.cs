@@ -2,6 +2,7 @@ using System.Globalization;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
+using FluentValidation;
 
 namespace EtkinlikYonetim.Business.Services;
 
@@ -18,7 +19,10 @@ public interface IEventService
     Task<int> CreateAsync(UserSession session, string? name, DateTime eventDate, int capacity, CancellationToken cancellationToken = default);
 }
 
-internal sealed class EventService(IEventRepository events, TimeProvider timeProvider) : IEventService
+internal sealed class EventService(
+    IEventRepository events,
+    TimeProvider timeProvider,
+    IValidator<EventInput> validator) : IEventService
 {
     internal const string NameRequired = "Etkinlik adı boş bırakılamaz.";
     internal const string PastDate = "Geçmiş tarihli etkinlik eklenemez.";
@@ -52,30 +56,11 @@ internal sealed class EventService(IEventRepository events, TimeProvider timePro
     {
         Access.RequireAdmin(session);
 
-        var trimmed = name?.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-        {
-            throw new BusinessRuleException(NameRequired);
-        }
-
-        if (trimmed.Length > InputRules.EventNameMaxLength)
-        {
-            throw new BusinessRuleException(NameTooLong);
-        }
-
-        var day = DateOnly.FromDateTime(eventDate);
-        if (day < timeProvider.Today())
-        {
-            throw new BusinessRuleException(PastDate);
-        }
-
-        if (capacity is < InputRules.MinCapacity or > InputRules.MaxCapacity)
-        {
-            throw new BusinessRuleException(CapacityInvalid);
-        }
+        var input = EventInput.Create(name, eventDate, capacity, timeProvider.Today());
+        validator.ValidateOrThrow(input);
 
         return events.AddAsync(
-            new ScheduledEvent { Name = trimmed, Date = day, Capacity = capacity, RegisteredCount = 0 },
+            new ScheduledEvent { Name = input.Name, Date = input.Day, Capacity = input.Capacity, RegisteredCount = 0 },
             cancellationToken);
     }
 }

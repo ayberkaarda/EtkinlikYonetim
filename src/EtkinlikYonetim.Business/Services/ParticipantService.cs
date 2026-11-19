@@ -1,6 +1,7 @@
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
+using FluentValidation;
 
 namespace EtkinlikYonetim.Business.Services;
 
@@ -25,7 +26,9 @@ public interface IParticipantService
     Task<IReadOnlyList<ParticipantView>> GetByEventAsync(UserSession session, int eventId, CancellationToken cancellationToken = default);
 }
 
-internal sealed class ParticipantService(IParticipantRepository participants) : IParticipantService
+internal sealed class ParticipantService(
+    IParticipantRepository participants,
+    IValidator<ParticipantInput> validator) : IParticipantService
 {
     internal const string FieldsRequired = "Lütfen tüm alanları doldurun.";
     internal const string NationalIdInvalid = "Lütfen geçerli bir T.C. Kimlik No girin.";
@@ -46,28 +49,9 @@ internal sealed class ParticipantService(IParticipantRepository participants) : 
     {
         Access.RequireSignedIn(session);
 
-        var id = nationalId?.Trim();
-        var name = fullName?.Trim();
-        var mail = email?.Trim();
-        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name) || string.IsNullOrEmpty(mail))
-        {
-            throw new BusinessRuleException(FieldsRequired);
-        }
-
-        if (!NationalIdNumber.IsValid(id))
-        {
-            throw new BusinessRuleException(NationalIdInvalid);
-        }
-
-        if (!InputRules.IsValidPersonName(name))
-        {
-            throw new BusinessRuleException(FullNameInvalid);
-        }
-
-        if (!InputRules.IsValidEmail(mail))
-        {
-            throw new BusinessRuleException(EmailInvalid);
-        }
+        var input = ParticipantInput.Create(nationalId, fullName, email);
+        validator.ValidateOrThrow(input);
+        var (id, name, mail) = (input.NationalId, input.FullName, input.Email);
 
         // Only the account's own list is checked: national ids are unique per owner, so the answer for
         // a number another account has is the same as for a number nobody has.

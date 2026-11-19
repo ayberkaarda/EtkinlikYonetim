@@ -101,7 +101,7 @@ public sealed class SetupKeyPolicyTests
         users.Setup(u => u.AddFirstAdminAsync(It.IsAny<User>(), It.IsNotNull<SetupKeyAttempt>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FirstAdminResult(FirstAdminStatus.NotAuthorized, 0));
         var delay = TimeSpan.FromMilliseconds(300);
-        var service = new SetupService(
+        var service = ServiceFactory.Setup(
             users.Object,
             new PasswordHasher(iterations: 1_000),
             new SetupKeyGate(new FakeTimeProvider(new DateTimeOffset(Now)), new SetupKeyThrottle(delay)),

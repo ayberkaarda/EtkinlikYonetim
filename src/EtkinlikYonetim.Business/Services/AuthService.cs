@@ -1,9 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
+using FluentValidation;
 
 namespace EtkinlikYonetim.Business.Services;
 
@@ -20,7 +20,9 @@ public interface IAuthService
 internal sealed class AuthService(
     IUserRepository users,
     IPasswordHasher passwordHasher,
-    TimeProvider timeProvider) : IAuthService
+    TimeProvider timeProvider,
+    IValidator<SignInInput> signInValidator,
+    IValidator<AccountInput> accountValidator) : IAuthService
 {
     internal const string InputRequired = "Lütfen kullanıcı adı ve şifrenizi girin.";
     internal const string RegisterInputRequired = "Kullanıcı adı ve şifre boş olamaz.";
@@ -43,11 +45,10 @@ internal sealed class AuthService(
 
     public async Task<UserSession> SignInAsync(string? userName, string? password, CancellationToken cancellationToken = default)
     {
-        var name = userName?.Trim();
-        if (string.IsNullOrEmpty(name) || name.Length > InputRules.StoredUserNameMaxLength || !IsAcceptableSignInPassword(password))
-        {
-            throw new BusinessRuleException(InputRequired);
-        }
+        var input = SignInInput.Create(userName, password);
+        signInValidator.ValidateOrThrow(input);
+        var name = input.UserName;
+        password = input.Password!;
 
         var account = await users.FindByUserNameAsync(name, cancellationToken).ConfigureAwait(false);
         if (account is null)
@@ -101,26 +102,9 @@ internal sealed class AuthService(
         string? passwordRepeat,
         CancellationToken cancellationToken = default)
     {
-        var name = userName?.Trim();
-        if (string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(password))
-        {
-            throw new BusinessRuleException(RegisterInputRequired);
-        }
-
-        if (!InputRules.IsValidUserName(name))
-        {
-            throw new BusinessRuleException(UserNameInvalid);
-        }
-
-        if (!string.Equals(password, passwordRepeat, StringComparison.Ordinal))
-        {
-            throw new BusinessRuleException(PasswordsDoNotMatch);
-        }
-
-        if (password.Length < PasswordPolicy.MinLength || password.Length > PasswordPolicy.MaxLength)
-        {
-            throw new BusinessRuleException(PasswordInvalid);
-        }
+        var input = AccountInput.Create(userName, password, passwordRepeat);
+        accountValidator.ValidateOrThrow(input);
+        var name = input.UserName;
 
         if (await users.UserNameExistsAsync(name, cancellationToken).ConfigureAwait(false))
         {
@@ -130,7 +114,7 @@ internal sealed class AuthService(
         var user = new User
         {
             UserName = name,
-            PasswordHash = passwordHasher.Hash(password),
+            PasswordHash = passwordHasher.Hash(input.Password!),
             PasswordFormat = PasswordFormat.Pbkdf2,
             Role = UserRole.User,
         };
@@ -145,11 +129,4 @@ internal sealed class AuthService(
             throw new BusinessRuleException(UserNameTaken, ex);
         }
     }
-
-    /// <summary>
-    /// Sign-in only bounds the input by what an existing account can hold; the registration rules of
-    /// <see cref="PasswordPolicy"/> apply to new passwords and would lock out legacy accounts here.
-    /// </summary>
-    private static bool IsAcceptableSignInPassword([NotNullWhen(true)] string? password) =>
-        !string.IsNullOrEmpty(password) && password.Length <= PasswordPolicy.SignInMaxLength;
 }
