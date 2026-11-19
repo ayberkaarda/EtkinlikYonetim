@@ -1,3 +1,4 @@
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
@@ -53,7 +54,8 @@ internal sealed class SetupService(
     IPasswordHasher passwordHasher,
     SetupKeyGate setupKeys,
     SetupKeyEnvironment environment,
-    IValidator<AccountInput> accountValidator) : ISetupService
+    IValidator<AccountInput> accountValidator,
+    IAuditLog audit) : ISetupService
 {
     internal const string AlreadyDone = "Kurulum zaten tamamlanmış. Lütfen giriş yapın.";
 
@@ -108,8 +110,10 @@ internal sealed class SetupService(
         switch (result.Status)
         {
             case FirstAdminStatus.Created:
+                audit.Record(AuditEvent.FirstAdminCreated, UserRole.Admin);
                 return new UserSession(result.AdminId, name, UserRole.Admin);
             case FirstAdminStatus.NotAuthorized:
+                audit.Record(AuditEvent.SetupKeyRefused, null);
                 await setupKeys.DelayAfterRefusalAsync(cancellationToken).ConfigureAwait(false);
                 throw new BusinessRuleException(SetupKeyInvalid);
             case FirstAdminStatus.KeyRequired:

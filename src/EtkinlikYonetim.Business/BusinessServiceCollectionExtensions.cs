@@ -1,3 +1,4 @@
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Business.Validation;
@@ -9,12 +10,16 @@ namespace EtkinlikYonetim.Business;
 
 public static class BusinessServiceCollectionExtensions
 {
-    /// <summary>Registers the business services. Repositories must be registered separately.</summary>
+    /// <summary>
+    /// Registers the business services. Repositories must be registered separately. An
+    /// <see cref="IAuditLog"/> registered before this call receives the audit events; otherwise they are discarded.
+    /// </summary>
     public static IServiceCollection AddBusinessServices(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IAuditLog>(NullAuditLog.Instance);
         services.TryAddSingleton<IPasswordHasher>(_ => new PasswordHasher());
         services.TryAddSingleton(SetupKeyThrottle.Default);
         services.TryAddSingleton(_ => SetupKeyEnvironment.FromProcess());

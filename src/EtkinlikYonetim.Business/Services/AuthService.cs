@@ -1,4 +1,5 @@
 using System.Globalization;
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
@@ -22,7 +23,8 @@ internal sealed class AuthService(
     IPasswordHasher passwordHasher,
     TimeProvider timeProvider,
     IValidator<SignInInput> signInValidator,
-    IValidator<AccountInput> accountValidator) : IAuthService
+    IValidator<AccountInput> accountValidator,
+    IAuditLog audit) : IAuthService
 {
     internal const string InputRequired = "Lütfen kullanıcı adı ve şifrenizi girin.";
     internal const string RegisterInputRequired = "Kullanıcı adı ve şifre boş olamaz.";
@@ -45,8 +47,14 @@ internal sealed class AuthService(
 
     public async Task<UserSession> SignInAsync(string? userName, string? password, CancellationToken cancellationToken = default)
     {
+        // Every refusal records the same audit entry, without a role: the local log must not tell an
+        // unknown account from a locked one or from a wrong password.
         var input = SignInInput.Create(userName, password);
-        signInValidator.ValidateOrThrow(input);
+        if (!signInValidator.Validate(input).IsValid)
+        {
+            throw SignInRefused(InputRequired);
+        }
+
         var name = input.UserName;
         password = input.Password!;
 
@@ -54,7 +62,7 @@ internal sealed class AuthService(
         if (account is null)
         {
             passwordHasher.SimulateVerification(password);
-            throw new BusinessRuleException(CredentialsInvalid);
+            throw SignInRefused();
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -63,7 +71,7 @@ internal sealed class AuthService(
             // Same answer and about the same cost as a wrong password; nothing is written, so the
             // lock neither grows nor ends early.
             passwordHasher.SimulateVerification(password);
-            throw new BusinessRuleException(CredentialsInvalid);
+            throw SignInRefused();
         }
 
         var result = passwordHasher.Verify(password, account.PasswordHash, account.PasswordFormat);
@@ -74,7 +82,7 @@ internal sealed class AuthService(
                 LoginPolicy.MaxFailedAttempts,
                 now + LoginPolicy.LockoutDuration,
                 cancellationToken).ConfigureAwait(false);
-            throw new BusinessRuleException(CredentialsInvalid);
+            throw SignInRefused();
         }
 
         string? newHash = null;
@@ -90,9 +98,15 @@ internal sealed class AuthService(
         var recorded = await users.RecordSuccessfulLoginAsync(account, now, newHash, cancellationToken).ConfigureAwait(false);
         if (!recorded)
         {
-            throw new BusinessRuleException(CredentialsInvalid);
+            throw SignInRefused();
         }
 
+        if (newHash is not null)
+        {
+            audit.Record(AuditEvent.PasswordUpgraded, account.Role);
+        }
+
+        audit.Record(AuditEvent.SignInSucceeded, account.Role);
         return new UserSession(account.Id, account.UserName, account.Role);
     }
 
@@ -128,5 +142,13 @@ internal sealed class AuthService(
             // Registered concurrently between the check and the insert.
             throw new BusinessRuleException(UserNameTaken, ex);
         }
+
+        audit.Record(AuditEvent.AccountRegistered, UserRole.User);
+    }
+
+    private BusinessRuleException SignInRefused(string? message = null)
+    {
+        audit.Record(AuditEvent.SignInFailed, null);
+        return new BusinessRuleException(message ?? CredentialsInvalid);
     }
 }

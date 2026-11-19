@@ -1,3 +1,4 @@
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
@@ -28,7 +29,8 @@ public interface IParticipantService
 
 internal sealed class ParticipantService(
     IParticipantRepository participants,
-    IValidator<ParticipantInput> validator) : IParticipantService
+    IValidator<ParticipantInput> validator,
+    IAuditLog audit) : IParticipantService
 {
     internal const string FieldsRequired = "Lütfen tüm alanları doldurun.";
     internal const string NationalIdInvalid = "Lütfen geçerli bir T.C. Kimlik No girin.";
@@ -68,15 +70,19 @@ internal sealed class ParticipantService(
             OwnerUserId = session.UserId,
         };
 
+        int added;
         try
         {
-            return await participants.AddAsync(participant, cancellationToken).ConfigureAwait(false);
+            added = await participants.AddAsync(participant, cancellationToken).ConfigureAwait(false);
         }
         catch (DuplicateNationalIdException ex)
         {
             // Added to the same account concurrently between the check and the insert.
             throw new BusinessRuleException(NationalIdTaken, ex);
         }
+
+        audit.Record(AuditEvent.ParticipantAdded, session.Role);
+        return added;
     }
 
     public async Task<IReadOnlyList<ParticipantView>> GetByEventAsync(
@@ -84,7 +90,7 @@ internal sealed class ParticipantService(
         int eventId,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireAdmin(session);
+        Access.RequireAdmin(session, audit);
 
         var rows = await participants.GetByEventAsync(eventId, cancellationToken).ConfigureAwait(false);
         return rows

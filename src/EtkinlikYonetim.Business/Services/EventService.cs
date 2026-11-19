@@ -1,4 +1,5 @@
 using System.Globalization;
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
@@ -22,7 +23,8 @@ public interface IEventService
 internal sealed class EventService(
     IEventRepository events,
     TimeProvider timeProvider,
-    IValidator<EventInput> validator) : IEventService
+    IValidator<EventInput> validator,
+    IAuditLog audit) : IEventService
 {
     internal const string NameRequired = "Etkinlik adı boş bırakılamaz.";
     internal const string PastDate = "Geçmiş tarihli etkinlik eklenemez.";
@@ -47,20 +49,22 @@ internal sealed class EventService(
         return events.GetFromAsync(timeProvider.Today(), cancellationToken);
     }
 
-    public Task<int> CreateAsync(
+    public async Task<int> CreateAsync(
         UserSession session,
         string? name,
         DateTime eventDate,
         int capacity,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireAdmin(session);
+        Access.RequireAdmin(session, audit);
 
         var input = EventInput.Create(name, eventDate, capacity, timeProvider.Today());
         validator.ValidateOrThrow(input);
 
-        return events.AddAsync(
+        var id = await events.AddAsync(
             new ScheduledEvent { Name = input.Name, Date = input.Day, Capacity = input.Capacity, RegisteredCount = 0 },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+        audit.Record(AuditEvent.EventCreated, session.Role);
+        return id;
     }
 }

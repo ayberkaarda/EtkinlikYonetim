@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
@@ -36,7 +37,8 @@ internal sealed class RegistrationService(
     TimeProvider timeProvider,
     IValidator<RegistrationRequestInput> requestValidator,
     IValidator<RegistrationTargetInput> targetValidator,
-    IValidator<CancellationInput> cancellationValidator) : IRegistrationService
+    IValidator<CancellationInput> cancellationValidator,
+    IAuditLog audit) : IRegistrationService
 {
     internal const string EventRequired = "Lütfen bir etkinlik seçin.";
     internal const string NationalIdFormat = "Geçerli bir 11 haneli TC Kimlik No girin.";
@@ -78,7 +80,16 @@ internal sealed class RegistrationService(
         var target = await events.GetByIdAsync(eventId, cancellationToken).ConfigureAwait(false)
             ?? throw new BusinessRuleException(EventRequired);
         var today = timeProvider.Today();
-        targetValidator.ValidateOrThrow(new RegistrationTargetInput(target.Date, target.FreeSeats, today));
+        var check = targetValidator.Validate(new RegistrationTargetInput(target.Date, target.FreeSeats, today));
+        if (!check.IsValid)
+        {
+            if (check.Errors[0].PropertyName == nameof(RegistrationTargetInput.FreeSeats))
+            {
+                audit.Record(AuditEvent.RegistrationEventFull, session.Role);
+            }
+
+            throw new BusinessRuleException(check.Errors[0].ErrorMessage);
+        }
 
         var code = TicketCode.New();
         try
@@ -92,6 +103,7 @@ internal sealed class RegistrationService(
                 timeProvider.GetUtcNow().UtcDateTime,
                 code,
                 cancellationToken).ConfigureAwait(false);
+            audit.Record(AuditEvent.RegistrationCreated, session.Role);
             return new RegistrationReceipt(registrationId, code, target.Name, target.Date);
         }
         catch (AlreadyRegisteredException ex)
@@ -100,6 +112,7 @@ internal sealed class RegistrationService(
         }
         catch (EventFullException ex)
         {
+            audit.Record(AuditEvent.RegistrationEventFull, session.Role);
             throw new BusinessRuleException(EventFull, ex);
         }
         catch (EventClosedException ex)
@@ -125,6 +138,7 @@ internal sealed class RegistrationService(
         // A missing registration and somebody else's registration get the same answer, so ids cannot be probed.
         if (registration is null || !(session.IsAdmin || registration.OwnerUserId == session.UserId))
         {
+            audit.Record(AuditEvent.AccessDenied, session.Role);
             throw new AccessDeniedException();
         }
 
@@ -143,6 +157,8 @@ internal sealed class RegistrationService(
         {
             throw new BusinessRuleException(CancelFailed);
         }
+
+        audit.Record(AuditEvent.RegistrationCancelled, session.Role);
     }
 }
 
