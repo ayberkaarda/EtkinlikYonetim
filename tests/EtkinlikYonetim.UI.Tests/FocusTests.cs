@@ -155,6 +155,24 @@ public sealed class FocusTests
         Assert.Same(nationalId, form.ActiveControl);
     });
 
+    [Fact]
+    public void Registration_OnAFullEvent_ShowsTheWaitingPlace() => Run(() =>
+    {
+        var registrations = new ControlledRegistrationService();
+        var prompts = new RecordingPrompts();
+        using var form = new KayitEkleForm(new ControlledEventService(), registrations, Sessions.User) { Prompts = prompts };
+        CreateHandles(form);
+        Find<TextBox>(form, "txtKatilimciTC").Text = "10000000146";
+
+        var save = form.RegisterAsync();
+        registrations.CompleteRegisterOnTheWaitingList(3);
+
+        Assert.True(save.IsCompletedSuccessfully && save.Result);
+        var message = Assert.Single(prompts.Messages);
+        Assert.StartsWith("Etkinlik dolu. Katılımcı bekleme listesine alındı (sıra: 3).", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Bilet kodu", message, StringComparison.Ordinal);
+    });
+
     private static void CreateHandles(Control control)
     {
         _ = control.Handle;

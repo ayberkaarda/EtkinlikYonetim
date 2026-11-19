@@ -156,6 +156,10 @@ internal sealed class ControlledRegistrationService : IRegistrationService
 
     public void CompleteRegister() =>
         _register.SetResult(new RegistrationReceipt(9, "ETK-ABCDEFGHJK", "Bahar Konseri", new DateOnly(2027, 4, 17)));
+
+    /// <summary>Completes the pending registration with a place on the waiting list.</summary>
+    public void CompleteRegisterOnTheWaitingList(int position) =>
+        _register.SetResult(new RegistrationReceipt(10, null, "Bahar Konseri", new DateOnly(2027, 4, 17), position));
 }
 
 /// <summary>Account changes stay pending; the account list is answered at once, or refused when <see cref="Expired"/> is set.</summary>
