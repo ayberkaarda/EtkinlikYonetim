@@ -41,6 +41,7 @@
             this.btnkapat = new System.Windows.Forms.Button();
             this.btnKullanicilar = new System.Windows.Forms.Button();
             this.btnEtkinlikYonet = new System.Windows.Forms.Button();
+            this.btnBiletKontrol = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numKapasite)).BeginInit();
             this.SuspendLayout();
             // 
@@ -200,12 +201,24 @@
             this.btnEtkinlikYonet.UseVisualStyleBackColor = true;
             this.btnEtkinlikYonet.Click += new System.EventHandler(this.btnEtkinlikYonet_Click);
             // 
+            // btnBiletKontrol
+            // 
+            this.btnBiletKontrol.Location = new System.Drawing.Point(487, 204);
+            this.btnBiletKontrol.Margin = new System.Windows.Forms.Padding(4);
+            this.btnBiletKontrol.Name = "btnBiletKontrol";
+            this.btnBiletKontrol.Size = new System.Drawing.Size(165, 44);
+            this.btnBiletKontrol.TabIndex = 14;
+            this.btnBiletKontrol.Text = "Bilet Kontrol";
+            this.btnBiletKontrol.UseVisualStyleBackColor = true;
+            this.btnBiletKontrol.Click += new System.EventHandler(this.btnBiletKontrol_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.ClientSize = new System.Drawing.Size(688, 325);
+            this.Controls.Add(this.btnBiletKontrol);
             this.Controls.Add(this.btnEtkinlikYonet);
             this.Controls.Add(this.btnKullanicilar);
             this.Controls.Add(this.btnAsagial);
@@ -246,6 +259,7 @@
         private System.Windows.Forms.Button btnkapat;
         private System.Windows.Forms.Button btnKullanicilar;
         private System.Windows.Forms.Button btnEtkinlikYonet;
+        private System.Windows.Forms.Button btnBiletKontrol;
     }
 }
 

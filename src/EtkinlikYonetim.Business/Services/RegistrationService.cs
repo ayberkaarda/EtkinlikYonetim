@@ -33,7 +33,10 @@ public interface IRegistrationService
         string? nationalId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Seats and waiting places the session may see: its own participants', or all for an admin.</summary>
+    /// <summary>
+    /// Seats and waiting places the session may see: its own participants', or all for an admin, who sees the
+    /// ticket codes of the participants it added only.
+    /// </summary>
     Task<IReadOnlyList<RegistrationDetails>> GetMyRegistrationsAsync(UserSession session, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -138,7 +141,13 @@ internal sealed class RegistrationService(
         CancellationToken cancellationToken = default)
     {
         await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
-        return await registrations.GetActiveAsync(Access.OwnerFilter(session), cancellationToken).ConfigureAwait(false);
+        var list = await registrations.GetActiveAsync(Access.OwnerFilter(session), cancellationToken).ConfigureAwait(false);
+
+        // A ticket code is the participant's secret: an admin sees the registrations of every account, but
+        // the code only of participants the admin added or that belong to no account.
+        return session.IsAdmin
+            ? list.Select(r => r.OwnerUserId is null || r.OwnerUserId == session.UserId ? r : r with { TicketCode = null }).ToList()
+            : list;
     }
 
     public async Task CancelAsync(UserSession session, int registrationId, CancellationToken cancellationToken = default)
@@ -180,14 +189,38 @@ internal sealed class RegistrationService(
     }
 }
 
-/// <summary>Random ticket codes such as "ETK-7KQ2M9XA4C".</summary>
+/// <summary>
+/// Ticket codes: "ETK-" and 26 characters drawn by the operating system's cryptographic random number
+/// generator from a 32 character alphabet, that is 130 random bits, so a code can be neither guessed nor
+/// derived from another one. The code is the secret of the ticket: it is shown only to the participant's
+/// account (and in its QR code), compared in constant time at the entrance and never written to a log.
+/// </summary>
 internal static class TicketCode
 {
     public const string Prefix = "ETK-";
-    public const int RandomLength = 10;
+    public const int RandomLength = 26;
+
+    /// <summary>Longest code the entrance accepts: new codes and the 32 hexadecimal characters of reissued old ones.</summary>
+    public const int MaxLength = 40;
 
     // No 0/O, 1/I: the code is read and typed by people.
     private const string Alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     public static string New() => Prefix + RandomNumberGenerator.GetString(Alphabet, RandomLength);
+
+    /// <summary>
+    /// The code as it is stored: trimmed and in upper case, so a hand-typed code in lower case matches.
+    /// Returns <see langword="false"/> for anything that cannot be a ticket code (wrong prefix, length or characters).
+    /// </summary>
+    public static bool TryNormalize(string? typed, out string code)
+    {
+        code = (typed ?? string.Empty).Trim().ToUpperInvariant();
+        return code.Length > Prefix.Length
+            && code.Length <= MaxLength
+            && code.StartsWith(Prefix, StringComparison.Ordinal)
+            && code.AsSpan(Prefix.Length).ContainsAnyExcept(CodeCharacters) is false;
+    }
+
+    private static readonly System.Buffers.SearchValues<char> CodeCharacters =
+        System.Buffers.SearchValues.Create("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
 }

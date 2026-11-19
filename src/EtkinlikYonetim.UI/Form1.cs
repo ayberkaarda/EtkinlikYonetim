@@ -92,6 +92,12 @@ namespace EtkinlikYonetim.UI
             form.ShowDialog(this);
         }
 
+        private void btnBiletKontrol_Click(object? sender, EventArgs e)
+        {
+            using var form = _forms.Create<BiletKontrolForm>(_session);
+            form.ShowDialog(this);
+        }
+
         private void btnKullanicilar_Click(object? sender, EventArgs e)
         {
             using var form = _forms.Create<KullaniciYonetForm>(_session);

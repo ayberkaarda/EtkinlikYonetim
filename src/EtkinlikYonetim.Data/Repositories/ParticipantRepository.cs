@@ -75,11 +75,11 @@ internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> co
                     p.FullName,
                     p.NationalId,
                     p.Email,
-                    r.Ticket != null ? r.Ticket.Code : null,
                     r.Status,
                     r.Status == RegistrationStatus.Waiting
                         ? db.Registrations.Count(w => w.EventId == r.EventId && w.Status == RegistrationStatus.Waiting && w.QueueNumber <= r.QueueNumber)
-                        : null))
+                        : null,
+                    r.Ticket != null ? r.Ticket.CheckedInAt : null))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }

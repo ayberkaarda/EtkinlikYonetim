@@ -124,7 +124,7 @@ public sealed class RegistrationServiceTests
 
         Assert.Equal(new RegistrationReceipt(7, first.TicketCode, "Konser", Today), first);
         Assert.False(first.Waitlisted);
-        Assert.Matches("^ETK-[A-HJ-NP-Z2-9]{10}$", first.TicketCode);
+        Assert.Matches("^ETK-[A-HJ-NP-Z2-9]{26}$", first.TicketCode);
         Assert.NotEqual(first.TicketCode, second.TicketCode);
         _registrations.Verify(r => r.AddAsync(1, 1, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
@@ -165,6 +165,23 @@ public sealed class RegistrationServiceTests
 
         _registrations.Verify(r => r.GetActiveAsync(Sessions.User.UserId, It.IsAny<CancellationToken>()), Times.Once);
         _registrations.Verify(r => r.GetActiveAsync(null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>An admin sees every registration but the ticket codes only of participants it added or that belong to no account.</summary>
+    [Fact]
+    public async Task List_AdminSeesOtherAccountsTicketCodesNot()
+    {
+        _registrations.Setup(r => r.GetActiveAsync(null, It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new RegistrationDetails(1, 1, "Konser", Today, 1, "Deniz", "ETK-OWN", OwnerUserId: Sessions.Admin.UserId),
+            new RegistrationDetails(2, 1, "Konser", Today, 2, "Ece", "ETK-OTHER", OwnerUserId: Sessions.User.UserId),
+            new RegistrationDetails(3, 1, "Konser", Today, 3, "Eski", "ETK-LEGACY", OwnerUserId: null),
+        ]);
+
+        var list = await Service().GetMyRegistrationsAsync(Sessions.Admin, Ct);
+
+        Assert.Equal(["ETK-OWN", null, "ETK-LEGACY"], list.Select(r => r.TicketCode));
+        Assert.Equal(3, list.Count);
     }
 
     // IDOR: somebody else's registration and a missing one get the same answer and nothing is written.

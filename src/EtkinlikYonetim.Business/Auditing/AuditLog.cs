@@ -80,6 +80,15 @@ public enum AuditEvent
 
     /// <summary>An admin cancelled an event; its registrations and waiting places were closed.</summary>
     EventCancelled = 20,
+
+    /// <summary>A valid, unused ticket was checked in at the entrance. The ticket code is never written.</summary>
+    TicketCheckedIn = 21,
+
+    /// <summary>A valid ticket was scanned again after its check-in.</summary>
+    TicketAlreadyUsed = 22,
+
+    /// <summary>A scanned code was no valid ticket of the chosen event (unknown, other event, cancelled or malformed).</summary>
+    TicketRejected = 23,
 }
 
 /// <summary>Receives <see cref="AuditEvent"/>s; the application writes them to its log file.</summary>
@@ -114,6 +123,9 @@ public static class AuditCodes
         AuditEvent.RegistrationPromoted => "registration.promoted",
         AuditEvent.EventUpdated => "event.updated",
         AuditEvent.EventCancelled => "event.cancelled",
+        AuditEvent.TicketCheckedIn => "ticket.checked_in",
+        AuditEvent.TicketAlreadyUsed => "ticket.already_used",
+        AuditEvent.TicketRejected => "ticket.rejected",
         _ => throw new ArgumentOutOfRangeException(nameof(auditEvent), auditEvent, "Unknown audit event."),
     };
 

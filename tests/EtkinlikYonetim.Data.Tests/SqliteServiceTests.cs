@@ -155,7 +155,7 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     {
         var receipt = await Registrations.RegisterAsync(User(SeedUserId), ConcertId, DenizNationalId, Ct);
 
-        Assert.Matches("^ETK-[A-HJ-NP-Z2-9]{10}$", receipt.TicketCode);
+        Assert.Matches("^ETK-[A-HJ-NP-Z2-9]{26}$", receipt.TicketCode);
         Assert.Equal("Bahar Konseri", receipt.EventName);
         var mine = await Registrations.GetMyRegistrationsAsync(User(SeedUserId), Ct);
         Assert.Equal(receipt.TicketCode, Assert.Single(mine).TicketCode);
@@ -566,7 +566,9 @@ public sealed class SqliteServiceTests : IAsyncLifetime
         var row = Assert.Single(list);
         Assert.Equal("Deniz Örnek", row.FullName);
         Assert.Equal("100******46", row.MaskedNationalId);
-        Assert.Equal(receipt.TicketCode, row.TicketCode);
+        Assert.Equal("Giriş yapılmadı", row.State);
+        Assert.NotNull(receipt.TicketCode);
+        Assert.DoesNotContain(receipt.TicketCode, row.ToString(), StringComparison.Ordinal);
     }
 
     private async Task<UserSession> RegisterAndSignInAsync(string userName)

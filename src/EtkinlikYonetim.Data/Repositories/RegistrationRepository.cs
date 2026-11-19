@@ -57,7 +57,7 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
         if (reserved == 1)
         {
             registration.Status = RegistrationStatus.Active;
-            registration.Ticket = new Ticket { Code = newTicketCode(), IssuedAt = createdAtUtc };
+            registration.Ticket = NewTicket(newTicketCode(), createdAtUtc);
         }
         else
         {
@@ -122,7 +122,8 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
                     r.Status,
                     r.Status == RegistrationStatus.Waiting
                         ? db.Registrations.Count(w => w.EventId == r.EventId && w.Status == RegistrationStatus.Waiting && w.QueueNumber <= r.QueueNumber)
-                        : null))
+                        : null,
+                    p.OwnerUserId))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -242,10 +243,16 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
             throw new InvalidOperationException("The waiting registration changed while the event was locked.");
         }
 
-        db.Tickets.Add(new Ticket { RegistrationId = nextId, Code = newTicketCode(), IssuedAt = nowUtc });
+        var ticket = NewTicket(newTicketCode(), nowUtc);
+        ticket.RegistrationId = nextId;
+        db.Tickets.Add(ticket);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }
+
+    /// <summary>A new ticket with <paramref name="code"/> and its lookup hash.</summary>
+    private static Ticket NewTicket(string code, DateTime issuedAtUtc) =>
+        new() { Code = code, CodeHash = TicketCodeHash.Of(code), IssuedAt = issuedAtUtc };
 
     /// <summary>Raises the seat counter by one while a seat is free and the event is not past; returns the rows changed.</summary>
     private static Task<int> TakeSeatAsync(EventDbContext db, int eventId, DateOnly today, CancellationToken cancellationToken) =>

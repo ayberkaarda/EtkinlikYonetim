@@ -44,21 +44,24 @@ public sealed record EventSummary(
 public sealed record ParticipantRecord(int Id, string NationalId, string? FullName, string? Email, int? OwnerUserId);
 
 /// <summary>
-/// A registration of an event that holds a seat or waits for one, with its participant, for the admin
-/// listing. <paramref name="QueuePosition"/> is the current place in the waiting list (1 is next).
+/// A registration of an event that holds a seat, waits for one or was closed with the event, with its
+/// participant, for the admin listing and the export. <paramref name="QueuePosition"/> is the current place
+/// in the waiting list (1 is next); <paramref name="CheckedInAt"/> the UTC time the ticket was used at the
+/// entrance. The ticket code is deliberately not part of it.
 /// </summary>
 public sealed record EventParticipant(
     int RegistrationId,
     string? FullName,
     string NationalId,
     string? Email,
-    string? TicketCode,
     RegistrationStatus Status = RegistrationStatus.Active,
-    int? QueuePosition = null);
+    int? QueuePosition = null,
+    DateTime? CheckedInAt = null);
 
 /// <summary>
-/// A registration that holds a seat or waits for one, with event, participant and ticket, for "my
-/// registrations". <paramref name="QueuePosition"/> is the current place in the waiting list (1 is next).
+/// A registration that holds a seat, waits for one or was closed with its event, with event, participant
+/// and ticket, for "my registrations". <paramref name="QueuePosition"/> is the current place in the waiting
+/// list (1 is next); <paramref name="OwnerUserId"/> the account that added the participant.
 /// </summary>
 public sealed record RegistrationDetails(
     int Id,
@@ -69,7 +72,8 @@ public sealed record RegistrationDetails(
     string? ParticipantName,
     string? TicketCode,
     RegistrationStatus Status = RegistrationStatus.Active,
-    int? QueuePosition = null);
+    int? QueuePosition = null,
+    int? OwnerUserId = null);
 
 /// <summary>
 /// The result of a registration: a seat with a ticket (<see cref="RegistrationStatus.Active"/>) or a
@@ -97,3 +101,9 @@ public sealed record RegistrationOwnership(
     DateOnly EventDate,
     int? OwnerUserId,
     RegistrationStatus Status);
+
+/// <summary>What the entrance needs to know about a ticket found by the hash of its code.</summary>
+public sealed record TicketForCheckIn(int TicketId, string Code, int EventId, RegistrationStatus Status, bool EventCancelled, DateTime? CheckedInAt);
+
+/// <summary>The check-ins of an event: tickets used at the entrance and seats held.</summary>
+public readonly record struct CheckInCount(int CheckedIn, int Seats);

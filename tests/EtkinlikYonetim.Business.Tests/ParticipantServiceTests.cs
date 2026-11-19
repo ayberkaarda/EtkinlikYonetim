@@ -89,18 +89,22 @@ public sealed class ParticipantServiceTests
     }
 
     [Fact]
-    public async Task GetByEvent_MasksNationalIdsAndFillsMissingValues()
+    public async Task GetByEvent_MasksNationalIdsFillsMissingValuesAndShowsTheStateWithoutTicketCodes()
     {
         _participants.Setup(p => p.GetByEventAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(
         [
-            new EventParticipant(1, "Deniz Örnek", NationalId, "deniz@example.com", "ETK-AAAAAAAAAA"),
-            new EventParticipant(2, null, "20000000001", null, null),
+            new EventParticipant(1, "Deniz Örnek", NationalId, "deniz@example.com", CheckedInAt: new DateTime(2026, 3, 2, 9, 0, 0, DateTimeKind.Utc)),
+            new EventParticipant(2, null, "20000000001", null),
+            new EventParticipant(3, "Ece Taslak", "10000000214", "ece@example.com", RegistrationStatus.Waiting, 2),
+            new EventParticipant(4, "Mert Deneme", "10000000382", "mert@example.com", RegistrationStatus.EventCancelled),
         ]);
 
         var list = await Service().GetByEventAsync(Sessions.Admin, 1, Ct);
 
-        Assert.Equal(new ParticipantView("Deniz Örnek", "100******46", "deniz@example.com", "ETK-AAAAAAAAAA"), list[0]);
-        Assert.Equal(new ParticipantView("Ad Bilinmiyor", "200******01", "E-posta Yok", "Bilet Yok"), list[1]);
+        Assert.Equal(new ParticipantView("Deniz Örnek", "100******46", "deniz@example.com", "Giriş yapıldı"), list[0]);
+        Assert.Equal(new ParticipantView("Ad Bilinmiyor", "200******01", "E-posta Yok", "Giriş yapılmadı"), list[1]);
+        Assert.Equal("Bekleme listesi, sıra: 2", list[2].State);
+        Assert.Equal("Etkinlik iptal edildi", list[3].State);
         Assert.All(list, p => Assert.DoesNotContain(p.MaskedNationalId, new[] { NationalId, "20000000001" }));
     }
 

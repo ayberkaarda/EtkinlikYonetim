@@ -87,6 +87,15 @@ public sealed class LegacyUpgradeTests
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kayitlar WHERE KatilimciId = 5 AND EtkinlikId = 4 AND Durum = 0", ct));
         Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kayitlar", ct));
         Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Biletler WHERE BiletKodu LIKE N'ETK-%'", ct));
+
+        // The short codes of the upgrade were reissued with 128 random bits, each with the hash the entrance looks up.
+        Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(DISTINCT BiletKodu) FROM dbo.Biletler WHERE LEN(BiletKodu) = 36 AND BiletKoduOzeti = HASHBYTES('SHA2_256', CONVERT(varchar(40), BiletKodu))", ct));
+        var legacyCode = await database.TextAsync("SELECT BiletKodu FROM dbo.Biletler b JOIN dbo.Kayitlar r ON r.Id = b.KayitId WHERE r.EtkinlikId = 2", ct);
+        Assert.NotNull(legacyCode);
+        Assert.Equal(TicketCodeHash.Of(legacyCode), await database.BytesAsync("SELECT BiletKoduOzeti FROM dbo.Biletler WHERE BiletKodu = @code", ct, ("@code", legacyCode)));
+        var checkIn = await provider.GetRequiredService<ICheckInService>().CheckInAsync(TestServices.Admin(3), 2, legacyCode.ToLowerInvariant(), ct);
+        Assert.Equal(CheckInOutcome.CheckedIn, checkIn.Outcome);
+        await database.ExecuteAsync("UPDATE dbo.Biletler SET GirisZamani = NULL", ct);
         Assert.Equal(1, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = 2", ct));
         Assert.Equal(1, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = 4", ct));
         Assert.Equal(0, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = 7", ct));

@@ -99,6 +99,33 @@ namespace EtkinlikYonetim.UI
                 },
                 btnKayitIptal);
 
+        /// <summary>
+        /// The ticket window of the selected registration, or <see langword="null"/> after telling why there is
+        /// none (nothing selected, a waiting place or a cancelled registration). The caller shows and disposes it.
+        /// </summary>
+        internal BiletForm? CreateTicketView()
+        {
+            if (lstKayitlar.SelectedItem is not RegistrationItem item)
+            {
+                Prompts.Warn("Lütfen biletini görmek istediğiniz kaydı seçin.");
+                return null;
+            }
+
+            if (item.Registration.Status != RegistrationStatus.Active)
+            {
+                Prompts.Warn("Bu kaydın bileti yok: katılımcı bekleme listesinde ya da kayıt iptal edilmiş.");
+                return null;
+            }
+
+            if (item.Registration.TicketCode is not { Length: > 0 })
+            {
+                Prompts.Warn("Bilet yalnızca katılımcıyı ekleyen hesapta gösterilir.");
+                return null;
+            }
+
+            return new BiletForm(item.Registration);
+        }
+
         private async Task RefreshRegistrationsAsync()
         {
             var request = _listRequests.Next();
@@ -114,6 +141,12 @@ namespace EtkinlikYonetim.UI
         private async void btnKayit_Click(object? sender, EventArgs e) => await RegisterAsync();
 
         private async void btnKayitIptal_Click(object? sender, EventArgs e) => await CancelAsync();
+
+        private void btnBiletGoster_Click(object? sender, EventArgs e)
+        {
+            using var ticket = CreateTicketView();
+            ticket?.ShowDialog(this);
+        }
 
         private void btnkapat_Click(object? sender, EventArgs e) => Close();
 

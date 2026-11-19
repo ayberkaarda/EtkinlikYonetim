@@ -55,9 +55,33 @@ public sealed class Ticket
 
     public int RegistrationId { get; set; }
 
-    /// <summary>Unique, random code printed on the ticket, for example "ETK-7KQ2M9XA4C".</summary>
+    /// <summary>
+    /// Unique, random code shown on the ticket and in its QR code: "ETK-" and 26 characters of a 32 letter
+    /// alphabet, 130 random bits. Kept so that the participant's account can show the QR code again;
+    /// never written to a log, an export or the admin lists.
+    /// </summary>
     public string Code { get; set; } = string.Empty;
+
+    /// <summary>SHA-256 of <see cref="Code"/> (<see cref="TicketCodeHash"/>); the entrance looks a ticket up by it.</summary>
+    public byte[] CodeHash { get; set; } = [];
 
     /// <summary>UTC time the ticket was issued.</summary>
     public DateTime IssuedAt { get; set; }
+
+    /// <summary>UTC time of the check-in at the entrance, or <see langword="null"/> while the ticket is unused.</summary>
+    public DateTime? CheckedInAt { get; set; }
+}
+
+/// <summary>
+/// The lookup key of a ticket code: SHA-256 of its ASCII text. The entrance finds a ticket by this hash,
+/// so the database compares hashes, whose timing tells nothing about the code, and the code itself is
+/// then compared in constant time.
+/// </summary>
+public static class TicketCodeHash
+{
+    public static byte[] Of(string code)
+    {
+        ArgumentNullException.ThrowIfNull(code);
+        return System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(code));
+    }
 }

@@ -7,8 +7,12 @@ using FluentValidation;
 
 namespace EtkinlikYonetim.Business.Services;
 
-/// <summary>A participant of an event as shown to admins; the national id is masked.</summary>
-public sealed record ParticipantView(string FullName, string MaskedNationalId, string Email, string TicketCode);
+/// <summary>
+/// A participant of an event as shown to admins: the national id is masked, the state tells the seat
+/// and its check-in, the waiting place or the cancellation. The ticket code is never part of it: it is the
+/// participant's secret, shown only to the account that owns the registration.
+/// </summary>
+public sealed record ParticipantView(string FullName, string MaskedNationalId, string Email, string State);
 
 /// <summary>Adding participants and listing the participants of an event.</summary>
 public interface IParticipantService
@@ -42,7 +46,8 @@ internal sealed class ParticipantService(
 
     internal const string UnknownName = "Ad Bilinmiyor";
     internal const string UnknownEmail = "E-posta Yok";
-    internal const string NoTicket = "Bilet Yok";
+    internal const string CheckedIn = "Giriş yapıldı";
+    internal const string NotCheckedIn = "Giriş yapılmadı";
     internal const string WaitingPrefix = "Bekleme listesi, sıra: ";
     internal const string EventCancelled = "Etkinlik iptal edildi";
 
@@ -106,7 +111,7 @@ internal sealed class ParticipantService(
                 {
                     RegistrationStatus.Waiting => string.Create(CultureInfo.InvariantCulture, $"{WaitingPrefix}{p.QueuePosition}"),
                     RegistrationStatus.EventCancelled => EventCancelled,
-                    _ => p.TicketCode ?? NoTicket,
+                    _ => p.CheckedInAt is null ? NotCheckedIn : CheckedIn,
                 }))
             .ToList();
     }

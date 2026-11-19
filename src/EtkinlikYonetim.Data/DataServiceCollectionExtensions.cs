@@ -43,6 +43,7 @@ public static class DataServiceCollectionExtensions
         services.AddSingleton<IEventRepository, EventRepository>();
         services.AddSingleton<IParticipantRepository, ParticipantRepository>();
         services.AddSingleton<IRegistrationRepository, RegistrationRepository>();
+        services.AddSingleton<ITicketRepository, TicketRepository>();
         return services;
     }
 }

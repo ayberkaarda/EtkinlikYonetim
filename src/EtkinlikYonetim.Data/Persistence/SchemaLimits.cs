@@ -18,7 +18,11 @@ internal static class SchemaLimits
     public const int PasswordLength = 256;
 
     public const int RoleLength = 20;
-    public const int TicketCodeLength = 20;
+    /// <summary>Room for "ETK-" and 26 random characters, and for the 32 hexadecimal characters of reissued codes.</summary>
+    public const int TicketCodeLength = 40;
+
+    /// <summary>Length of a SHA-256 hash of a ticket code.</summary>
+    public const int TicketCodeHashLength = 32;
 
     /// <summary>Stored values of <see cref="Domain.Entities.UserRole"/>, as the original application wrote them.</summary>
     public const string UserRoleValue = "Kullanici";

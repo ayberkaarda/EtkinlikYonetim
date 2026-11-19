@@ -34,9 +34,9 @@ internal sealed record AccountItem(AccountSummary Account)
         $"{Account.UserName} - {(Account.Role == UserRole.Admin ? "Yönetici" : "Kullanıcı")} - {(Account.Disabled ? "Devre dışı" : "Etkin")}";
 }
 
-/// <summary>A participant of an event, as the original list showed it, with the national id masked.</summary>
+/// <summary>A participant of an event with the national id masked and the state of the registration; no ticket code.</summary>
 internal sealed record ParticipantItem(ParticipantView Participant)
 {
     public override string ToString() =>
-        $"{Participant.FullName} - {Participant.MaskedNationalId} - {Participant.Email} - {Participant.TicketCode}";
+        $"{Participant.FullName} - {Participant.MaskedNationalId} - {Participant.Email} - {Participant.State}";
 }

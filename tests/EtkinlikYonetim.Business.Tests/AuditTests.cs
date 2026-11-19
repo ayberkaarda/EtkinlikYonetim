@@ -53,6 +53,9 @@ public sealed class AuditTests
         { AuditEvent.RegistrationPromoted, 18, "registration.promoted" },
         { AuditEvent.EventUpdated, 19, "event.updated" },
         { AuditEvent.EventCancelled, 20, "event.cancelled" },
+        { AuditEvent.TicketCheckedIn, 21, "ticket.checked_in" },
+        { AuditEvent.TicketAlreadyUsed, 22, "ticket.already_used" },
+        { AuditEvent.TicketRejected, 23, "ticket.rejected" },
     };
 
     [Theory]

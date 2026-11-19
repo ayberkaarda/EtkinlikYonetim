@@ -39,6 +39,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IParticipantService, ParticipantService>();
         services.AddSingleton<IRegistrationService, RegistrationService>();
         services.AddSingleton<IAccountService, AccountService>();
+        services.AddSingleton<ICheckInService, CheckInService>();
         return services;
     }
 }

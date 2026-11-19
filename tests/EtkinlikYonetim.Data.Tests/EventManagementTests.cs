@@ -74,10 +74,12 @@ public sealed class EventManagementTests : IAsyncLifetime
 
         await Events.UpdateAsync(admin, id, Today.AddDays(5), 2, null, Ct);
 
-        var mine = (await Registrations.GetMyRegistrationsAsync(admin, Ct)).Where(r => r.EventId == id).ToDictionary(r => r.Id);
-        Assert.Equal(RegistrationStatus.Active, mine[first.RegistrationId].Status);
-        Assert.NotNull(mine[first.RegistrationId].TicketCode);
-        Assert.Equal((RegistrationStatus.Waiting, 1), (mine[second.RegistrationId].Status, mine[second.RegistrationId].QueuePosition!.Value));
+        // Ece belongs to the user account, which is the one that sees her new ticket; Mert belongs to the admin.
+        var promoted = (await Registrations.GetMyRegistrationsAsync(User(SeedUserId), Ct)).Single(r => r.Id == first.RegistrationId);
+        Assert.Equal(RegistrationStatus.Active, promoted.Status);
+        Assert.NotNull(promoted.TicketCode);
+        var waiting = (await Registrations.GetMyRegistrationsAsync(admin, Ct)).Single(r => r.Id == second.RegistrationId);
+        Assert.Equal((RegistrationStatus.Waiting, 1), (waiting.Status, waiting.QueuePosition!.Value));
         Assert.Equal(2, (await Events.GetEventsAsync(admin, Ct)).Single(e => e.Id == id).RegisteredCount);
     }
 

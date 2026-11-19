@@ -144,7 +144,7 @@ public sealed class SqlServerConcurrencyTests
         Assert.Contains("IX_Kayitlar_KatilimciId_EtkinlikId", duplicate.Message, StringComparison.Ordinal);
         var overbooked = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync("UPDATE dbo.Etkinlikler SET KayitSayisi = 3 WHERE Id = 3", ct));
         Assert.Contains("CK_Etkinlikler_KayitSayisi", overbooked.Message, StringComparison.Ordinal);
-        var ticket = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync("INSERT dbo.Biletler (KayitId, BiletKodu, OlusturmaZamani) VALUES (999, N'ETK-X', SYSUTCDATETIME())", ct));
+        var ticket = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync("INSERT dbo.Biletler (KayitId, BiletKodu, BiletKoduOzeti, OlusturmaZamani) VALUES (999, N'ETK-X', HASHBYTES('SHA2_256', 'ETK-X'), SYSUTCDATETIME())", ct));
         Assert.Contains("FK_Biletler_Kayitlar", ticket.Message, StringComparison.Ordinal);
     }
 
