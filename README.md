@@ -53,7 +53,8 @@ startup.
 - ✅ **No duplicate registration**: a participant has at most one active registration per event (unique index);
   a cancelled registration stays as history.
 - ✅ **No past events**: events cannot be created, registered for or cancelled once their day has passed.
-- ✅ **KVKK**: national ids are shown masked (`123******01`) in admin lists and never written to log files.
+- ✅ **KVKK**: national ids are shown masked (`123******01`) in admin lists and never written to log files; names and
+  e-mail addresses are shown in full in the admin participant list.
 
 ### Security
 
@@ -271,7 +272,8 @@ plain text passwords are kept; the passwords are marked as legacy plain text and
 successful sign-in. A participant's single event, stored by name in the original application, becomes an active
 registration with a ticket, and the events' seat counters are filled in. The upgrade runs in one transaction under
 an application lock (`sp_getapplock`) and is safe to repeat. When existing rows break the new rules, it stops
-before changing anything and reports what has to be corrected.
+before changing anything; the application shows a general error message and the log file records the failure only
+as exception types and numeric error codes, without the rows or their contents.
 
 Take a backup of the database before the first start with the new version and keep it protected: it still
 contains the plain text passwords.
@@ -308,7 +310,8 @@ Names, e-mail addresses, national ids, passwords, setup keys and exception messa
 See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the threat model.
 
 - National ids, names and e-mail addresses are personal data (KVKK). They are stored only in the configured SQL
-  Server database, shown masked in admin lists and never written to log files.
+  Server database and never written to log files. National ids are shown masked in admin lists; names and e-mail
+  addresses are shown in full in the admin participant list.
 - Passwords are hashed with PBKDF2; the stored format is kept in its own column, so a value is never read in
   another format.
 - Lockout counters are updated atomically, and a successful sign-in is written only while the account is still

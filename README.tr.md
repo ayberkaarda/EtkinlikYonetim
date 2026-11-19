@@ -54,7 +54,7 @@ otomatik olarak oluşturulup güncellenir.
   edilen kayıt geçmiş olarak kalır.
 - ✅ **Geçmiş etkinlik yok**: günü geçmiş bir etkinlik oluşturulamaz, ona kayıt yapılamaz ve kaydı iptal edilemez.
 - ✅ **KVKK**: kimlik numaraları yönetim listelerinde maskelenmiş gösterilir (`123******01`) ve log dosyalarına asla
-  yazılmaz.
+  yazılmaz; ad ve e-posta adresleri yöneticinin katılımcı listesinde açık gösterilir.
 
 ### Güvenlik
 
@@ -271,8 +271,9 @@ Demo modunu gerçek bir kurulumda açmayın.
 düz metin şifreler korunur; şifreler eski düz metin olarak işaretlenir ve her hesabın bir sonraki başarılı girişinde
 özetlenir. Özgün uygulamada adıyla saklanan katılımcının tek etkinliği biletli etkin bir kayda dönüşür ve
 etkinliklerin yer sayaçları doldurulur. Yükseltme tek bir işlemde, bir uygulama kilidi (`sp_getapplock`) altında
-çalışır ve tekrarlanması güvenlidir. Mevcut satırlar yeni kurallara uymuyorsa hiçbir şeyi değiştirmeden durur ve
-düzeltilmesi gerekenleri bildirir.
+çalışır ve tekrarlanması güvenlidir. Mevcut satırlar yeni kurallara uymuyorsa hiçbir şeyi değiştirmeden durur;
+uygulama genel bir hata mesajı gösterir, log dosyasına ise hata yalnızca istisna türleri ve sayısal hata kodlarıyla,
+satırlar ve içerikleri olmadan yazılır.
 
 Yeni sürümle ilk açılıştan önce veritabanının yedeğini alın ve yedeği koruyun: hâlâ düz metin şifreleri içerir.
 
@@ -307,7 +308,8 @@ Adlar, e-posta adresleri, kimlik numaraları, şifreler, kurulum anahtarları ve
 Tehdit modeli için [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) dosyasına bakın.
 
 - Kimlik numaraları, adlar ve e-posta adresleri kişisel veridir (KVKK). Yalnızca yapılandırılan SQL Server
-  veritabanında saklanır, yönetim listelerinde maskelenmiş gösterilir ve log dosyalarına asla yazılmaz.
+  veritabanında saklanır ve log dosyalarına asla yazılmaz. Kimlik numaraları yönetim listelerinde maskelenmiş
+  gösterilir; ad ve e-posta adresleri yöneticinin katılımcı listesinde açık gösterilir.
 - Şifreler PBKDF2 ile özetlenir; saklama biçimi ayrı bir sütunda tutulur, bu yüzden bir değer asla başka bir
   biçimde okunmaz.
 - Kilitleme sayaçları atomik olarak güncellenir ve başarılı giriş yalnızca hesap hâlâ kilitli değilken yazılır;
