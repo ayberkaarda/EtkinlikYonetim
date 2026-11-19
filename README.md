@@ -3,8 +3,9 @@
 🇬🇧 **English** · 🇹🇷 [Türkçe](README.tr.md)
 
 A Windows Forms application built with .NET 10 and SQL Server for running events: accounts sign up and sign in,
-add the participants they bring, register them for events and get a ticket for each registration; admins create
-events, see every registration and list the participants of an event. The code is split into Domain, Business,
+add the participants they bring, register them for events (or join the waiting list of a full event) and get a
+ticket with a QR code for each seat; admins create, change and cancel events, check tickets in at the entrance,
+list and export the participants of an event and manage the accounts. The code is split into Domain, Business,
 Data and UI layers; database access uses EF Core, and the database is created and migrated automatically on
 startup.
 
@@ -32,25 +33,43 @@ startup.
   and a national id can be added only once per account.
 - ✅ **Register for an event** ("Kayıt Ekle", Add Registration): choose an event that has not passed ("Etkinlik
   Seçimi", Event Selection) and enter the participant's national id ("Katılımcı TC Kimlik Numarası"). A ticket code
-  such as `ETK-7KQ2M9XA4C` is issued with every registration. A participant can be registered for several events.
-- ✅ **My registrations and tickets** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): the active
-  registrations of the account's own participants, which can be cancelled ("Kaydı İptal Et", Cancel Registration)
-  up to and including the event day; the seat becomes free again and the participant can register again.
+  of 130 random bits (`ETK-` and 26 characters) is issued with every seat. A participant can be registered for
+  several events.
+- ✅ **Waiting list**: when an event is full the participant joins its waiting list with a queue number instead
+  of being refused. When a seat is cancelled, the first one waiting moves up to it at once and gets a ticket.
+- ✅ **My registrations and tickets** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): the seats and
+  waiting places of the account's own participants, and registrations closed because their event was cancelled
+  ("Etkinlik iptal edildi", Event cancelled). Seats and waiting places can be cancelled ("Kaydı İptal Et", Cancel
+  Registration) up to and including the event day.
+- ✅ **Show the ticket** ("Bileti Göster", Show Ticket): the QR code and the code of a seat, as often as needed.
 
 ### Admin panel
 
 - ✅ **Create an event** ("Etkinlik Ekle", Add Event): name ("Etkinlik Adı", at most 80 characters), date (today or
   later) and capacity ("Kişi Kapasitesi", 1-1000 seats).
+- ✅ **Event management** ("Etkinlik Yönetimi", Event Management): change the date, capacity and description of an
+  event that has not passed; the capacity cannot go below the seats held, and added seats go to the waiting list.
+  Cancelling an event ("Etkinliği İptal Et", Cancel Event) keeps it listed as cancelled and closes its
+  registrations and waiting places (soft delete).
 - ✅ **Add participants** ("Katılımcı Ekleme") and **issue tickets** ("Bilet Oluştur", Create Ticket) for the
-  participants of every account; an admin sees and cancels every active registration.
+  participants of every account; an admin sees and cancels every registration, but sees the ticket codes only of
+  the participants it added.
+- ✅ **Entrance check-in** ("Bilet Kontrol", Ticket Check): choose the event and type or scan ticket codes. A valid
+  unused ticket is checked in ("GİRİŞ YAPILDI"), a second scan says "ZATEN KULLANILDI" (already used) on the same
+  screen, and unknown or cancelled tickets and those of other events get one refusal ("GEÇERSİZ BİLET"); a counter
+  shows the check-ins against the seats.
 - ✅ **Participant list** ("Katılımcı Görüntüle", View Participants): the participants of a chosen event ("Etkinlik
-  Seçin", Select Event) with name, masked national id, e-mail and ticket code.
+  Seçin", Select Event) with name, masked national id, e-mail and state (checked in, waiting, cancelled), saved as
+  CSV ("CSV Olarak Kaydet") or as a printable HTML page ("Yazdırılabilir Liste"). Exports contain no ticket codes.
+- ✅ **Accounts** ("Kullanıcılar", Users): enable or disable accounts and make them admins or users. An admin
+  cannot change their own account, and the last enabled admin is kept.
 
 ### Rules and protection
 
 - ✅ **Capacity**: an event never takes more registrations than its capacity; the seat count is checked and
-  increased in the same database transaction, so concurrent registrations cannot overbook it.
-- ✅ **No duplicate registration**: a participant has at most one active registration per event (unique index);
+  increased in the same database transaction, under an application lock per event, so concurrent registrations,
+  cancellations and capacity changes cannot overbook it or let anyone pass the waiting list.
+- ✅ **No duplicate registration**: a participant has at most one seat or waiting place per event (unique index);
   a cancelled registration stays as history.
 - ✅ **No past events**: events cannot be created, registered for or cancelled once their day has passed.
 - ✅ **KVKK**: national ids are shown masked (`123******01`) in admin lists and never written to log files; names and
@@ -62,11 +81,14 @@ startup.
   the original application are replaced with a hash on the next successful sign-in.
 - ✅ 5 failed sign-ins lock the account for 15 minutes; unknown accounts, wrong passwords and locked accounts get
   the same answer.
-- ✅ Every call is checked against the signed-in session: users reach only their own participants and
+- ✅ Every call is checked against the signed-in session and the session against the database: a demoted,
+  disabled or deleted account cannot use a window that is still open. Users reach only their own participants and
   registrations, and a missing record and somebody else's record get the same answer.
+- ✅ Ticket codes are compared in constant time after a lookup by their SHA-256; they are never logged or exported.
 - ✅ Central FluentValidation validators with Turkish messages; write buttons ignore repeated clicks while an
   operation is pending.
-- ✅ Daily log files without personal data, with anonymous audit codes.
+- ✅ Daily log files without personal data, with anonymous audit codes; outcomes that would tell whether an account,
+  a registration or a ticket exists share one neutral code.
 
 ---
 
@@ -99,11 +121,16 @@ These images show the screens of the original application; they will be replaced
 | Sign in | ✅ | ✅ |
 | List events | ✅ | ✅ |
 | Create an event | ❌ | ✅ |
+| Change or cancel an event (not past) | ❌ | ✅ |
 | Add a participant | ✅ owned by their account | ✅ owned by their account |
-| Register a participant for an event | ✅ their own participants only | ✅ any participant |
-| List registrations and tickets | ✅ of their own participants | ✅ all |
-| Cancel a registration | ✅ their own, up to the event day | ✅ any, up to the event day |
+| Register a participant for an event (or its waiting list) | ✅ their own participants only | ✅ any participant |
+| List registrations and waiting places | ✅ of their own participants | ✅ all |
+| See a ticket code and its QR code | ✅ of their own participants | ✅ of the participants they added |
+| Cancel a registration or waiting place | ✅ their own, up to the event day | ✅ any, up to the event day |
 | List the participants of an event (masked national id) | ❌ | ✅ |
+| Export the participant list (CSV, HTML; no ticket codes) | ❌ | ✅ |
+| Check tickets in at the entrance | ❌ | ✅ |
+| Enable, disable or change the role of another account | ❌ (not even their own) | ✅ (not their own; the last enabled admin stays) |
 | Create the first admin | ❌ (empty database, or with the owner's setup key only) | - |
 
 ---
@@ -118,6 +145,7 @@ These images show the screens of the original application; they will be replaced
 | Database | Microsoft SQL Server (Express is enough) |
 | Password hashing | PBKDF2-HMAC-SHA256 (`Rfc2898DeriveBytes.Pbkdf2`) |
 | Validation | FluentValidation |
+| QR codes | QRCoder 1.6.0 (MIT) |
 | Configuration / DI | Microsoft.Extensions.Configuration (JSON, user secrets, environment), Microsoft.Extensions.DependencyInjection |
 | Logging | Serilog (file sink, daily rolling) |
 | Testing | xUnit v3, Moq, EF Core SQLite (in-memory), real SQL Server tests |
@@ -131,9 +159,9 @@ These images show the screens of the original application; they will be replaced
 EtkinlikYonetim/
 ├── src/
 │   ├── EtkinlikYonetim.Domain/     # Entities (User, Event, Participant, Registration, SetupKey) and repository contracts
-│   ├── EtkinlikYonetim.Business/   # Auth, setup, event, participant and registration services, Security/ (PBKDF2, lockout, setup keys), Validation/ (FluentValidation), Auditing/
+│   ├── EtkinlikYonetim.Business/   # Auth, setup, account, event, participant, registration and check-in services, Exports/ (CSV, HTML), Security/ (PBKDF2, lockout, setup keys), Validation/ (FluentValidation), Auditing/
 │   ├── EtkinlikYonetim.Data/       # EF Core DbContext, configurations, Migrations/, legacy upgrade, demo data, repositories
-│   └── EtkinlikYonetim.UI/         # WinForms screens, Infrastructure/ (errors, logging, dialogs, write guard), Program.cs (composition root)
+│   └── EtkinlikYonetim.UI/         # WinForms screens, Infrastructure/ (errors, logging, dialogs, write guard, session end, QR codes, export files), Program.cs (composition root)
 ├── tests/
 │   ├── EtkinlikYonetim.Business.Tests/  # Validators, national id, hashing, lockout, capacity, dates and ownership (Moq)
 │   ├── EtkinlikYonetim.Data.Tests/      # Services on SQLite; races, setup keys and the legacy upgrade on SQL Server
@@ -297,11 +325,15 @@ new migrations with the database owner's connection; the application's restricte
 
 Logs are written to `%LOCALAPPDATA%\EtkinlikYonetim\logs`, one file per day. Files older than 30 days are deleted,
 and at most 30 files are kept. The folder is outside the repository. Error entries contain only exception types,
-HResult codes and the method names of the stack trace (no file paths); refused operations log only the exception
-type. Audit entries are a fixed code and a role only, never an account; every failed sign-in (unknown account,
-wrong password or locked account) writes the same code, `auth.sign_in.failed`.
+HResult codes and the method names of the stack trace (no file paths); refused operations write nothing of their
+own. Audit entries are a fixed code and a role only, never an account; every failed sign-in (unknown account,
+wrong password, locked or disabled account) writes the same code, `auth.sign_in.failed`. The outcomes that would
+tell whether an account, a registration or a ticket exists share one code: `auth.account.registration_submitted`
+for a sign-up, `registration.submitted` for a registration, `registration.cancel_submitted` for a cancellation and
+`ticket.check_in_submitted` for a scan at the entrance.
 
-Names, e-mail addresses, national ids, passwords, setup keys and exception messages are never written to the log.
+Names, e-mail addresses, national ids, passwords, setup keys, ticket codes and exception messages are never written
+to the log.
 
 ---
 
@@ -317,6 +349,11 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the threat model.
 - Lockout counters are updated atomically, and a successful sign-in is written only while the account is still
   unlocked, so concurrent attempts cannot clear a fresh lock.
 - Ownership is checked in the services and repeated in the database statements.
+- Every operation of an open session reads the account's role and enabled state from the database first; account
+  changes check the acting admin again inside their own transaction.
+- Ticket codes have 130 random bits. They are stored as they are, so the participant's account can show the QR
+  code again, together with their SHA-256: the entrance finds a ticket by the hash and compares the code in
+  constant time. Admin lists and exports never show them.
 - Connection strings are kept out of the repository (`appsettings.json` is ignored; user secrets and environment
   variables are supported). All queries go through EF Core with parameters.
 - Users only see Turkish messages; raw exception text is never shown.
@@ -335,9 +372,9 @@ dotnet test -c Release
 
 | Project | Type | Scope |
 |---|---|---|
-| `tests/EtkinlikYonetim.Business.Tests` | Unit | Validator limits (user name 32, password 8/64 and 100 at sign-in, name 64, event name 80, capacity 1/1000, past dates), national id checksum, PBKDF2 and format upgrade, lockout, setup key checks, ownership and audit events with strict Moq mocks |
-| `tests/EtkinlikYonetim.Data.Tests` | Integration | Services and repositories on SQLite in-memory (capacity limits, cancellation and registering again, IDOR answers, lockout timing); capacity, duplicate, lockout and first-admin races, setup keys with the restricted login, the legacy upgrade and its lock on SQL Server |
-| `tests/EtkinlikYonetim.UI.Tests` | Unit | Example configuration, error messages, log content and retention, focus after unlock, write guards, latest-wins loading, neutral branding |
+| `tests/EtkinlikYonetim.Business.Tests` | Unit | Validator limits (user name 32, password 8/64 and 100 at sign-in, name 64, event name 80, capacity 0/1/1000/1001, description 500, past dates), national id checksum, PBKDF2 and format upgrade, lockout, setup key checks, database checked sessions, account rules, ticket codes and check-in outcomes, CSV and HTML exports, ownership and audit events with strict Moq mocks |
+| `tests/EtkinlikYonetim.Data.Tests` | Integration | Services and repositories on SQLite in-memory (capacity limits, waiting list order, cancellation and registering again, event changes and cancellation, check-in, exports, demoted and disabled sessions, IDOR answers, lockout timing); capacity, waiting list, duplicate, check-in, account, lockout and first-admin races, setup keys with the restricted login, the migrations, the legacy upgrade and its lock on SQL Server |
+| `tests/EtkinlikYonetim.UI.Tests` | Unit | Example configuration, error messages, log content, neutral codes and retention, focus after unlock, write guards, latest-wins loading, event management, entrance and account windows, ticket QR view, export files, session end, neutral branding |
 
 The SQL Server tests use throw-away databases on the server in `ETKINLIK_TEST_SQLSERVER` (default: local SQL
 Express with Windows authentication). They are skipped when `ETKINLIK_SKIP_SQL_TESTS=1` is set or no server is
