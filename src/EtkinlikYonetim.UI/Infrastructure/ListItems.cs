@@ -12,17 +12,31 @@ internal static class DisplayFormat
     public static string Date(DateOnly value) => value.ToString("dd.MM.yyyy", Turkish);
 }
 
-/// <summary>A registration in "my registrations": event, date, participant and ticket code.</summary>
+/// <summary>A registration in "my registrations": event, date, participant and ticket code or waiting place.</summary>
 internal sealed record RegistrationItem(RegistrationDetails Registration)
 {
     public override string ToString() =>
         $"{Registration.EventName} - {DisplayFormat.Date(Registration.EventDate)} - "
-        + $"{Registration.ParticipantName ?? "Ad Bilinmiyor"} - Bilet: {Registration.TicketCode ?? "-"}";
+        + $"{Registration.ParticipantName ?? "Ad Bilinmiyor"} - {State(Registration)}";
+
+    private static string State(RegistrationDetails registration) => registration.Status switch
+    {
+        RegistrationStatus.Waiting => $"Bekleme listesi, sıra: {registration.QueuePosition}",
+        RegistrationStatus.EventCancelled => "Etkinlik iptal edildi",
+        _ => $"Bilet: {registration.TicketCode ?? "-"}",
+    };
 }
 
-/// <summary>A participant of an event, as the original list showed it, with the national id masked.</summary>
+/// <summary>An account in the account management: name, role and state.</summary>
+internal sealed record AccountItem(AccountSummary Account)
+{
+    public override string ToString() =>
+        $"{Account.UserName} - {(Account.Role == UserRole.Admin ? "Yönetici" : "Kullanıcı")} - {(Account.Disabled ? "Devre dışı" : "Etkin")}";
+}
+
+/// <summary>A participant of an event with the national id masked and the state of the registration; no ticket code.</summary>
 internal sealed record ParticipantItem(ParticipantView Participant)
 {
     public override string ToString() =>
-        $"{Participant.FullName} - {Participant.MaskedNationalId} - {Participant.Email} - {Participant.TicketCode}";
+        $"{Participant.FullName} - {Participant.MaskedNationalId} - {Participant.Email} - {Participant.State}";
 }

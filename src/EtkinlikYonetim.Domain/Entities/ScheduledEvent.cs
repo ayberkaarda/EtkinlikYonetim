@@ -19,4 +19,17 @@ public sealed class ScheduledEvent
     /// it between zero and the capacity.
     /// </summary>
     public int RegisteredCount { get; set; }
+
+    /// <summary>Optional text an admin writes about the event; shown in the event management.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Set when an admin cancels the event. The row stays (soft delete): its registrations are closed
+    /// with <see cref="RegistrationStatus.EventCancelled"/>, it takes no new registration and cannot be
+    /// changed any more.
+    /// </summary>
+    public bool Cancelled { get; set; }
+
+    /// <summary>UTC time of the cancellation, or <see langword="null"/>.</summary>
+    public DateTime? CancelledAt { get; set; }
 }

@@ -78,14 +78,25 @@ namespace EtkinlikYonetim.UI
 
         /// <summary>
         /// Opens the panel of the signed-in role: admins get the management panel, users the participant
-        /// form. Closing the panel ends the application, as in the original application.
+        /// form. Closing the panel ends the application, as in the original application; a panel closed
+        /// because the database no longer accepts the session shows the sign-in again.
         /// </summary>
         private void OpenPanel(UserSession session)
         {
             Hide();
+            bool signedOut;
             using (Form panel = session.IsAdmin ? _forms.Create<Form1>(session) : _forms.Create<KatilimciEkleForm>(session))
             {
                 panel.ShowDialog();
+                signedOut = panel is ISessionPanel { SignedOut: true };
+            }
+
+            if (signedOut)
+            {
+                txtKullaniciAdi.Clear();
+                Show();
+                txtKullaniciAdi.Focus();
+                return;
             }
 
             Close();

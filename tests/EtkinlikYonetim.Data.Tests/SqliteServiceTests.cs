@@ -155,7 +155,7 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     {
         var receipt = await Registrations.RegisterAsync(User(SeedUserId), ConcertId, DenizNationalId, Ct);
 
-        Assert.Matches("^ETK-[A-HJ-NP-Z2-9]{10}$", receipt.TicketCode);
+        Assert.Matches("^ETK-[A-HJ-NP-Z2-9]{26}$", receipt.TicketCode);
         Assert.Equal("Bahar Konseri", receipt.EventName);
         var mine = await Registrations.GetMyRegistrationsAsync(User(SeedUserId), Ct);
         Assert.Equal(receipt.TicketCode, Assert.Single(mine).TicketCode);
@@ -174,7 +174,7 @@ public sealed class SqliteServiceTests : IAsyncLifetime
 
         var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(User(SeedUserId), ConcertId, DenizNationalId, Ct));
 
-        Assert.Equal("Bu katılımcı bu etkinliğe zaten kayıtlı.", error.Message);
+        Assert.Equal("Bu katılımcı bu etkinliğe zaten kayıtlı veya bekleme listesinde.", error.Message);
         Assert.Equal(1, (await Events.GetEventsAsync(User(SeedUserId), Ct)).Single(e => e.Id == ConcertId).RegisteredCount);
     }
 
@@ -183,9 +183,9 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     {
         var repository = _db.Get<IRegistrationRepository>();
         var today = DateOnly.FromDateTime(Start.DateTime);
-        await repository.AddAsync(1, ConcertId, today, Start.UtcDateTime, "ETK-AAAAAAAAAA", Ct);
+        await repository.AddAsync(1, ConcertId, today, Start.UtcDateTime, () => "ETK-AAAAAAAAAA", Ct);
 
-        await Assert.ThrowsAsync<AlreadyRegisteredException>(() => repository.AddAsync(1, ConcertId, today, Start.UtcDateTime, "ETK-BBBBBBBBBB", Ct));
+        await Assert.ThrowsAsync<AlreadyRegisteredException>(() => repository.AddAsync(1, ConcertId, today, Start.UtcDateTime, () => "ETK-BBBBBBBBBB", Ct));
 
         await using var context = _db.CreateContext();
         Assert.Equal(1, (await context.Events.SingleAsync(e => e.Id == ConcertId, Ct)).RegisteredCount);
@@ -204,6 +204,29 @@ public sealed class SqliteServiceTests : IAsyncLifetime
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(Ct));
     }
 
+    /// <summary>Nobody waits twice: a waiting place counts like a seat in the unique index, and queue numbers are unique per event.</summary>
+    [Fact]
+    public async Task Database_FilteredUniqueIndexes_RejectASecondWaitingPlaceAndARepeatedQueueNumber()
+    {
+        await using (var context = _db.CreateContext())
+        {
+            context.Registrations.Add(new Registration { ParticipantId = 1, EventId = ConcertId, CreatedAt = Start.UtcDateTime, Status = RegistrationStatus.Waiting, QueueNumber = 1 });
+            await context.SaveChangesAsync(Ct);
+        }
+
+        await using (var context = _db.CreateContext())
+        {
+            context.Registrations.Add(new Registration { ParticipantId = 1, EventId = ConcertId, CreatedAt = Start.UtcDateTime, Status = RegistrationStatus.Waiting, QueueNumber = 2 });
+            await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(Ct));
+        }
+
+        await using (var context = _db.CreateContext())
+        {
+            context.Registrations.Add(new Registration { ParticipantId = 2, EventId = ConcertId, CreatedAt = Start.UtcDateTime, Status = RegistrationStatus.Waiting, QueueNumber = 1 });
+            await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(Ct));
+        }
+    }
+
     [Fact]
     public async Task Database_CheckConstraint_RejectsMoreRegistrationsThanSeats()
     {
@@ -216,32 +239,93 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Register_FullEvent_IsRejected()
+    public async Task Register_FullEvent_JoinsTheWaitingListWithoutATicket()
     {
         var admin = Admin(SeedAdminId);
         await Registrations.RegisterAsync(admin, SmallEventId, DenizNationalId, Ct);
         await Registrations.RegisterAsync(admin, SmallEventId, EceNationalId, Ct);
 
-        var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(admin, SmallEventId, MertNationalId, Ct));
+        var waiting = await Registrations.RegisterAsync(admin, SmallEventId, MertNationalId, Ct);
 
-        Assert.Equal("Etkinliğin kontenjanı dolu.", error.Message);
-        Assert.Equal(2, (await Events.GetEventsAsync(admin, Ct)).Single(e => e.Id == SmallEventId).RegisteredCount);
+        Assert.True(waiting.Waitlisted);
+        Assert.Equal((null, 1), (waiting.TicketCode, waiting.QueuePosition));
+        var summary = (await Events.GetEventsAsync(admin, Ct)).Single(e => e.Id == SmallEventId);
+        Assert.Equal((2, 1), (summary.RegisteredCount, summary.WaitingCount));
+        var mine = await Registrations.GetMyRegistrationsAsync(admin, Ct);
+        Assert.Equal((RegistrationStatus.Waiting, 1, null), mine.Where(r => r.Id == waiting.RegistrationId).Select(r => (r.Status, r.QueuePosition, r.TicketCode)).Single());
+    }
+
+    /// <summary>The same participant cannot wait twice, nor wait while holding a seat.</summary>
+    [Fact]
+    public async Task Register_WaitingParticipantAgain_IsRejected()
+    {
+        var admin = Admin(SeedAdminId);
+        await Registrations.RegisterAsync(admin, SmallEventId, DenizNationalId, Ct);
+        await Registrations.RegisterAsync(admin, SmallEventId, EceNationalId, Ct);
+        await Registrations.RegisterAsync(admin, SmallEventId, MertNationalId, Ct);
+
+        var waitingAgain = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(admin, SmallEventId, MertNationalId, Ct));
+        var seatedAgain = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(admin, SmallEventId, DenizNationalId, Ct));
+
+        Assert.Equal(RegistrationService.AlreadyRegistered, waitingAgain.Message);
+        Assert.Equal(RegistrationService.AlreadyRegistered, seatedAgain.Message);
+        await using var context = _db.CreateContext();
+        Assert.Equal(3, await context.Registrations.CountAsync(r => r.EventId == SmallEventId, Ct));
+    }
+
+    /// <summary>
+    /// Queue numbers follow the order of arrival; a cancelled seat goes to number 1, a waiting place that
+    /// is given up moves the others up, and the counter always equals the seats held.
+    /// </summary>
+    [Fact]
+    public async Task WaitingList_MovesUpInOrderOnCancellations()
+    {
+        var admin = Admin(SeedAdminId);
+        var participants = _db.Get<IParticipantService>();
+        string[] extra = ["10000000528", "10000000696"];
+        foreach (var nationalId in extra)
+        {
+            await participants.AddAsync(admin, nationalId, "Sıra Kişisi", "sira@example.com", Ct);
+        }
+
+        var deniz = await Registrations.RegisterAsync(admin, SmallEventId, DenizNationalId, Ct);
+        await Registrations.RegisterAsync(admin, SmallEventId, EceNationalId, Ct);
+        var mert = await Registrations.RegisterAsync(admin, SmallEventId, MertNationalId, Ct);
+        var fourth = await Registrations.RegisterAsync(admin, SmallEventId, extra[0], Ct);
+        var fifth = await Registrations.RegisterAsync(admin, SmallEventId, extra[1], Ct);
+        Assert.Equal([1, 2, 3], new[] { mert, fourth, fifth }.Select(r => r.QueuePosition!.Value));
+
+        await Registrations.CancelAsync(admin, fourth.RegistrationId, Ct); // leaves the waiting list
+        await Registrations.CancelAsync(admin, deniz.RegistrationId, Ct); // frees a seat for number 1
+
+        var mine = (await Registrations.GetMyRegistrationsAsync(admin, Ct)).Where(r => r.EventId == SmallEventId).ToDictionary(r => r.Id);
+        Assert.Equal(RegistrationStatus.Active, mine[mert.RegistrationId].Status);
+        Assert.NotNull(mine[mert.RegistrationId].TicketCode);
+        Assert.Equal((RegistrationStatus.Waiting, 1), (mine[fifth.RegistrationId].Status, mine[fifth.RegistrationId].QueuePosition!.Value));
+        Assert.False(mine.ContainsKey(deniz.RegistrationId));
+        Assert.False(mine.ContainsKey(fourth.RegistrationId));
+        await using var context = _db.CreateContext();
+        Assert.Equal(2, (await context.Events.SingleAsync(e => e.Id == SmallEventId, Ct)).RegisteredCount);
+        Assert.Equal(3, await context.Tickets.CountAsync(t => context.Registrations.Any(r => r.Id == t.RegistrationId && r.EventId == SmallEventId), Ct));
     }
 
     [Fact]
-    public async Task Repository_FullOrPastEvent_IsRefusedInsideTheTransaction()
+    public async Task Repository_FullOrPastEvent_IsDecidedInsideTheTransaction()
     {
         var repository = _db.Get<IRegistrationRepository>();
         var today = DateOnly.FromDateTime(Start.DateTime);
-        await repository.AddAsync(1, SmallEventId, today, Start.UtcDateTime, "ETK-AAAAAAAAAA", Ct);
-        await repository.AddAsync(2, SmallEventId, today, Start.UtcDateTime, "ETK-BBBBBBBBBB", Ct);
+        var codes = new Queue<string>(["ETK-AAAAAAAAAA", "ETK-BBBBBBBBBB", "ETK-CCCCCCCCCC"]);
+        await repository.AddAsync(1, SmallEventId, today, Start.UtcDateTime, codes.Dequeue, Ct);
+        await repository.AddAsync(2, SmallEventId, today, Start.UtcDateTime, codes.Dequeue, Ct);
 
-        await Assert.ThrowsAsync<EventFullException>(() => repository.AddAsync(3, SmallEventId, today, Start.UtcDateTime, "ETK-CCCCCCCCCC", Ct));
-        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(3, ConcertId, new DateOnly(2027, 4, 18), Start.UtcDateTime, "ETK-DDDDDDDDDD", Ct));
-        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(3, 999, today, Start.UtcDateTime, "ETK-EEEEEEEEEE", Ct));
+        var waiting = await repository.AddAsync(3, SmallEventId, today, Start.UtcDateTime, codes.Dequeue, Ct);
+        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(3, ConcertId, new DateOnly(2027, 4, 18), Start.UtcDateTime, codes.Dequeue, Ct));
+        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(3, 999, today, Start.UtcDateTime, codes.Dequeue, Ct));
 
+        Assert.Equal((RegistrationStatus.Waiting, 1), (waiting.Status, waiting.QueuePosition!.Value));
+        Assert.Single(codes); // only the two seats drew a ticket code
         await using var context = _db.CreateContext();
-        Assert.Equal(2, await context.Registrations.CountAsync(Ct));
+        Assert.Equal(3, await context.Registrations.CountAsync(Ct));
         Assert.Equal(2, await context.Tickets.CountAsync(Ct));
     }
 
@@ -397,8 +481,8 @@ public sealed class SqliteServiceTests : IAsyncLifetime
 
         var again = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.CancelAsync(user, receipt.RegistrationId, Ct));
         Assert.Equal("Bu kayıt zaten iptal edilmiş.", again.Message);
-        await Registrations.RegisterAsync(Admin(SeedAdminId), SmallEventId, MertNationalId, Ct);
-        await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(user, SmallEventId, DenizNationalId, Ct));
+        Assert.False((await Registrations.RegisterAsync(Admin(SeedAdminId), SmallEventId, MertNationalId, Ct)).Waitlisted);
+        Assert.Equal(1, (await Registrations.RegisterAsync(user, SmallEventId, DenizNationalId, Ct)).QueuePosition); // full again
     }
 
     /// <summary>
@@ -458,12 +542,14 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     {
         var repository = _db.Get<IRegistrationRepository>();
         var today = DateOnly.FromDateTime(Start.DateTime);
-        var id = await repository.AddAsync(1, ConcertId, today, Start.UtcDateTime, "ETK-AAAAAAAAAA", Ct);
+        var id = (await repository.AddAsync(1, ConcertId, today, Start.UtcDateTime, () => "ETK-AAAAAAAAAA", Ct)).RegistrationId;
+        static string NoCode() => throw new InvalidOperationException("Nobody waits, so no ticket is issued.");
 
-        Assert.False(await repository.CancelAsync(id, SeedAdminId, today, Start.UtcDateTime, Ct)); // participant 1 belongs to user 2
-        Assert.False(await repository.CancelAsync(id, SeedUserId, new DateOnly(2027, 4, 18), Start.UtcDateTime, Ct));
-        Assert.True(await repository.CancelAsync(id, SeedUserId, today, Start.UtcDateTime, Ct));
-        Assert.False(await repository.CancelAsync(id, null, today, Start.UtcDateTime, Ct));
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(id, SeedAdminId, today, Start.UtcDateTime, NoCode, Ct)); // participant 1 belongs to user 2
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(id, SeedUserId, new DateOnly(2027, 4, 18), Start.UtcDateTime, NoCode, Ct));
+        Assert.Equal(CancellationOutcome.Cancelled, await repository.CancelAsync(id, SeedUserId, today, Start.UtcDateTime, NoCode, Ct));
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(id, null, today, Start.UtcDateTime, NoCode, Ct));
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(404, null, today, Start.UtcDateTime, NoCode, Ct));
 
         await using var context = _db.CreateContext();
         Assert.Equal(0, (await context.Events.SingleAsync(e => e.Id == ConcertId, Ct)).RegisteredCount);
@@ -480,7 +566,9 @@ public sealed class SqliteServiceTests : IAsyncLifetime
         var row = Assert.Single(list);
         Assert.Equal("Deniz Örnek", row.FullName);
         Assert.Equal("100******46", row.MaskedNationalId);
-        Assert.Equal(receipt.TicketCode, row.TicketCode);
+        Assert.Equal("Giriş yapılmadı", row.State);
+        Assert.NotNull(receipt.TicketCode);
+        Assert.DoesNotContain(receipt.TicketCode, row.ToString(), StringComparison.Ordinal);
     }
 
     private async Task<UserSession> RegisterAndSignInAsync(string userName)

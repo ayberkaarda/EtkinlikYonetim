@@ -64,6 +64,13 @@ internal static class TestServices
         return SetupKeyPolicy.Format(key);
     }
 
+    /// <summary>
+    /// Moves <paramref name="clock"/> forward to 10:00 UTC on <paramref name="day"/>; on SQLite it is the
+    /// database's clock too, so this is how a test reaches the day of an event.
+    /// </summary>
+    public static void MoveTo(this FakeTimeProvider clock, DateOnly day) =>
+        clock.SetUtcNow(new DateTimeOffset(day.ToDateTime(new TimeOnly(10, 0)), TimeSpan.Zero));
+
     public static UserSession User(int id) => new(id, "kullanici" + id, UserRole.User);
 
     public static UserSession Admin(int id) => new(id, "yonetici" + id, UserRole.Admin);

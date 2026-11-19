@@ -22,10 +22,35 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
 - Mimari diyagramlı İngilizce ve Türkçe README, tehdit modeli (`docs/THREAT_MODEL.md`) ve bu değişiklik günlüğü.
 - CI'da sürüm işi: `v*` etiketlerinde etiket adı denetlenir, win-x64 derlemesi yayımlanır ve zip çıktısı olarak
   yüklenir.
+- Bekleme listesi: dolu bir etkinlik katılımcıyı sıra numarasıyla bekleme listesine alır; iptal edilen yer hemen
+  sıradaki kişiye biletiyle birlikte geçer (`AddWaitingList` migration'ı).
+- Yöneticiler için etkinlik yönetimi: günü geçmemiş bir etkinliğin tarihi, kapasitesi (mevcut kayıtların altına
+  inmeden) ve açıklaması değiştirilir ya da etkinlik iptal edilir; iptal edilen etkinlik listede kalır ve kayıtları
+  hesaplarına iptal edildi olarak gösterilir (`AddEventManagement` migration'ı).
+- Katılımcının hesabının yeniden gösterebildiği QR kodlu biletler (QRCoder 1.6.0, MIT) ve yöneticiler için ikinci
+  okutmada "zaten kullanıldı" diyen, sayaçlı giriş kontrolü penceresi (`AddTicketCheckIn` migration'ı).
+- Bir etkinliğin katılımcı ve giriş listesinin bilet kodu içermeyen CSV ve yazdırılabilir HTML dışa aktarımı.
+- Yöneticiler için hesap yönetimi: etkinleştirme, devre dışı bırakma, yönetici veya kullanıcı yapma; yöneticinin
+  kendi hesabı ve son etkin yönetici korunur (`AddAccountDisabledFlag` migration'ı).
+- Bekleme listesi, kapasite değişikliği, etkinlik iptali, eşzamanlı giriş kontrolü ve birbirinin rolünü düşüren
+  yöneticiler için SQL Server yarış testleri.
 
 ### Değişti
 
 - Hatalar izleme çıktısı yerine log dosyasına yazılır; hata pencereleri değişmedi.
+- Bilet kodları artık `ETK-` ve 26 karakterdir (130 rastgele bit); migration mevcut her bilete 128 rastgele bitlik
+  yeni bir kod verir, bu yüzden yükseltmeden önce gösterilen kodlar artık çalışmaz.
+- Yöneticinin katılımcı listesi bilet kodu yerine kaydın durumunu (giriş yaptı, bekliyor, iptal) gösterir; yönetici
+  bilet kodlarını yalnızca kendi eklediği katılımcıların görür.
+- Reddedilen işlemler log dosyasına artık "Operation refused" satırı yazmaz.
+- Aynı etkinliğin veya hesapların başka bir değişikliğini 10 saniyeden fazla bekleyen bir değişiklik, sunucuyla
+  ilgili bir mesaj yerine "hiçbir değişiklik yapılmadı, birkaç saniye sonra tekrar deneyin" diye reddedilir. Komutlar
+  istemci tarafından iptal edilmeden önce 60 saniye, açılıştaki işlemler (eski veritabanı yükseltmesi ve
+  migration'lar) beş dakika alır; böylece istemci, kilidin kendi bekleme süresinden önce vazgeçmez.
+- Giriş ekranı içeri alınan katılımcının adını gösterir, biletleri yalnızca etkinlik günü kullanır (başka bir gün
+  bileti harcamadan "ETKİNLİK GÜNÜ DEĞİL" gösterir), kod alanını açık tutar; böylece okuyucunun okuttuğu sonraki kod
+  kaybolmaz, süren denetimden hemen sonra denetlenir. Eski bir sayaç yanıtı artık yenisinin yerine geçmez.
+- Bilet penceresi QR kodu göstermeden önce kaydı yeniden okur; bu arada iptal edilmiş bir bilet gösterilmez.
 
 ### Güvenlik
 
@@ -34,6 +59,24 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
   kullanılabilir anahtarların seçimi de artık bilgisayarın saatine bağlı değildir. Bir kurulum beklerken süresi
   dolan ya da yalnızca geri kalmış bir saatin kabul edeceği anahtar reddedilir ve kullanılmamış kalır.
 - Adlar, e-posta adresleri, kimlik numaraları, şifreler, kurulum anahtarları ve istisna mesajları loga asla yazılmaz.
+- Açık oturumlar her işlemde veritabanına göre denetlenir: rolü düşürülen, devre dışı bırakılan veya silinen bir
+  hesap hâlâ açık bir pencereden işlem yapamaz; devre dışı hesaplar giriş yapamaz. Bir hesabın erişimindeki her
+  değişiklik oturum sürümünü artırır (migration `AddSessionVersion`); hesap devre dışı bırakılmadan veya rolü
+  düşürülmeden önce açılan bir pencere, hesap yeniden etkinleştirilse ya da yönetici yapılsa da kapalı kalır; hesap
+  yeniden giriş yapar.
+- Bilet kodları SHA-256 özetleriyle bulunur ve sabit zamanda karşılaştırılır; loga ve dışa aktarımlara asla yazılmaz.
+- Log dosyası kayıt olma, etkinlik kaydı, iptal ve girişte okutmanın her sonucu için tek bir nötr kod yazar; artık
+  hangi hesapların, kayıtların veya biletlerin var olduğunu belli etmez.
+- Tarihler ve saatler veritabanının saatinden alınır: hangi etkinliklerin geçmiş olduğu, bir kaydın hâlâ yapılıp
+  yapılamayacağı veya iptal edilip edilemeyeceği, giriş kilitleri ve kayıtlar, biletler, iptaller ve girişler için
+  yazılan zamanlar. Saati yanlış olan ya da bilerek geri alınmış bir bilgisayar artık geçmiş bir etkinliğe kayıt
+  yapamaz, kayıtlarını iptal edemez, bir giriş kilidini erken bitiremez ve sahte giriş zamanları yazamaz.
+- Bileti girişte okutulmuş bir kayıt artık iptal edilemez ("Giriş yapılmış bir kayıt iptal edilemez.") ve giriş
+  işlemi etkinliğin kilidini alır: içerideki katılımcı yerini korur, yer sıradaki bekleyene geçmez; böylece salonda
+  yer sayısından fazla kişi olmaz.
+- Form açıldıktan sonra başka bir yöneticinin değiştirdiği bir etkinliği kaydetmek, eski tarihi, kapasiteyi veya
+  açıklamayı geri yazmak yerine reddedilir; etkinlik yönetimi güncel değerleri gösterir ve değişikliğin yeniden
+  yapılmasını ister.
 
 ## Temel
 

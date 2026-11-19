@@ -3,8 +3,9 @@
 🇬🇧 [English](README.md) · 🇹🇷 **Türkçe**
 
 .NET 10 ve SQL Server ile geliştirilmiş, etkinlik organizasyonu için bir Windows Forms uygulaması: hesaplar kayıt
-olup giriş yapar, getirdikleri katılımcıları ekler, onları etkinliklere kaydeder ve her kayıt için bir bilet alır;
-yöneticiler etkinlik oluşturur, tüm kayıtları görür ve bir etkinliğin katılımcılarını listeler. Kod Domain,
+olup giriş yapar, getirdikleri katılımcıları ekler, onları etkinliklere kaydeder (ya da dolu bir etkinliğin bekleme
+listesine alınır) ve her yer için QR kodlu bir bilet alır; yöneticiler etkinlik oluşturur, değiştirir ve iptal eder,
+girişte biletleri kontrol eder, bir etkinliğin katılımcılarını listeler ve dışa aktarır, hesapları yönetir. Kod Domain,
 Business, Data ve UI katmanlarına ayrılmıştır; veritabanı erişimi EF Core ile yapılır ve veritabanı açılışta
 otomatik olarak oluşturulup güncellenir.
 
@@ -31,41 +32,70 @@ otomatik olarak oluşturulup güncellenir.
   boşluk içerebilir (en fazla 64 karakter). Katılımcı, onu ekleyen hesaba aittir ve bir kimlik numarası her hesapta
   yalnızca bir kez eklenebilir.
 - ✅ **Etkinliğe kayıt** ("Kayıt Ekle", Add Registration): tarihi geçmemiş bir etkinlik seçilir ("Etkinlik Seçimi",
-  Event Selection) ve katılımcının kimlik numarası girilir ("Katılımcı TC Kimlik Numarası"). Her kayıtla
-  `ETK-7KQ2M9XA4C` gibi bir bilet kodu üretilir. Bir katılımcı birden fazla etkinliğe kaydedilebilir.
+  Event Selection) ve katılımcının kimlik numarası girilir ("Katılımcı TC Kimlik Numarası"). Her yerle 130 rastgele
+  bitlik bir bilet kodu (`ETK-` ve 26 karakter) üretilir. Bir katılımcı birden fazla etkinliğe kaydedilebilir.
+- ✅ **Bekleme listesi**: etkinlik doluysa katılımcı reddedilmez, sıra numarasıyla bekleme listesine alınır. Bir
+  yer iptal edildiğinde sıradaki katılımcı hemen o yere geçer ve bileti oluşturulur.
 - ✅ **Kayıtlarım ve biletlerim** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): hesabın kendi
-  katılımcılarının etkin kayıtları; etkinlik günü dahil iptal edilebilir ("Kaydı İptal Et", Cancel Registration),
-  yer yeniden boşalır ve katılımcı yeniden kaydedilebilir.
+  katılımcılarının yerleri ve bekleme sıraları ile etkinliği iptal edildiği için kapanan kayıtlar ("Etkinlik iptal
+  edildi"). Yerler ve bekleme sıraları etkinlik günü dahil iptal edilebilir ("Kaydı İptal Et", Cancel Registration);
+  girişte bileti okutulmuş bir kayıt artık iptal edilemez.
+- ✅ **Bileti göster** ("Bileti Göster", Show Ticket): bir yerin QR kodu ve bilet kodu, istendiği kadar.
 
 ### Yönetim paneli
 
 - ✅ **Etkinlik oluşturma** ("Etkinlik Ekle", Add Event): ad ("Etkinlik Adı", en fazla 80 karakter), tarih (bugün
   veya sonrası) ve kapasite ("Kişi Kapasitesi", 1-1000 kişi).
+- ✅ **Etkinlik yönetimi** ("Etkinlik Yönetimi", Event Management): günü geçmemiş bir etkinliğin tarihi, kapasitesi
+  ve açıklaması değiştirilir; kapasite mevcut kayıt sayısının altına inemez, eklenen yerler bekleme listesine
+  verilir. Form açıldıktan sonra başka bir yöneticinin yaptığı bir değişikliğin üzerine kaydetmek reddedilir ve güncel
+  değerler gösterilir. Etkinliği iptal etmek ("Etkinliği İptal Et", Cancel Event) onu iptal edildi olarak listede tutar, kayıtlarını
+  ve bekleme sıralarını kapatır (soft delete).
 - ✅ **Katılımcı ekleme** ("Katılımcı Ekleme") ve tüm hesapların katılımcıları için **bilet oluşturma** ("Bilet
-  Oluştur", Create Ticket); yönetici tüm etkin kayıtları görür ve iptal edebilir.
+  Oluştur", Create Ticket); yönetici tüm kayıtları görür ve iptal edebilir, bilet kodlarını ise yalnızca kendi
+  eklediği katılımcıların görür.
+- ✅ **Giriş kontrolü** ("Bilet Kontrol", Ticket Check): etkinlik seçilir, bilet kodu yazılır veya okutulur. Geçerli
+  ve kullanılmamış bilet için "GİRİŞ YAPILDI", ikinci okutmada aynı ekranda "ZATEN KULLANILDI" gösterilir; bilinmeyen,
+  iptal edilmiş ya da başka etkinliğe ait biletler tek bir retle ("GEÇERSİZ BİLET") karşılanır; sayaç girişleri yer
+  sayısıyla birlikte gösterir. Girişte katılımcının adı kimlik belgesiyle karşılaştırılmak üzere gösterilir; biletler
+  yalnızca etkinlik günü kullanılır (aksi hâlde "ETKİNLİK GÜNÜ DEĞİL" gösterilir ve bilet geçerli kalır); kod alanı
+  açık kalır, böylece bir bilet denetlenirken okuyucu sonrakini okuyabilir.
 - ✅ **Katılımcı listesi** ("Katılımcı Görüntüle", View Participants): seçilen etkinliğin ("Etkinlik Seçin", Select
-  Event) katılımcıları; ad, maskelenmiş kimlik numarası, e-posta ve bilet koduyla.
+  Event) katılımcıları; ad, maskelenmiş kimlik numarası, e-posta ve durumla (giriş yaptı, bekliyor, iptal). Liste CSV
+  ("CSV Olarak Kaydet") veya yazdırılabilir HTML ("Yazdırılabilir Liste") olarak kaydedilir; dışa aktarımlarda bilet
+  kodu yoktur.
+- ✅ **Hesaplar** ("Kullanıcılar", Users): hesaplar etkinleştirilir, devre dışı bırakılır, yönetici veya kullanıcı
+  yapılır. Yönetici kendi hesabını değiştiremez; son etkin yönetici korunur.
 
 ### Kurallar ve koruma
 
-- ✅ **Kapasite**: bir etkinlik kapasitesinden fazla kayıt almaz; yer sayısı aynı veritabanı işleminde kontrol edilip
-  artırılır, bu yüzden eşzamanlı kayıtlar kontenjanı aşamaz.
-- ✅ **Çift kayıt yok**: bir katılımcının bir etkinlikte en fazla bir etkin kaydı olur (benzersiz indeks); iptal
-  edilen kayıt geçmiş olarak kalır.
+- ✅ **Kapasite**: bir etkinlik kapasitesinden fazla kayıt almaz; yer sayısı aynı veritabanı işleminde, etkinlik
+  başına bir uygulama kilidi altında kontrol edilip artırılır, bu yüzden eşzamanlı kayıtlar, iptaller ve kapasite
+  değişiklikleri kontenjanı aşamaz ve kimse bekleme listesinin önüne geçemez. Girişi yapılmış bir katılımcı yerini
+  korur: kaydı iptal edilemez ve giriş de aynı kilidi alır, bu yüzden salonda yer sayısından fazla kişi olmaz.
+- ✅ **Çift kayıt yok**: bir katılımcının bir etkinlikte en fazla bir yeri veya bekleme sırası olur (benzersiz
+  indeks); iptal edilen kayıt geçmiş olarak kalır.
 - ✅ **Geçmiş etkinlik yok**: günü geçmiş bir etkinlik oluşturulamaz, ona kayıt yapılamaz ve kaydı iptal edilemez.
+  Bugünün hangi gün olduğunu bilgisayarın değil veritabanının saati belirler; kayıt, iptal ve giriş zamanları da
+  onunla yazılır.
 - ✅ **KVKK**: kimlik numaraları yönetim listelerinde maskelenmiş gösterilir (`123******01`) ve log dosyalarına asla
-  yazılmaz.
+  yazılmaz; ad ve e-posta adresleri yöneticinin katılımcı listesinde açık gösterilir.
 
 ### Güvenlik
 
 - ✅ Şifreler PBKDF2-HMAC-SHA256 özetleri olarak saklanır (600.000 iterasyon, rastgele tuz); özgün uygulamanın düz
   metin şifreleri bir sonraki başarılı girişte özetle değiştirilir.
 - ✅ 5 hatalı giriş hesabı 15 dakika kilitler; bilinmeyen hesap, yanlış şifre ve kilitli hesap aynı yanıtı alır.
-- ✅ Her çağrı oturum açmış hesaba göre denetlenir: kullanıcılar yalnızca kendi katılımcılarına ve kayıtlarına
-  erişir; olmayan bir kayıt ile başkasının kaydı aynı yanıtı alır.
+- ✅ Her çağrı oturum açmış hesaba, oturum da veritabanına göre denetlenir: rolü düşürülen, devre dışı bırakılan
+  veya silinen bir hesap hâlâ açık olan bir pencereyi kullanamaz; hesap yeniden etkinleştirilse veya yeniden yönetici
+  yapılsa da o pencere kapalı kalır (her erişim değişikliğinde oturum sürümü değişir). Kullanıcılar yalnızca kendi
+  katılımcılarına ve kayıtlarına erişir; olmayan bir kayıt ile başkasının kaydı aynı yanıtı alır.
+- ✅ Bilet kodları SHA-256 özetleriyle bulunduktan sonra sabit zamanda karşılaştırılır; loga ve dışa aktarımlara asla
+  yazılmaz.
 - ✅ Türkçe mesajlı merkezi FluentValidation doğrulayıcıları; yazma düğmeleri bir işlem sürerken tekrarlanan
   tıklamaları yok sayar.
-- ✅ Kişisel veri içermeyen, anonim denetim kodlarıyla günlük log dosyaları.
+- ✅ Kişisel veri içermeyen, anonim denetim kodlarıyla günlük log dosyaları; bir hesabın, kaydın veya biletin var olup
+  olmadığını belli edecek sonuçlar tek bir nötr kodu paylaşır.
 
 ---
 
@@ -98,11 +128,16 @@ Bu görüntüler özgün uygulamanın ekranlarını gösterir; tasarım güncell
 | Giriş | ✅ | ✅ |
 | Etkinlikleri listeleme | ✅ | ✅ |
 | Etkinlik oluşturma | ❌ | ✅ |
+| Etkinliği değiştirme veya iptal etme (geçmemiş) | ❌ | ✅ |
 | Katılımcı ekleme | ✅ kendi hesabına ait | ✅ kendi hesabına ait |
-| Katılımcıyı etkinliğe kaydetme | ✅ yalnızca kendi katılımcıları | ✅ her katılımcı |
-| Kayıtları ve biletleri listeleme | ✅ kendi katılımcılarının | ✅ tümü |
-| Kayıt iptali | ✅ kendi kaydı, etkinlik gününe kadar | ✅ her kayıt, etkinlik gününe kadar |
+| Katılımcıyı etkinliğe (veya bekleme listesine) kaydetme | ✅ yalnızca kendi katılımcıları | ✅ her katılımcı |
+| Kayıtları ve bekleme sıralarını listeleme | ✅ kendi katılımcılarının | ✅ tümü |
+| Bilet kodunu ve QR kodunu görme | ✅ kendi katılımcılarının | ✅ kendi eklediği katılımcıların |
+| Kayıt veya bekleme sırası iptali | ✅ kendi kaydı, etkinlik gününe kadar | ✅ her kayıt, etkinlik gününe kadar |
 | Bir etkinliğin katılımcılarını listeleme (maskeli kimlik no) | ❌ | ✅ |
+| Katılımcı listesini dışa aktarma (CSV, HTML; bilet kodu yok) | ❌ | ✅ |
+| Girişte bilet kontrolü | ❌ | ✅ |
+| Başka bir hesabı etkinleştirme, devre dışı bırakma veya rolünü değiştirme | ❌ (kendi hesabı da dahil) | ✅ (kendi hesabı hariç; son etkin yönetici kalır) |
 | İlk yöneticiyi oluşturma | ❌ (yalnızca boş veritabanında veya sahibin kurulum anahtarıyla) | - |
 
 ---
@@ -117,6 +152,7 @@ Bu görüntüler özgün uygulamanın ekranlarını gösterir; tasarım güncell
 | Veritabanı | Microsoft SQL Server (Express yeterli) |
 | Şifre özeti | PBKDF2-HMAC-SHA256 (`Rfc2898DeriveBytes.Pbkdf2`) |
 | Doğrulama | FluentValidation |
+| QR kodları | QRCoder 1.6.0 (MIT) |
 | Yapılandırma / DI | Microsoft.Extensions.Configuration (JSON, user secrets, ortam değişkenleri), Microsoft.Extensions.DependencyInjection |
 | Loglama | Serilog (dosya, günlük dönüşüm) |
 | Test | xUnit v3, Moq, EF Core SQLite (bellek içi), gerçek SQL Server testleri |
@@ -130,9 +166,9 @@ Bu görüntüler özgün uygulamanın ekranlarını gösterir; tasarım güncell
 EtkinlikYonetim/
 ├── src/
 │   ├── EtkinlikYonetim.Domain/     # Varlıklar (User, Event, Participant, Registration, SetupKey) ve depo sözleşmeleri
-│   ├── EtkinlikYonetim.Business/   # Giriş, kurulum, etkinlik, katılımcı ve kayıt servisleri, Security/ (PBKDF2, kilitleme, kurulum anahtarı), Validation/ (FluentValidation), Auditing/
+│   ├── EtkinlikYonetim.Business/   # Giriş, kurulum, hesap, etkinlik, katılımcı, kayıt ve giriş kontrolü servisleri, Exports/ (CSV, HTML), Security/ (PBKDF2, kilitleme, kurulum anahtarı), Validation/ (FluentValidation), Auditing/
 │   ├── EtkinlikYonetim.Data/       # EF Core DbContext, yapılandırmalar, Migrations/, eski şema yükseltmesi, demo verisi, depolar
-│   └── EtkinlikYonetim.UI/         # WinForms ekranları, Infrastructure/ (hatalar, loglama, iletişim kutuları, yazma koruması), Program.cs (kompozisyon kökü)
+│   └── EtkinlikYonetim.UI/         # WinForms ekranları, Infrastructure/ (hatalar, loglama, iletişim kutuları, yazma koruması, oturum sonu, QR kodu, dışa aktarım dosyaları), Program.cs (kompozisyon kökü)
 ├── tests/
 │   ├── EtkinlikYonetim.Business.Tests/  # Doğrulayıcılar, kimlik no, şifre özeti, kilitleme, kapasite, tarihler ve sahiplik (Moq)
 │   ├── EtkinlikYonetim.Data.Tests/      # SQLite üzerinde servisler; SQL Server'da yarışlar, kurulum anahtarları ve eski şema yükseltmesi
@@ -271,8 +307,9 @@ Demo modunu gerçek bir kurulumda açmayın.
 düz metin şifreler korunur; şifreler eski düz metin olarak işaretlenir ve her hesabın bir sonraki başarılı girişinde
 özetlenir. Özgün uygulamada adıyla saklanan katılımcının tek etkinliği biletli etkin bir kayda dönüşür ve
 etkinliklerin yer sayaçları doldurulur. Yükseltme tek bir işlemde, bir uygulama kilidi (`sp_getapplock`) altında
-çalışır ve tekrarlanması güvenlidir. Mevcut satırlar yeni kurallara uymuyorsa hiçbir şeyi değiştirmeden durur ve
-düzeltilmesi gerekenleri bildirir.
+çalışır ve tekrarlanması güvenlidir. Mevcut satırlar yeni kurallara uymuyorsa hiçbir şeyi değiştirmeden durur;
+uygulama genel bir hata mesajı gösterir, log dosyasına ise hata yalnızca istisna türleri ve sayısal hata kodlarıyla,
+satırlar ve içerikleri olmadan yazılır.
 
 Yeni sürümle ilk açılıştan önce veritabanının yedeğini alın ve yedeği koruyun: hâlâ düz metin şifreleri içerir.
 
@@ -294,11 +331,15 @@ Yeni migration'ları veritabanı sahibinin bağlantısıyla uygulayın; uygulama
 
 Loglar `%LOCALAPPDATA%\EtkinlikYonetim\logs` altına, her gün için bir dosya olarak yazılır. 30 günden eski dosyalar
 silinir ve en fazla 30 dosya tutulur. Klasör deponun dışındadır. Hata kayıtları yalnızca istisna türlerini, HResult
-kodlarını ve yığın izindeki metot adlarını içerir (dosya yolu yok); reddedilen işlemler yalnızca istisna türünü
-loglar. Denetim kayıtları yalnızca sabit bir kod ve bir roldür, asla bir hesap değildir; her başarısız giriş
-(bilinmeyen hesap, yanlış şifre veya kilitli hesap) aynı kodu yazar: `auth.sign_in.failed`.
+kodlarını ve yığın izindeki metot adlarını içerir (dosya yolu yok); reddedilen işlemler kendi başına bir satır
+yazmaz. Denetim kayıtları yalnızca sabit bir kod ve bir roldür, asla bir hesap değildir; her başarısız giriş
+(bilinmeyen hesap, yanlış şifre, kilitli veya devre dışı hesap) aynı kodu yazar: `auth.sign_in.failed`. Bir hesabın,
+kaydın veya biletin var olup olmadığını belli edecek sonuçlar tek bir kodu paylaşır: kayıt olma için
+`auth.account.registration_submitted`, etkinlik kaydı için `registration.submitted`, iptal için
+`registration.cancel_submitted` ve girişte okutma için `ticket.check_in_submitted`.
 
-Adlar, e-posta adresleri, kimlik numaraları, şifreler, kurulum anahtarları ve istisna mesajları loga asla yazılmaz.
+Adlar, e-posta adresleri, kimlik numaraları, şifreler, kurulum anahtarları, bilet kodları ve istisna mesajları loga
+asla yazılmaz.
 
 ---
 
@@ -307,12 +348,18 @@ Adlar, e-posta adresleri, kimlik numaraları, şifreler, kurulum anahtarları ve
 Tehdit modeli için [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) dosyasına bakın.
 
 - Kimlik numaraları, adlar ve e-posta adresleri kişisel veridir (KVKK). Yalnızca yapılandırılan SQL Server
-  veritabanında saklanır, yönetim listelerinde maskelenmiş gösterilir ve log dosyalarına asla yazılmaz.
+  veritabanında saklanır ve log dosyalarına asla yazılmaz. Kimlik numaraları yönetim listelerinde maskelenmiş
+  gösterilir; ad ve e-posta adresleri yöneticinin katılımcı listesinde açık gösterilir.
 - Şifreler PBKDF2 ile özetlenir; saklama biçimi ayrı bir sütunda tutulur, bu yüzden bir değer asla başka bir
   biçimde okunmaz.
 - Kilitleme sayaçları atomik olarak güncellenir ve başarılı giriş yalnızca hesap hâlâ kilitli değilken yazılır;
   eşzamanlı denemeler yeni bir kilidi kaldıramaz.
 - Sahiplik servislerde denetlenir ve veritabanı komutlarında tekrarlanır.
+- Açık bir oturumun her işlemi önce hesabın rolünü ve etkinlik durumunu veritabanından okur; hesap değişiklikleri
+  işlemi yapan yöneticiyi kendi işlemlerinin içinde yeniden denetler.
+- Bilet kodları 130 rastgele bittir (yükseltmenin yeniden verdiği biletlerde 128). Katılımcının hesabı QR kodu yeniden gösterebilsin diye olduğu gibi, SHA-256
+  özetiyle birlikte saklanır: giriş bileti özetle bulur ve kodu sabit zamanda karşılaştırır. Yönetim listeleri ve
+  dışa aktarımlar kodu asla göstermez.
 - Bağlantı dizeleri depo dışında tutulur (`appsettings.json` yok sayılır; user secrets ve ortam değişkenleri
   desteklenir). Tüm sorgular parametrelerle EF Core üzerinden gider.
 - Kullanıcılar yalnızca Türkçe mesajlar görür; ham istisna metni asla gösterilmez.
@@ -331,9 +378,9 @@ dotnet test -c Release
 
 | Proje | Tür | Kapsam |
 |---|---|---|
-| `tests/EtkinlikYonetim.Business.Tests` | Birim | Doğrulayıcı sınırları (kullanıcı adı 32, şifre 8/64 ve girişte 100, ad 64, etkinlik adı 80, kapasite 1/1000, geçmiş tarihler), kimlik no kontrol basamakları, PBKDF2 ve biçim yükseltmesi, kilitleme, kurulum anahtarı denetimleri, sıkı Moq nesneleriyle sahiplik ve denetim olayları |
-| `tests/EtkinlikYonetim.Data.Tests` | Entegrasyon | Bellek içi SQLite üzerinde servisler ve depolar (kapasite sınırları, iptal ve yeniden kayıt, IDOR yanıtları, kilit süresi); SQL Server'da kapasite, çift kayıt, kilitleme ve ilk yönetici yarışları, kısıtlı oturumla kurulum anahtarları, eski şema yükseltmesi ve kilidi |
-| `tests/EtkinlikYonetim.UI.Tests` | Birim | Örnek yapılandırma, hata mesajları, log içeriği ve saklama süresi, kilit açıldıktan sonra odak, yazma korumaları, en son isteğin kazandığı yüklemeler, nötr marka |
+| `tests/EtkinlikYonetim.Business.Tests` | Birim | Doğrulayıcı sınırları (kullanıcı adı 32, şifre 8/64 ve girişte 100, ad 64, etkinlik adı 80, kapasite 0/1/1000/1001, açıklama 500, geçmiş tarihler), kimlik no kontrol basamakları, PBKDF2 ve biçim yükseltmesi, kilitleme, kurulum anahtarı denetimleri, veritabanıyla denetlenen oturumlar, hesap kuralları, bilet kodları ve giriş sonuçları, CSV ve HTML dışa aktarımı, sıkı Moq nesneleriyle sahiplik ve denetim olayları |
+| `tests/EtkinlikYonetim.Data.Tests` | Entegrasyon | Bellek içi SQLite üzerinde servisler ve depolar (kapasite sınırları, bekleme listesi sırası, iptal ve yeniden kayıt, etkinlik değişikliği ve iptali, giriş kontrolü, dışa aktarım, rolü düşürülen ve devre dışı oturumlar, IDOR yanıtları, kilit süresi); SQL Server'da kapasite, bekleme listesi, çift kayıt, giriş, hesap, kilitleme ve ilk yönetici yarışları, kısıtlı oturumla kurulum anahtarları, migration'lar, eski şema yükseltmesi ve kilidi |
+| `tests/EtkinlikYonetim.UI.Tests` | Birim | Örnek yapılandırma, hata mesajları, log içeriği, nötr kodlar ve saklama süresi, kilit açıldıktan sonra odak, yazma korumaları, en son isteğin kazandığı yüklemeler, etkinlik yönetimi, giriş kontrolü ve hesap pencereleri, bilet QR görünümü, dışa aktarım dosyaları, oturum sonu, nötr marka |
 
 SQL Server testleri `ETKINLIK_TEST_SQLSERVER` içindeki sunucuda geçici veritabanları kullanır (varsayılan: Windows
 kimlik doğrulamasıyla yerel SQL Express). `ETKINLIK_SKIP_SQL_TESTS=1` tanımlıysa veya sunucuya ulaşılamıyorsa

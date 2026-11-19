@@ -87,6 +87,10 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .HasColumnType("int")
                         .HasColumnName("KatilimciId");
 
+                    b.Property<int?>("QueueNumber")
+                        .HasColumnType("int")
+                        .HasColumnName("SiraNo");
+
                     b.Property<int>("Status")
                         .HasColumnType("int")
                         .HasColumnName("Durum");
@@ -96,13 +100,17 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     b.HasIndex(new[] { "EventId" }, "IX_Kayitlar_EtkinlikId");
 
+                    b.HasIndex(new[] { "EventId", "QueueNumber" }, "IX_Kayitlar_EtkinlikId_SiraNo")
+                        .IsUnique()
+                        .HasFilter("[SiraNo] IS NOT NULL");
+
                     b.HasIndex(new[] { "ParticipantId", "EventId" }, "IX_Kayitlar_KatilimciId_EtkinlikId")
                         .IsUnique()
-                        .HasFilter("[Durum] = 0");
+                        .HasFilter("[Durum] IN (0, 2)");
 
                     b.ToTable("Kayitlar", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Kayitlar_Durum", "[Durum] IN (0, 1)");
+                            t.HasCheckConstraint("CK_Kayitlar_Durum", "[Durum] IN (0, 1, 2, 3)");
                         });
                 });
 
@@ -115,6 +123,14 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Cancelled")
+                        .HasColumnType("bit")
+                        .HasColumnName("IptalEdildi");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("IptalZamani");
+
                     b.Property<int>("Capacity")
                         .HasColumnType("int")
                         .HasColumnName("Kapasite");
@@ -122,6 +138,11 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date")
                         .HasColumnName("Tarih");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("Aciklama");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -193,11 +214,22 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("CheckedInAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("GirisZamani");
+
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
                         .HasColumnName("BiletKodu");
+
+                    b.Property<byte[]>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)")
+                        .HasColumnName("BiletKoduOzeti")
+                        .IsFixedLength();
 
                     b.Property<DateTime>("IssuedAt")
                         .HasColumnType("datetime2")
@@ -211,6 +243,9 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .HasName("PK_Biletler");
 
                     b.HasIndex(new[] { "Code" }, "IX_Biletler_BiletKodu")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "CodeHash" }, "IX_Biletler_BiletKoduOzeti")
                         .IsUnique();
 
                     b.HasIndex(new[] { "RegistrationId" }, "IX_Biletler_KayitId")
@@ -227,6 +262,10 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .HasColumnName("Id");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Disabled")
+                        .HasColumnType("bit")
+                        .HasColumnName("DevreDisi");
 
                     b.Property<int>("FailedLoginCount")
                         .HasColumnType("int")
@@ -251,6 +290,10 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasColumnName("Rol");
+
+                    b.Property<int>("SessionVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("OturumSurumu");
 
                     b.Property<string>("UserName")
                         .IsRequired()

@@ -42,6 +42,17 @@ public sealed class ErrorReporterTests
         Assert.StartsWith("Veritabanı hazırlanamadı.", message, StringComparison.Ordinal);
     }
 
+    /// <summary>A lock that another change held too long: the user is told nothing changed and to try again, not to check the server.</summary>
+    [Fact]
+    public void Describe_BusyLock_AsksToTryAgain()
+    {
+        var message = ErrorReporter.Describe(new InvalidOperationException("x", new Data.Persistence.DatabaseBusyException()));
+
+        Assert.Equal(ErrorReporter.BusyMessage, message);
+        Assert.Contains("hiçbir değişiklik yapılmadı", message, StringComparison.Ordinal);
+        Assert.Contains("tekrar deneyin", message, StringComparison.Ordinal);
+    }
+
     private static InvalidOperationException Capture()
     {
         try

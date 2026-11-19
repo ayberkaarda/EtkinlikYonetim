@@ -1,4 +1,5 @@
 using EtkinlikYonetim.Business.Auditing;
+using EtkinlikYonetim.Business.Exports;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Business.Validation;
@@ -27,15 +28,20 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IValidator<SignInInput>, SignInInputValidator>();
         services.AddSingleton<IValidator<ParticipantInput>, ParticipantInputValidator>();
         services.AddSingleton<IValidator<EventInput>, EventInputValidator>();
+        services.AddSingleton<IValidator<EventUpdateInput>, EventUpdateInputValidator>();
         services.AddSingleton<IValidator<RegistrationRequestInput>, RegistrationRequestInputValidator>();
         services.AddSingleton<IValidator<RegistrationTargetInput>, RegistrationTargetInputValidator>();
         services.AddSingleton<IValidator<CancellationInput>, CancellationInputValidator>();
         services.AddSingleton<SetupKeyGate>();
+        services.AddSingleton<ISessionGuard, SessionGuard>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<ISetupService, SetupService>();
         services.AddSingleton<IEventService, EventService>();
         services.AddSingleton<IParticipantService, ParticipantService>();
         services.AddSingleton<IRegistrationService, RegistrationService>();
+        services.AddSingleton<IAccountService, AccountService>();
+        services.AddSingleton<ICheckInService, CheckInService>();
+        services.AddSingleton<IParticipantExportService, ParticipantExportService>();
         return services;
     }
 }

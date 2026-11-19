@@ -3,6 +3,7 @@ using EtkinlikYonetim.Data.Repositories;
 using EtkinlikYonetim.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EtkinlikYonetim.Data;
 
@@ -14,6 +15,12 @@ public static class DataServiceCollectionExtensions
     /// <summary>Environment variable that turns the demonstration data on ("1" or "true").</summary>
     public const string DemoEnvironmentVariable = "ETKINLIK_DEMO";
 
+    /// <summary>
+    /// Seconds SqlClient lets a statement run before it cancels it. Well above the wait for an application
+    /// lock, so a busy lock is reported as such and not as a client side timeout.
+    /// </summary>
+    public const int CommandTimeoutSeconds = 60;
+
     /// <summary>Registers the data access layer on SQL Server.</summary>
     public static IServiceCollection AddSqlServerDataAccess(
         this IServiceCollection services,
@@ -21,7 +28,7 @@ public static class DataServiceCollectionExtensions
         DataAccessOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-        return services.AddDataAccess(builder => builder.UseSqlServer(connectionString), options);
+        return services.AddDataAccess(builder => builder.UseSqlServer(connectionString, sql => sql.CommandTimeout(CommandTimeoutSeconds)), options);
     }
 
     /// <summary>
@@ -43,6 +50,9 @@ public static class DataServiceCollectionExtensions
         services.AddSingleton<IEventRepository, EventRepository>();
         services.AddSingleton<IParticipantRepository, ParticipantRepository>();
         services.AddSingleton<IRegistrationRepository, RegistrationRepository>();
+        services.AddSingleton<ITicketRepository, TicketRepository>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<IDatabaseClock, DatabaseClock>();
         return services;
     }
 }

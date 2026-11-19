@@ -38,6 +38,7 @@
             this.label3 = new System.Windows.Forms.Label();
             this.lstKayitlar = new System.Windows.Forms.ListBox();
             this.btnKayitIptal = new System.Windows.Forms.Button();
+            this.btnBiletGoster = new System.Windows.Forms.Button();
             this.SuspendLayout();
             //
             // label3
@@ -160,6 +161,7 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.LightGreen;
             this.ClientSize = new System.Drawing.Size(676, 460);
+            this.Controls.Add(this.btnBiletGoster);
             this.Controls.Add(this.btnKayitIptal);
             this.Controls.Add(this.lstKayitlar);
             this.Controls.Add(this.label3);
@@ -192,5 +194,6 @@
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.ListBox lstKayitlar;
         private System.Windows.Forms.Button btnKayitIptal;
+        private System.Windows.Forms.Button btnBiletGoster;
     }
 }

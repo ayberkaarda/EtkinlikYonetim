@@ -16,7 +16,7 @@ public sealed class ListingTests
     {
         var participants = new ControlledParticipantService();
         var events = new ControlledEventService();
-        using var form = new KatilimciGoruntule(events, participants, Sessions.Admin);
+        using var form = new KatilimciGoruntule(events, participants, new ControlledExportService(), Sessions.Admin);
         var picker = Find<ComboBox>(form, "cmbEtkinlikSec");
         var list = Find<ListBox>(form, "lstKatilimcilar");
         picker.Items.Add(events.Events[0]);
@@ -38,7 +38,7 @@ public sealed class ListingTests
     {
         var participants = new ControlledParticipantService();
         var events = new ControlledEventService();
-        using var form = new KatilimciGoruntule(events, participants, Sessions.Admin);
+        using var form = new KatilimciGoruntule(events, participants, new ControlledExportService(), Sessions.Admin);
         var picker = Find<ComboBox>(form, "cmbEtkinlikSec");
         var list = Find<ListBox>(form, "lstKatilimcilar");
         picker.Items.Add(events.Events[0]);
@@ -62,6 +62,9 @@ public sealed class ListingTests
             "Eski Etkinlik - 01.02.2026 - Ad Bilinmiyor - Bilet: -",
             new RegistrationItem(new RegistrationDetails(6, 2, "Eski Etkinlik", new DateOnly(2026, 2, 1), 3, null, null)).ToString());
         Assert.Equal("Bahar Konseri - 17.04.2027", new EventSummary(1, "Bahar Konseri", new DateOnly(2027, 4, 17), 150, 0).ToString());
+        Assert.Equal(
+            "Bahar Konseri - 17.04.2027 - Deniz Örnek - Bekleme listesi, sıra: 2",
+            new RegistrationItem(Sessions.Registration(5) with { TicketCode = null, Status = RegistrationStatus.Waiting, QueuePosition = 2 }).ToString());
     }
 
     [Fact]

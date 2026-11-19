@@ -34,6 +34,20 @@ internal sealed record EventInput(string Name, DateOnly Day, int Capacity, DateO
 {
     public static EventInput Create(string? name, DateTime eventDate, int capacity, DateOnly today) =>
         new(name?.Trim() ?? string.Empty, DateOnly.FromDateTime(eventDate), capacity, today);
+
+    /// <summary>A description is trimmed; an empty one is stored as none.</summary>
+    public static string? Normalize(string? description) =>
+        string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+}
+
+/// <summary>
+/// A change of an existing event by an admin: the new day, capacity and description, checked against the
+/// local date <paramref name="Today"/>. The event's name stays.
+/// </summary>
+internal sealed record EventUpdateInput(DateOnly Day, int Capacity, string? Description, DateOnly Today)
+{
+    public static EventUpdateInput Create(DateTime eventDate, int capacity, string? description, DateOnly today) =>
+        new(DateOnly.FromDateTime(eventDate), capacity, EventInput.Normalize(description), today);
 }
 
 /// <summary>A registration request: the chosen event and the participant's national id (trimmed).</summary>
@@ -45,12 +59,14 @@ internal sealed record RegistrationRequestInput(int EventId, string NationalId)
 
 /// <summary>
 /// The event a participant is about to be registered for, checked against the local date
-/// <paramref name="Today"/>. The repository repeats these checks inside its transaction.
+/// <paramref name="Today"/>. A full event is no refusal: the repository puts the participant on its
+/// waiting list, and repeats the date check inside its transaction.
 /// </summary>
-internal sealed record RegistrationTargetInput(DateOnly EventDate, int FreeSeats, DateOnly Today);
+internal sealed record RegistrationTargetInput(DateOnly EventDate, DateOnly Today);
 
 /// <summary>
-/// A cancellation of a registration the caller may see, checked against the local date
-/// <paramref name="Today"/>. Ownership is decided before this input is built.
+/// A cancellation of a registration the caller may see, checked against the database's day
+/// <paramref name="Today"/>; <paramref name="CheckedIn"/> tells whether its ticket was used at the entrance.
+/// Ownership is decided before this input is built.
 /// </summary>
-internal sealed record CancellationInput(RegistrationStatus Status, DateOnly EventDate, DateOnly Today);
+internal sealed record CancellationInput(RegistrationStatus Status, DateOnly EventDate, DateOnly Today, bool CheckedIn = false);

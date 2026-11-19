@@ -4,8 +4,11 @@ using EtkinlikYonetim.UI.Infrastructure;
 
 namespace EtkinlikYonetim.UI
 {
-    /// <summary>Admin panel: creates events and opens the participant, registration and listing forms.</summary>
-    public partial class Form1 : Form
+    /// <summary>
+    /// Admin panel: creates events and opens the participant, registration, listing and account forms.
+    /// When the database no longer accepts the admin's session the panel closes and the sign-in returns.
+    /// </summary>
+    public partial class Form1 : Form, ISessionPanel
     {
         private readonly IEventService _events;
         private readonly IFormFactory _forms;
@@ -70,6 +73,34 @@ namespace EtkinlikYonetim.UI
         private void btnKatilimciGoruntule_Click(object? sender, EventArgs e)
         {
             using var form = _forms.Create<KatilimciGoruntule>(_session);
+            form.ShowDialog(this);
+        }
+
+        /// <inheritdoc/>
+        public bool SignedOut { get; private set; }
+
+        /// <inheritdoc/>
+        public void EndSession()
+        {
+            SignedOut = true;
+            SessionEnd.Close(this);
+        }
+
+        private void btnEtkinlikYonet_Click(object? sender, EventArgs e)
+        {
+            using var form = _forms.Create<EtkinlikYonetForm>(_session);
+            form.ShowDialog(this);
+        }
+
+        private void btnBiletKontrol_Click(object? sender, EventArgs e)
+        {
+            using var form = _forms.Create<BiletKontrolForm>(_session);
+            form.ShowDialog(this);
+        }
+
+        private void btnKullanicilar_Click(object? sender, EventArgs e)
+        {
+            using var form = _forms.Create<KullaniciYonetForm>(_session);
             form.ShowDialog(this);
         }
 

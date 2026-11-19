@@ -6,10 +6,20 @@ namespace EtkinlikYonetim.UI
 {
     /// <summary>
     /// Adds a participant owned by the signed-in account; the main screen of users and a dialog of the
-    /// admin panel.
+    /// admin panel. As a user's main screen it closes when the database no longer accepts the session.
     /// </summary>
-    public partial class KatilimciEkleForm : Form
+    public partial class KatilimciEkleForm : Form, ISessionPanel
     {
+        /// <inheritdoc/>
+        public bool SignedOut { get; private set; }
+
+        /// <inheritdoc/>
+        public void EndSession()
+        {
+            SignedOut = true;
+            SessionEnd.Close(this);
+        }
+
         private readonly IParticipantService _participants;
         private readonly IFormFactory _forms;
         private readonly UserSession _session;

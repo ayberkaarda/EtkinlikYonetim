@@ -16,6 +16,7 @@ namespace EtkinlikYonetim.UI
         private readonly UserSession _session;
         private readonly ExclusiveOperation _register = new();
         private readonly ExclusiveOperation _cancel = new();
+        private readonly ExclusiveOperation _ticket = new();
         private readonly RequestSequence _listRequests = new();
 
         public KayitEkleForm(IEventService events, IRegistrationService registrations, UserSession session)
@@ -61,7 +62,9 @@ namespace EtkinlikYonetim.UI
                 {
                     var eventId = cmbEtkinlikler.SelectedItem is EventSummary selected ? selected.Id : 0;
                     var receipt = await _registrations.RegisterAsync(_session, eventId, txtKatilimciTC.Text);
-                    Prompts.Inform($"Kayıt tamamlandı. Bilet kodu: {receipt.TicketCode}");
+                    Prompts.Inform(receipt.QueuePosition is int position
+                        ? $"Etkinlik dolu. Katılımcı bekleme listesine alındı (sıra: {position}). Bir kayıt iptal edildiğinde sıradaki katılımcı kendiliğinden kayda geçer ve bileti oluşturulur."
+                        : $"Kayıt tamamlandı. Bilet kodu: {receipt.TicketCode}");
 
                     txtKatilimciTC.Clear();
                     if (cmbEtkinlikler.Items.Count > 0)
@@ -97,6 +100,56 @@ namespace EtkinlikYonetim.UI
                 },
                 btnKayitIptal);
 
+        /// <summary>
+        /// The ticket window of the selected registration, or <see langword="null"/> after telling why there is
+        /// none (nothing selected, a waiting place or a cancelled registration). The registration is read again
+        /// first: the list may be older than a cancellation by an admin or of the event, or a move up from the
+        /// waiting list, and a cancelled ticket must not be shown as valid. The caller shows and disposes it.
+        /// </summary>
+        internal async Task<BiletForm?> CreateTicketViewAsync()
+        {
+            if (lstKayitlar.SelectedItem is not RegistrationItem selected)
+            {
+                Prompts.Warn("Lütfen biletini görmek istediğiniz kaydı seçin.");
+                return null;
+            }
+
+            var request = _listRequests.Next();
+            var registrations = await _registrations.GetMyRegistrationsAsync(_session);
+            if (IsDisposed)
+            {
+                return null;
+            }
+
+            var current = registrations.FirstOrDefault(r => r.Id == selected.Registration.Id);
+            if (_listRequests.IsLatest(request) && current != selected.Registration)
+            {
+                lstKayitlar.ReplaceItems(registrations.Select(r => new RegistrationItem(r)));
+                lstKayitlar.SelectedIndex = registrations.ToList().FindIndex(r => r.Id == selected.Registration.Id);
+            }
+
+            if (current is null)
+            {
+                Prompts.Warn("Bu kayıt artık listenizde değil; liste yenilendi.");
+                return null;
+            }
+
+            var item = new RegistrationItem(current);
+            if (item.Registration.Status != RegistrationStatus.Active)
+            {
+                Prompts.Warn("Bu kaydın bileti yok: katılımcı bekleme listesinde ya da kayıt iptal edilmiş.");
+                return null;
+            }
+
+            if (item.Registration.TicketCode is not { Length: > 0 })
+            {
+                Prompts.Warn("Bilet yalnızca katılımcıyı ekleyen hesapta gösterilir.");
+                return null;
+            }
+
+            return new BiletForm(item.Registration);
+        }
+
         private async Task RefreshRegistrationsAsync()
         {
             var request = _listRequests.Next();
@@ -112,6 +165,19 @@ namespace EtkinlikYonetim.UI
         private async void btnKayit_Click(object? sender, EventArgs e) => await RegisterAsync();
 
         private async void btnKayitIptal_Click(object? sender, EventArgs e) => await CancelAsync();
+
+        private async void btnBiletGoster_Click(object? sender, EventArgs e) =>
+            await this.RunExclusiveAsync(
+                _ticket,
+                async () =>
+                {
+                    using var ticket = await CreateTicketViewAsync();
+                    if (ticket is not null && !IsDisposed)
+                    {
+                        ticket.ShowDialog(this);
+                    }
+                },
+                btnBiletGoster);
 
         private void btnkapat_Click(object? sender, EventArgs e) => Close();
 

@@ -25,6 +25,19 @@ public sealed class User
 
     /// <summary>UTC time until which sign-in is refused, or <see langword="null"/>.</summary>
     public DateTime? LockoutEnd { get; set; }
+
+    /// <summary>
+    /// Set by an admin to stop the account from signing in. Every operation of an open session checks
+    /// it in the database, so a disabled account's session can no longer do anything.
+    /// </summary>
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Raised by one on every change of the account's access (disabled, enabled, role changed). A session
+    /// carries the value it was issued with, and every operation compares it with this column, so a session
+    /// opened before such a change never works again, even after the account is enabled or promoted back.
+    /// </summary>
+    public int SessionVersion { get; set; }
 }
 
 /// <summary>What an account may do (column Rol, stored as "Kullanici" or "Admin").</summary>

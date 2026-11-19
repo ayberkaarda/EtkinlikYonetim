@@ -21,7 +21,7 @@ public interface IAuthService
 internal sealed class AuthService(
     IUserRepository users,
     IPasswordHasher passwordHasher,
-    TimeProvider timeProvider,
+    IDatabaseClock clock,
     IValidator<SignInInput> signInValidator,
     IValidator<AccountInput> accountValidator,
     IAuditLog audit) : IAuthService
@@ -58,6 +58,9 @@ internal sealed class AuthService(
         var name = input.UserName;
         password = input.Password!;
 
+        // Locks are set and ended by the database's clock, so a computer whose clock is ahead cannot end
+        // one early. Read for every attempt, so an unknown account takes the same round trips.
+        var now = await clock.GetUtcNowAsync(cancellationToken).ConfigureAwait(false);
         var account = await users.FindByUserNameAsync(name, cancellationToken).ConfigureAwait(false);
         if (account is null)
         {
@@ -65,11 +68,10 @@ internal sealed class AuthService(
             throw SignInRefused();
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        if (account.LockoutEnd > now)
+        if (account.Disabled || account.LockoutEnd > now)
         {
             // Same answer and about the same cost as a wrong password; nothing is written, so the
-            // lock neither grows nor ends early.
+            // lock neither grows nor ends early, and a disabled account is not told apart.
             passwordHasher.SimulateVerification(password);
             throw SignInRefused();
         }
@@ -107,7 +109,7 @@ internal sealed class AuthService(
         }
 
         audit.Record(AuditEvent.SignInSucceeded, account.Role);
-        return new UserSession(account.Id, account.UserName, account.Role);
+        return new UserSession(account.Id, account.UserName, account.Role, account.SessionVersion);
     }
 
     public async Task RegisterAsync(
@@ -122,7 +124,7 @@ internal sealed class AuthService(
 
         if (await users.UserNameExistsAsync(name, cancellationToken).ConfigureAwait(false))
         {
-            throw new BusinessRuleException(UserNameTaken);
+            throw RegistrationRefused();
         }
 
         var user = new User
@@ -140,10 +142,17 @@ internal sealed class AuthService(
         catch (DuplicateUserNameException ex)
         {
             // Registered concurrently between the check and the insert.
-            throw new BusinessRuleException(UserNameTaken, ex);
+            throw RegistrationRefused(ex);
         }
 
         audit.Record(AuditEvent.AccountRegistered, UserRole.User);
+    }
+
+    /// <summary>A taken name; the log file writes it with the code of a new account.</summary>
+    private BusinessRuleException RegistrationRefused(Exception? inner = null)
+    {
+        audit.Record(AuditEvent.AccountRegistrationRefused, UserRole.User);
+        return inner is null ? new BusinessRuleException(UserNameTaken) : new BusinessRuleException(UserNameTaken, inner);
     }
 
     private BusinessRuleException SignInRefused(string? message = null)

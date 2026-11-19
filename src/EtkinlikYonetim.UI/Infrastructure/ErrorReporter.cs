@@ -15,6 +15,9 @@ internal static class ErrorReporter
 
     internal const string UnexpectedErrorMessage = "Beklenmeyen bir hata oluştu. İşleminiz tamamlanamamış olabilir.";
 
+    /// <summary>Another change of the same event or of the accounts held the database lock too long; nothing was written.</summary>
+    internal const string BusyMessage = "Veritabanı şu anda aynı kayıtlar üzerindeki başka bir işlemle meşgul; hiçbir değişiklik yapılmadı. Lütfen birkaç saniye sonra tekrar deneyin.";
+
     public static void Show(Exception? exception, IWin32Window? owner = null)
     {
         if (exception is null)
@@ -25,7 +28,7 @@ internal static class ErrorReporter
         Record(Log.Logger, exception);
 
         // Rule and permission messages are fixed texts written for the user; they are shown as warnings.
-        if (exception is BusinessRuleException or AccessDeniedException)
+        if (exception is BusinessRuleException or AccessDeniedException or SessionExpiredException)
         {
             Dialogs.Show(owner, exception.Message, "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
@@ -35,19 +38,19 @@ internal static class ErrorReporter
     }
 
     /// <summary>
-    /// Writes <paramref name="exception"/> to <paramref name="logger"/> without its message. Rule and
-    /// permission refusals are expected and logged as a warning with their type only; the audit log
-    /// already counts the security relevant ones. Every other exception is logged through
-    /// <see cref="FormatForLog"/>.
+    /// Writes <paramref name="exception"/> to <paramref name="logger"/> without its message. Rule,
+    /// permission and session refusals are expected answers, not failures, and are not written: a line for
+    /// a refusal and none for a success would tell the reader of the file which attempt found an existing
+    /// account, registration or ticket. The audit log records the security relevant ones with neutral
+    /// codes. Every other exception is logged through <see cref="FormatForLog"/>.
     /// </summary>
     internal static void Record(ILogger logger, Exception exception)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(exception);
 
-        if (exception is BusinessRuleException or AccessDeniedException)
+        if (exception is BusinessRuleException or AccessDeniedException or SessionExpiredException)
         {
-            logger.Warning("Operation refused: {Type}", exception.GetType().Name);
             return;
         }
 
@@ -106,6 +109,11 @@ internal static class ErrorReporter
         {
             return "Veritabanı hazırlanamadı. SQL Server'ın çalıştığından, bağlantı ayarlarının doğru olduğundan "
                 + "ve veritabanı oluşturma yetkiniz bulunduğundan emin olun.";
+        }
+
+        if (Find<DatabaseBusyException>(exception) is not null)
+        {
+            return BusyMessage;
         }
 
         if (Find<DbException>(exception) is not null)

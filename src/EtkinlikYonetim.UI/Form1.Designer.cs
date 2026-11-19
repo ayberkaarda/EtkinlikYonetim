@@ -39,6 +39,9 @@
             this.btnKatilimciGoruntule = new System.Windows.Forms.Button();
             this.btnAsagial = new System.Windows.Forms.Button();
             this.btnkapat = new System.Windows.Forms.Button();
+            this.btnKullanicilar = new System.Windows.Forms.Button();
+            this.btnEtkinlikYonet = new System.Windows.Forms.Button();
+            this.btnBiletKontrol = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numKapasite)).BeginInit();
             this.SuspendLayout();
             // 
@@ -176,12 +179,48 @@
             this.btnkapat.UseVisualStyleBackColor = false;
             this.btnkapat.Click += new System.EventHandler(this.btnkapat_Click);
             // 
+            // btnKullanicilar
+            // 
+            this.btnKullanicilar.Location = new System.Drawing.Point(277, 265);
+            this.btnKullanicilar.Margin = new System.Windows.Forms.Padding(4);
+            this.btnKullanicilar.Name = "btnKullanicilar";
+            this.btnKullanicilar.Size = new System.Drawing.Size(165, 44);
+            this.btnKullanicilar.TabIndex = 12;
+            this.btnKullanicilar.Text = "Kullanıcılar";
+            this.btnKullanicilar.UseVisualStyleBackColor = true;
+            this.btnKullanicilar.Click += new System.EventHandler(this.btnKullanicilar_Click);
+            // 
+            // btnEtkinlikYonet
+            // 
+            this.btnEtkinlikYonet.Location = new System.Drawing.Point(61, 204);
+            this.btnEtkinlikYonet.Margin = new System.Windows.Forms.Padding(4);
+            this.btnEtkinlikYonet.Name = "btnEtkinlikYonet";
+            this.btnEtkinlikYonet.Size = new System.Drawing.Size(165, 44);
+            this.btnEtkinlikYonet.TabIndex = 13;
+            this.btnEtkinlikYonet.Text = "Etkinlik Yönetimi";
+            this.btnEtkinlikYonet.UseVisualStyleBackColor = true;
+            this.btnEtkinlikYonet.Click += new System.EventHandler(this.btnEtkinlikYonet_Click);
+            // 
+            // btnBiletKontrol
+            // 
+            this.btnBiletKontrol.Location = new System.Drawing.Point(487, 204);
+            this.btnBiletKontrol.Margin = new System.Windows.Forms.Padding(4);
+            this.btnBiletKontrol.Name = "btnBiletKontrol";
+            this.btnBiletKontrol.Size = new System.Drawing.Size(165, 44);
+            this.btnBiletKontrol.TabIndex = 14;
+            this.btnBiletKontrol.Text = "Bilet Kontrol";
+            this.btnBiletKontrol.UseVisualStyleBackColor = true;
+            this.btnBiletKontrol.Click += new System.EventHandler(this.btnBiletKontrol_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
-            this.ClientSize = new System.Drawing.Size(688, 263);
+            this.ClientSize = new System.Drawing.Size(688, 325);
+            this.Controls.Add(this.btnBiletKontrol);
+            this.Controls.Add(this.btnEtkinlikYonet);
+            this.Controls.Add(this.btnKullanicilar);
             this.Controls.Add(this.btnAsagial);
             this.Controls.Add(this.btnkapat);
             this.Controls.Add(this.btnKatilimciGoruntule);
@@ -218,6 +257,9 @@
         private System.Windows.Forms.Button btnKatilimciGoruntule;
         private System.Windows.Forms.Button btnAsagial;
         private System.Windows.Forms.Button btnkapat;
+        private System.Windows.Forms.Button btnKullanicilar;
+        private System.Windows.Forms.Button btnEtkinlikYonet;
+        private System.Windows.Forms.Button btnBiletKontrol;
     }
 }
 

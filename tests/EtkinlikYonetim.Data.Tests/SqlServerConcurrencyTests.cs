@@ -17,8 +17,12 @@ public sealed class SqlServerConcurrencyTests
 {
     private const int Contenders = 16;
 
+    /// <summary>
+    /// Sixteen participants race for three seats: three get a seat and a ticket, the others join the
+    /// waiting list with the numbers 1 to 13, each number once, and the counter equals the seats.
+    /// </summary>
     [Fact]
-    public async Task Register_ManyParticipantsRaceForTheLastSeats_CapacityHolds()
+    public async Task Register_ManyParticipantsRaceForTheLastSeats_CapacityHoldsAndTheRestWaitInOrder()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
@@ -32,15 +36,14 @@ public sealed class SqlServerConcurrencyTests
         for (var round = 0; round < 4; round++)
         {
             const int Seats = 3;
-            var eventId = await events.CreateAsync(Admin(SeedAdminId), "Yarış " + round, new DateTime(2026, 4, 1), Seats, ct);
+            var eventId = await events.CreateAsync(Admin(SeedAdminId), "Yarış " + round, database.Today.AddDays(30), Seats, ct);
 
             var results = await RaceAsync(nationalIds, id => service.RegisterAsync(Admin(SeedAdminId), eventId, id, ct), ct);
 
-            Assert.Equal(Seats, results.Count(r => r is null));
-            Assert.All(
-                results.Where(r => r is not null),
-                r => Assert.Equal("Etkinliğin kontenjanı dolu.", Assert.IsType<BusinessRuleException>(r).Message));
+            Assert.All(results, Assert.Null);
             Assert.Equal(Seats, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kayitlar WHERE EtkinlikId = @id AND Durum = 0", ct, ("@id", eventId)));
+            Assert.Equal(Contenders - Seats, await database.ScalarAsync("SELECT COUNT(DISTINCT SiraNo) FROM dbo.Kayitlar WHERE EtkinlikId = @id AND Durum = 2", ct, ("@id", eventId)));
+            Assert.Equal(Contenders - Seats, await database.ScalarAsync("SELECT MAX(SiraNo) FROM dbo.Kayitlar WHERE EtkinlikId = @id", ct, ("@id", eventId)));
             Assert.Equal(Seats, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Biletler b JOIN dbo.Kayitlar r ON r.Id = b.KayitId WHERE r.EtkinlikId = @id", ct, ("@id", eventId)));
             Assert.Equal(Seats, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = @id", ct, ("@id", eventId)));
         }
@@ -57,7 +60,7 @@ public sealed class SqlServerConcurrencyTests
 
         for (var round = 0; round < 4; round++)
         {
-            var eventId = await provider.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Tekrar " + round, new DateTime(2026, 4, 1), 100, ct);
+            var eventId = await provider.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Tekrar " + round, database.Today.AddDays(30), 100, ct);
 
             var results = await RaceAsync(
                 Enumerable.Repeat(DenizNationalId, Contenders).ToList(),
@@ -67,7 +70,7 @@ public sealed class SqlServerConcurrencyTests
             Assert.Single(results, r => r is null);
             Assert.All(
                 results.Where(r => r is not null),
-                r => Assert.Equal("Bu katılımcı bu etkinliğe zaten kayıtlı.", Assert.IsType<BusinessRuleException>(r).Message));
+                r => Assert.Equal(RegistrationService.AlreadyRegistered, Assert.IsType<BusinessRuleException>(r).Message));
             Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kayitlar WHERE EtkinlikId = @id", ct, ("@id", eventId)));
             Assert.Equal(1, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = @id", ct, ("@id", eventId)));
         }
@@ -86,10 +89,10 @@ public sealed class SqlServerConcurrencyTests
         await using var a = database.BuildServices(demo: true);
         await a.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
         await using var b = database.BuildServices();
-        var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İptal yarışı", new DateTime(2026, 4, 1), 2, ct);
+        var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İptal yarışı", database.Today.AddDays(30), 2, ct);
         const string Active = "SELECT COUNT(*) FROM dbo.Kayitlar WHERE EtkinlikId = @id AND Durum = 0";
         const string Counter = "SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = @id";
-        string[] allowed = ["Bu katılımcı bu etkinliğe zaten kayıtlı.", "Bu kayıt zaten iptal edilmiş."];
+        string[] allowed = [RegistrationService.AlreadyRegistered, RegistrationService.AlreadyCancelled];
 
         for (var round = 0; round < 12; round++)
         {
@@ -141,7 +144,7 @@ public sealed class SqlServerConcurrencyTests
         Assert.Contains("IX_Kayitlar_KatilimciId_EtkinlikId", duplicate.Message, StringComparison.Ordinal);
         var overbooked = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync("UPDATE dbo.Etkinlikler SET KayitSayisi = 3 WHERE Id = 3", ct));
         Assert.Contains("CK_Etkinlikler_KayitSayisi", overbooked.Message, StringComparison.Ordinal);
-        var ticket = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync("INSERT dbo.Biletler (KayitId, BiletKodu, OlusturmaZamani) VALUES (999, N'ETK-X', SYSUTCDATETIME())", ct));
+        var ticket = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync("INSERT dbo.Biletler (KayitId, BiletKodu, BiletKoduOzeti, OlusturmaZamani) VALUES (999, N'ETK-X', HASHBYTES('SHA2_256', 'ETK-X'), SYSUTCDATETIME())", ct));
         Assert.Contains("FK_Biletler_Kayitlar", ticket.Message, StringComparison.Ordinal);
     }
 

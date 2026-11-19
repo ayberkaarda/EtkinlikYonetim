@@ -1,3 +1,4 @@
+using System.Globalization;
 using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
@@ -6,8 +7,12 @@ using FluentValidation;
 
 namespace EtkinlikYonetim.Business.Services;
 
-/// <summary>A participant of an event as shown to admins; the national id is masked.</summary>
-public sealed record ParticipantView(string FullName, string MaskedNationalId, string Email, string TicketCode);
+/// <summary>
+/// A participant of an event as shown to admins: the national id is masked, the state tells the seat
+/// and its check-in, the waiting place or the cancellation. The ticket code is never part of it: it is the
+/// participant's secret, shown only to the account that owns the registration.
+/// </summary>
+public sealed record ParticipantView(string FullName, string MaskedNationalId, string Email, string State);
 
 /// <summary>Adding participants and listing the participants of an event.</summary>
 public interface IParticipantService
@@ -30,6 +35,7 @@ public interface IParticipantService
 internal sealed class ParticipantService(
     IParticipantRepository participants,
     IValidator<ParticipantInput> validator,
+    ISessionGuard sessions,
     IAuditLog audit) : IParticipantService
 {
     internal const string FieldsRequired = "Lütfen tüm alanları doldurun.";
@@ -40,7 +46,10 @@ internal sealed class ParticipantService(
 
     internal const string UnknownName = "Ad Bilinmiyor";
     internal const string UnknownEmail = "E-posta Yok";
-    internal const string NoTicket = "Bilet Yok";
+    internal const string CheckedIn = "Giriş yapıldı";
+    internal const string NotCheckedIn = "Giriş yapılmadı";
+    internal const string WaitingPrefix = "Bekleme listesi, sıra: ";
+    internal const string EventCancelled = "Etkinlik iptal edildi";
 
     public async Task<int> AddAsync(
         UserSession session,
@@ -49,7 +58,7 @@ internal sealed class ParticipantService(
         string? email,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireSignedIn(session);
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
 
         var input = ParticipantInput.Create(nationalId, fullName, email);
         validator.ValidateOrThrow(input);
@@ -90,15 +99,22 @@ internal sealed class ParticipantService(
         int eventId,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireAdmin(session, audit);
+        await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
         var rows = await participants.GetByEventAsync(eventId, cancellationToken).ConfigureAwait(false);
-        return rows
-            .Select(p => new ParticipantView(
-                string.IsNullOrWhiteSpace(p.FullName) ? UnknownName : p.FullName,
-                NationalIdNumber.Mask(p.NationalId),
-                string.IsNullOrWhiteSpace(p.Email) ? UnknownEmail : p.Email,
-                p.TicketCode ?? NoTicket))
-            .ToList();
+        return rows.Select(View).ToList();
     }
+
+    /// <summary>The admin's view of a registration: masked national id, filled in gaps and the state; never the ticket code.</summary>
+    internal static ParticipantView View(EventParticipant p) =>
+        new(
+            string.IsNullOrWhiteSpace(p.FullName) ? UnknownName : p.FullName,
+            NationalIdNumber.Mask(p.NationalId),
+            string.IsNullOrWhiteSpace(p.Email) ? UnknownEmail : p.Email,
+            p.Status switch
+            {
+                RegistrationStatus.Waiting => string.Create(CultureInfo.InvariantCulture, $"{WaitingPrefix}{p.QueuePosition}"),
+                RegistrationStatus.EventCancelled => EventCancelled,
+                _ => p.CheckedInAt is null ? NotCheckedIn : CheckedIn,
+            });
 }

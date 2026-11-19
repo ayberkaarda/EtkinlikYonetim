@@ -8,12 +8,13 @@ namespace EtkinlikYonetim.Business.Tests;
 
 /// <summary>
 /// The services with their real validators, as the application's container builds them. Audit events
-/// go to <c>audit</c>, or nowhere when it is not given.
+/// go to <c>audit</c>, or nowhere when it is not given. Sessions are accepted as they are unless a
+/// <c>sessions</c> guard is given; <see cref="SessionGuardTests"/> covers the real one.
 /// </summary>
 internal static class ServiceFactory
 {
     public static AuthService Auth(IUserRepository users, IPasswordHasher hasher, TimeProvider time, IAuditLog? audit = null) =>
-        new(users, hasher, time, new SignInInputValidator(), new AccountInputValidator(), audit ?? NullAuditLog.Instance);
+        new(users, hasher, new TestDatabaseClock(time), new SignInInputValidator(), new AccountInputValidator(), audit ?? NullAuditLog.Instance);
 
     public static SetupService Setup(
         IUserRepository users,
@@ -23,25 +24,64 @@ internal static class ServiceFactory
         IAuditLog? audit = null) =>
         new(users, hasher, gate, environment, new AccountInputValidator(), audit ?? NullAuditLog.Instance);
 
-    public static EventService Event(IEventRepository events, TimeProvider time, IAuditLog? audit = null) =>
-        new(events, time, new EventInputValidator(), audit ?? NullAuditLog.Instance);
+    public static EventService Event(IEventRepository events, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null, IDatabaseClock? clock = null) =>
+        new(events, clock ?? new TestDatabaseClock(time), time, new EventInputValidator(), new EventUpdateInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
-    public static ParticipantService Participant(IParticipantRepository participants, IAuditLog? audit = null) =>
-        new(participants, new ParticipantInputValidator(), audit ?? NullAuditLog.Instance);
+    public static ParticipantService Participant(IParticipantRepository participants, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
+        new(participants, new ParticipantInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
     public static RegistrationService Registration(
         IRegistrationRepository registrations,
         IParticipantRepository participants,
         IEventRepository events,
         TimeProvider time,
-        IAuditLog? audit = null) =>
+        IAuditLog? audit = null,
+        ISessionGuard? sessions = null,
+        IDatabaseClock? clock = null) =>
         new(
             registrations,
             participants,
             events,
+            clock ?? new TestDatabaseClock(time),
             time,
             new RegistrationRequestInputValidator(),
             new RegistrationTargetInputValidator(),
             new CancellationInputValidator(),
+            sessions ?? AcceptAllSessions.Instance,
             audit ?? NullAuditLog.Instance);
+
+    public static AccountService Account(IUserRepository users, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
+        new(users, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+
+    public static CheckInService CheckIn(ITicketRepository tickets, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
+        new(tickets, new TestDatabaseClock(time), time, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+
+    public static Exports.ParticipantExportService Export(
+        IEventRepository events,
+        IParticipantRepository participants,
+        TimeProvider time,
+        IAuditLog? audit = null,
+        ISessionGuard? sessions = null) =>
+        new(events, participants, time, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+
+    /// <summary>The real guard over <paramref name="users"/>.</summary>
+    public static SessionGuard Guard(IUserRepository users, IAuditLog? audit = null) => new(users, audit ?? NullAuditLog.Instance);
+
+    /// <summary>Accepts every session, as if the database confirmed it.</summary>
+    private sealed class AcceptAllSessions : ISessionGuard
+    {
+        public static readonly AcceptAllSessions Instance = new();
+
+        public Task EnsureCurrentAsync(UserSession session, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// A database clock at <paramref name="time"/> plus <paramref name="offset"/>: with no offset, a database
+/// whose clock agrees with the computer's; with one, a computer whose clock is wrong by minus that much.
+/// </summary>
+internal sealed class TestDatabaseClock(TimeProvider time, TimeSpan offset = default) : IDatabaseClock
+{
+    public Task<DateTime> GetUtcNowAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(time.GetUtcNow().UtcDateTime + offset);
 }

@@ -36,7 +36,8 @@ public sealed class LegacyUpgradeTests
 
     // Fictional rows. Identity values deliberately do not start at 1 so overwritten or re-seeded rows
     // would show. "admin" in lower case and a missing role are what the original application allowed.
-    private const string LegacyData = """
+    // The open events are dated by the database's clock, which decides what is past: today and in 30 days.
+    internal const string LegacyData = """
         SET IDENTITY_INSERT dbo.Kullanicilar ON;
         INSERT dbo.Kullanicilar (Id, KullaniciAdi, Sifre, Rol) VALUES
             (3, N'yonetici', N'admin1', N'admin'),
@@ -45,9 +46,9 @@ public sealed class LegacyUpgradeTests
         SET IDENTITY_INSERT dbo.Kullanicilar OFF;
         SET IDENTITY_INSERT dbo.Etkinlikler ON;
         INSERT dbo.Etkinlikler (Id, EtkinlikAdi, Tarih, Kapasite) VALUES
-            (2, N'Eski Konser', '2026-03-10', 2),
+            (2, N'Eski Konser', CAST(SYSUTCDATETIME() AS date), 2),
             (4, N'Geçmiş Etkinlik', '2025-05-17', 10),
-            (7, N'Boş Etkinlik', '2026-04-01', 5);
+            (7, N'Boş Etkinlik', DATEADD(DAY, 30, CAST(SYSUTCDATETIME() AS date)), 5);
         SET IDENTITY_INSERT dbo.Etkinlikler OFF;
         SET IDENTITY_INSERT dbo.Katilimcilar ON;
         INSERT dbo.Katilimcilar (Id, EtkinlikAdi, TcKimlikNo, AdSoyad, Email) VALUES
@@ -87,6 +88,15 @@ public sealed class LegacyUpgradeTests
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kayitlar WHERE KatilimciId = 5 AND EtkinlikId = 4 AND Durum = 0", ct));
         Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kayitlar", ct));
         Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Biletler WHERE BiletKodu LIKE N'ETK-%'", ct));
+
+        // The short codes of the upgrade were reissued with 128 random bits, each with the hash the entrance looks up.
+        Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(DISTINCT BiletKodu) FROM dbo.Biletler WHERE LEN(BiletKodu) = 36 AND BiletKoduOzeti = HASHBYTES('SHA2_256', CONVERT(varchar(40), BiletKodu))", ct));
+        var legacyCode = await database.TextAsync("SELECT BiletKodu FROM dbo.Biletler b JOIN dbo.Kayitlar r ON r.Id = b.KayitId WHERE r.EtkinlikId = 2", ct);
+        Assert.NotNull(legacyCode);
+        Assert.Equal(TicketCodeHash.Of(legacyCode), await database.BytesAsync("SELECT BiletKoduOzeti FROM dbo.Biletler WHERE BiletKodu = @code", ct, ("@code", legacyCode)));
+        var checkIn = await provider.GetRequiredService<ICheckInService>().CheckInAsync(TestServices.Admin(3), 2, legacyCode.ToLowerInvariant(), ct);
+        Assert.Equal(CheckInOutcome.CheckedIn, checkIn.Outcome);
+        await database.ExecuteAsync("UPDATE dbo.Biletler SET GirisZamani = NULL", ct);
         Assert.Equal(1, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = 2", ct));
         Assert.Equal(1, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = 4", ct));
         Assert.Equal(0, await database.ScalarAsync("SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = 7", ct));
@@ -113,8 +123,8 @@ public sealed class LegacyUpgradeTests
         // the derived seat counters.
         var receipt = await registrations.RegisterAsync(admin, 2, "20000000003", ct);
         Assert.True(receipt.RegistrationId > 2);
-        var full = await Assert.ThrowsAsync<BusinessRuleException>(() => registrations.RegisterAsync(admin, 2, "20000000002", ct));
-        Assert.Equal("Etkinliğin kontenjanı dolu.", full.Message);
+        var full = await registrations.RegisterAsync(admin, 2, "20000000002", ct);
+        Assert.Equal((null, 1), (full.TicketCode, full.QueuePosition)); // the derived counter says the event is full
         var participantId = await provider.GetRequiredService<IParticipantService>().AddAsync(user, "10000000450", "Yeni Katılımcı", "yeni@example.com", ct);
         Assert.True(participantId > 8);
         await registrations.RegisterAsync(user, 7, "10000000450", ct);
@@ -127,7 +137,7 @@ public sealed class LegacyUpgradeTests
             ct));
         Assert.Contains("IX_Kayitlar_KatilimciId_EtkinlikId", duplicate.Message, StringComparison.Ordinal);
         var role = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync(
-            "INSERT dbo.Kullanicilar (KullaniciAdi, Sifre, SifreBicimi, Rol, BasarisizGiris) VALUES (N'x', N'-', 0, N'Sahip', 0)",
+            "INSERT dbo.Kullanicilar (KullaniciAdi, Sifre, SifreBicimi, Rol, BasarisizGiris, DevreDisi, OturumSurumu) VALUES (N'x', N'-', 0, N'Sahip', 0, 0, 0)",
             ct));
         Assert.Contains("CK_Kullanicilar_Rol", role.Message, StringComparison.Ordinal);
         var nationalId = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync(
@@ -452,7 +462,10 @@ public sealed class LegacyUpgradeTests
             "SELECT COUNT(*) FROM sys.index_columns ic JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id WHERE i.name = N'IX_Katilimcilar_KullaniciId_TcKimlikNo'",
             ct));
         Assert.Equal(1, await database.ScalarAsync(
-            "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Kayitlar_KatilimciId_EtkinlikId' AND is_unique = 1 AND has_filter = 1 AND filter_definition = N'([Durum]=(0))'",
+            "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Kayitlar_KatilimciId_EtkinlikId' AND is_unique = 1 AND has_filter = 1 AND filter_definition = N'([Durum] IN ((0), (2)))'",
+            ct));
+        Assert.Equal(1, await database.ScalarAsync(
+            "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Kayitlar_EtkinlikId_SiraNo' AND is_unique = 1 AND has_filter = 1 AND filter_definition = N'([SiraNo] IS NOT NULL)'",
             ct));
         Assert.Equal(3, await database.ScalarAsync(
             "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 0 AND name IN (N'IX_Etkinlikler_Tarih', N'IX_Katilimcilar_KullaniciId', N'IX_Kayitlar_EtkinlikId')",

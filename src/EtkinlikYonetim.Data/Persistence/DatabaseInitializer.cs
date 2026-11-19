@@ -28,6 +28,9 @@ internal sealed class DatabaseInitializer(
     IDbContextFactory<EventDbContext> contextFactory,
     DataAccessOptions options) : IDatabaseInitializer
 {
+    /// <summary>Command timeout of the start-up statements: above the legacy upgrade's 60 second lock wait.</summary>
+    internal const int StartupCommandTimeoutSeconds = 300;
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -36,6 +39,15 @@ internal sealed class DatabaseInitializer(
         {
             if (db.Database.IsSqlServer())
             {
+                // The legacy upgrade waits up to a minute for another instance's upgrade, and schema changes
+                // of a large database take time: the statements of the start-up get more time than the
+                // operations, so the client never cancels a statement the server is still working on.
+                var seconds = db.Database.GetCommandTimeout() ?? 30; // 30: SqlClient's default, 0: no limit
+                if (seconds != 0 && seconds < StartupCommandTimeoutSeconds)
+                {
+                    db.Database.SetCommandTimeout(StartupCommandTimeoutSeconds);
+                }
+
                 // A database from the original application has the tables but no migration history.
                 await LegacySchemaUpgrader.UpgradeIfLegacyAsync(db, cancellationToken).ConfigureAwait(false);
                 await db.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);

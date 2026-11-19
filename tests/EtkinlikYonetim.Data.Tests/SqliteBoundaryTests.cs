@@ -57,26 +57,30 @@ public sealed class SqliteBoundaryTests : IAsyncLifetime
         Assert.Equal(SeedUserId, (await Auth.SignInAsync("ornek", "Demo.Kullanici1", Ct)).UserId);
     }
 
-    /// <summary>An event with the smallest capacity takes one registration; a cancellation frees the seat for another participant.</summary>
+    /// <summary>
+    /// An event with the smallest capacity takes one registration; the next one waits, and a cancellation
+    /// gives the seat to the one waiting, not to whoever registers next.
+    /// </summary>
     [Fact]
-    public async Task Capacity_OneSeat_IsTakenOnceAndFreedByACancellation()
+    public async Task Capacity_OneSeat_IsTakenOnceAndPassedToTheWaitingParticipant()
     {
         var user = User(SeedUserId);
         var id = await Events.CreateAsync(Admin(SeedAdminId), "Tek Kişilik", Today.AddDays(10), 1, Ct);
 
         var first = await Registrations.RegisterAsync(user, id, DenizNationalId, Ct);
-        var full = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(user, id, EceNationalId, Ct));
-        Assert.Equal(RegistrationService.EventFull, full.Message);
+        var waiting = await Registrations.RegisterAsync(user, id, EceNationalId, Ct);
+        Assert.Equal((null, 1), (waiting.TicketCode, waiting.QueuePosition));
 
         await Registrations.CancelAsync(user, first.RegistrationId, Ct);
-        await Registrations.RegisterAsync(user, id, EceNationalId, Ct);
-        var again = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(user, id, DenizNationalId, Ct));
-        Assert.Equal(RegistrationService.EventFull, again.Message);
+        var again = await Registrations.RegisterAsync(user, id, DenizNationalId, Ct);
+        Assert.Equal(1, again.QueuePosition);
 
         await using var context = _db.CreateContext();
         var stored = await context.Events.SingleAsync(e => e.Id == id, Ct);
         Assert.Equal(1, stored.RegisteredCount);
-        Assert.Equal(1, await context.Registrations.CountAsync(r => r.EventId == id && r.Status == Domain.Entities.RegistrationStatus.Active, Ct));
+        var active = await context.Registrations.Include(r => r.Ticket).SingleAsync(r => r.EventId == id && r.Status == Domain.Entities.RegistrationStatus.Active, Ct);
+        Assert.Equal(waiting.RegistrationId, active.Id);
+        Assert.NotNull(active.Ticket);
     }
 
     /// <summary>Capacity 1 to 1000 and a day from today on are stored; everything outside is refused and writes nothing.</summary>

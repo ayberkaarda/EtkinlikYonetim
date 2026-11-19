@@ -1,10 +1,13 @@
+using EtkinlikYonetim.Business;
+
 namespace EtkinlikYonetim.UI.Infrastructure;
 
 internal static class UiExtensions
 {
     /// <summary>
     /// Runs an asynchronous UI action with a wait cursor. Business rule violations are shown as
-    /// warnings; anything else is reported through <see cref="ErrorReporter"/>.
+    /// warnings; anything else is reported through <see cref="ErrorReporter"/>. A session the database
+    /// no longer accepts is reported and then ended, which returns the application to the sign-in.
     /// </summary>
     public static async Task RunAsync(this Form form, Func<Task> action)
     {
@@ -15,6 +18,11 @@ internal static class UiExtensions
         try
         {
             await action();
+        }
+        catch (SessionExpiredException ex)
+        {
+            ErrorReporter.Show(ex, form);
+            SessionEnd.Request(form);
         }
 #pragma warning disable CA1031 // UI boundary: every failure is reported to the user.
         catch (Exception ex)

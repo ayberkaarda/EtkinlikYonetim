@@ -9,6 +9,7 @@ internal static class SchemaLimits
     /// <summary>Sizes of the original columns (NVARCHAR(50) and NVARCHAR(100)).</summary>
     public const int UserNameLength = 50;
     public const int EventNameLength = 100;
+    public const int EventDescriptionLength = 500;
     public const int PersonNameLength = 100;
     public const int EmailLength = 100;
     public const int NationalIdLength = 11;
@@ -17,7 +18,11 @@ internal static class SchemaLimits
     public const int PasswordLength = 256;
 
     public const int RoleLength = 20;
-    public const int TicketCodeLength = 20;
+    /// <summary>Room for "ETK-" and 26 random characters, and for the 32 hexadecimal characters of reissued codes.</summary>
+    public const int TicketCodeLength = 40;
+
+    /// <summary>Length of a SHA-256 hash of a ticket code.</summary>
+    public const int TicketCodeHashLength = 32;
 
     /// <summary>Stored values of <see cref="Domain.Entities.UserRole"/>, as the original application wrote them.</summary>
     public const string UserRoleValue = "Kullanici";
@@ -38,8 +43,24 @@ internal static class SchemaLimits
     /// <summary>The seat counter can neither go negative nor exceed the capacity: no event is ever overbooked.</summary>
     public const string RegisteredCountCheck = "[KayitSayisi] >= 0 AND [KayitSayisi] <= [Kapasite]";
 
-    public const string StatusCheck = "[Durum] IN (0, 1)";
+    /// <summary>
+    /// Values of <see cref="Domain.Entities.RegistrationStatus"/>: 0 active, 1 cancelled, 2 waiting, 3 closed
+    /// by the cancellation of the event.
+    /// </summary>
+    public const string StatusCheck = "[Durum] IN (0, 1, 2, 3)";
 
-    /// <summary>Only active registrations take a seat and count as a registration; cancelled ones are history.</summary>
+    /// <summary>
+    /// The filter of the one-registration-per-participant index as InitialCreate made it (active only);
+    /// the legacy upgrade recreates that shape and the later migrations widen it to <see cref="PlaceHoldingFilter"/>.
+    /// </summary>
     public const string ActiveRegistrationFilter = "[Durum] = 0";
+
+    /// <summary>
+    /// Registrations that hold a seat (0) or wait for one (2): a participant has at most one of them per
+    /// event, so nobody is registered twice or waits twice. Cancelled ones are history.
+    /// </summary>
+    public const string PlaceHoldingFilter = "[Durum] IN (0, 2)";
+
+    /// <summary>Waiting list numbers are unique per event; registrations that never waited have none.</summary>
+    public const string QueueNumberFilter = "[SiraNo] IS NOT NULL";
 }

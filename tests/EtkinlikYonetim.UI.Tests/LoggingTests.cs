@@ -7,6 +7,7 @@ using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
 using EtkinlikYonetim.UI.Infrastructure;
+using EtkinlikYonetim.UI.Tests.Support;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
@@ -136,17 +137,22 @@ public sealed partial class LoggingTests : IDisposable
         AssertNoPersonalData(text);
     }
 
+    /// <summary>
+    /// A refusal is an answer, not a failure: it leaves no line of its own, so the file cannot tell a
+    /// refused attempt from a successful one. The audit codes cover what matters.
+    /// </summary>
     [Fact]
-    public void Record_RefusedOperation_LogsTheTypeButNotTheMessage()
+    public void Record_RefusedOperation_WritesNothing()
     {
         var text = WriteAndRead(logger =>
         {
+            logger.Information("probe");
             ErrorReporter.Record(logger, new BusinessRuleException($"{NationalId} {FullName} {Email}"));
             ErrorReporter.Record(logger, new AccessDeniedException($"{UserName} {SetupKey}"));
+            ErrorReporter.Record(logger, new SessionExpiredException());
         });
 
-        Assert.Contains("[WRN] Operation refused: BusinessRuleException", text, StringComparison.Ordinal);
-        Assert.Contains("[WRN] Operation refused: AccessDeniedException", text, StringComparison.Ordinal);
+        Assert.Single(Lines(text));
         AssertNoPersonalData(text);
     }
 
@@ -165,9 +171,26 @@ public sealed partial class LoggingTests : IDisposable
         });
 
         Assert.Contains("[INF] Audit auth.sign_in.failed none", text, StringComparison.Ordinal);
-        Assert.Contains("[INF] Audit registration.cancelled user", text, StringComparison.Ordinal);
+        Assert.Contains("[INF] Audit registration.cancel_submitted user", text, StringComparison.Ordinal);
         Assert.Contains("[INF] Audit event.created admin", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("registration.promoted", text, StringComparison.Ordinal);
         Assert.All(Lines(text), line => Assert.Matches(AuditLine(), line));
+    }
+
+    /// <summary>
+    /// The outcomes that would tell whether an account, a participant, a registration or a ticket exists
+    /// share one code in the file; the in-process events stay distinct.
+    /// </summary>
+    [Theory]
+    [InlineData(new[] { AuditEvent.AccountRegistered, AuditEvent.AccountRegistrationRefused }, AuditCodes.AccountRegistrationSubmitted)]
+    [InlineData(new[] { AuditEvent.RegistrationCreated, AuditEvent.RegistrationWaitlisted, AuditEvent.RegistrationEventFull, AuditEvent.RegistrationRefused }, AuditCodes.RegistrationSubmitted)]
+    [InlineData(new[] { AuditEvent.RegistrationCancelled, AuditEvent.RegistrationCancelRefused }, AuditCodes.CancellationSubmitted)]
+    [InlineData(new[] { AuditEvent.TicketCheckedIn, AuditEvent.TicketAlreadyUsed, AuditEvent.TicketRejected }, AuditCodes.CheckInSubmitted)]
+    public void PublicCodes_OfOutcomesThatWouldRevealExistence_AreTheSame(AuditEvent[] outcomes, string code)
+    {
+        Assert.All(outcomes, o => Assert.Equal(code, AuditCodes.ForPublicLog(o)));
+        Assert.Equal(outcomes.Length, outcomes.Select(AuditCodes.Of).Distinct(StringComparer.Ordinal).Count());
+        Assert.Null(AuditCodes.ForPublicLog(AuditEvent.RegistrationPromoted));
     }
 
     /// <summary>
@@ -195,6 +218,7 @@ public sealed partial class LoggingTests : IDisposable
             .ReturnsAsync(true);
         users.Setup(u => u.AddFirstAdminAsync(It.IsAny<User>(), It.IsAny<SetupKeyAttempt?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FirstAdminResult(FirstAdminStatus.NotAuthorized, 0));
+        users.Setup(u => u.GetSessionStateAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(new SessionState(UserRole.User, false));
         var day = DateOnly.FromDateTime(Now.UtcDateTime).AddDays(10);
         var events = new Mock<IEventRepository>();
         events.Setup(e => e.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(1, EventName, day, 10, 0));
@@ -205,15 +229,21 @@ public sealed partial class LoggingTests : IDisposable
             .Callback<Participant, CancellationToken>((p, _) => stored.Add(new ParticipantRecord(3, p.NationalId, p.FullName, null, p.OwnerUserId)))
             .ReturnsAsync(3);
         var registrations = new Mock<IRegistrationRepository>();
-        registrations.Setup(r => r.AddAsync(3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(5);
+        registrations.Setup(r => r.AddAsync(3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((int _, int _, DateOnly _, DateTime _, Func<string> newTicketCode, CancellationToken _) =>
+            {
+                newTicketCode();
+                return Task.FromResult(new RegistrationOutcome(5, RegistrationStatus.Active, null));
+            });
         registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOwnership(5, 1, day, 7, RegistrationStatus.Active));
-        registrations.Setup(r => r.CancelAsync(5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        registrations.Setup(r => r.CancelAsync(5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
 
         var clock = new FakeTimeProvider(Now);
         await using var provider = new ServiceCollection()
             .AddSingleton<IAuditLog>(new SerilogAuditLog(logger))
             .AddSingleton<TimeProvider>(clock)
+            .AddSingleton<IDatabaseClock>(new ComputerClock(clock))
             .AddSingleton<IPasswordHasher>(hasher)
             .AddSingleton(new SetupKeyThrottle(TimeSpan.Zero))
             .AddSingleton(new SetupKeyEnvironment(null))
@@ -252,21 +282,23 @@ public sealed partial class LoggingTests : IDisposable
         await provider.GetRequiredService<IParticipantService>().AddAsync(session, NationalId, FullName, Email, Ct);
         var registrationService = provider.GetRequiredService<IRegistrationService>();
         var receipt = await registrationService.RegisterAsync(session, 1, NationalId, Ct);
+        Assert.NotNull(receipt.TicketCode);
         await Attempt(() => registrationService.CancelAsync(new UserSession(9, "baska", UserRole.User), 5, Ct)); // not the owner
         await Attempt(() => provider.GetRequiredService<IEventService>().CreateAsync(session, EventName, Now.UtcDateTime, 10, Ct)); // not an admin
         await registrationService.CancelAsync(session, 5, Ct);
         logger.Dispose();
 
         var text = File.ReadAllText(Assert.Single(Directory.GetFiles(_directory)));
-        Assert.Contains("Audit auth.account.registered user", text, StringComparison.Ordinal);
+        Assert.Contains("Audit auth.account.registration_submitted user", text, StringComparison.Ordinal);
         // The refusal of the locked account is counted as one more failure, not as a lock.
         Assert.Equal(LoginPolicy.MaxFailedAttempts + 1, Regex.Count(text, "Audit auth.sign_in.failed none"));
         Assert.Contains("Audit auth.sign_in.succeeded user", text, StringComparison.Ordinal);
         Assert.Contains("Audit setup.key.refused none", text, StringComparison.Ordinal);
         Assert.Contains("Audit participant.added user", text, StringComparison.Ordinal);
-        Assert.Contains("Audit registration.created user", text, StringComparison.Ordinal);
-        Assert.Equal(2, Regex.Count(text, "Audit access.denied user"));
-        Assert.Contains("Audit registration.cancelled user", text, StringComparison.Ordinal);
+        Assert.Contains("Audit registration.submitted user", text, StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(text, "Audit access.denied user")); // the event creation of a user
+        Assert.Equal(2, Regex.Count(text, "Audit registration.cancel_submitted user")); // the foreign and the own cancellation
+        Assert.DoesNotContain("Operation refused", text, StringComparison.Ordinal);
         Assert.DoesNotContain("lock", text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(receipt.TicketCode, text, StringComparison.Ordinal);
         Assert.DoesNotContain(receipt.TicketCode[4..], text, StringComparison.Ordinal);
@@ -306,6 +338,7 @@ public sealed partial class LoggingTests : IDisposable
                 await using var provider = new ServiceCollection()
                     .AddSingleton<IAuditLog>(new SerilogAuditLog(logger))
                     .AddSingleton<TimeProvider>(new FakeTimeProvider(Now))
+                    .AddSingleton<IDatabaseClock>(new ComputerClock(new FakeTimeProvider(Now)))
                     .AddSingleton<IPasswordHasher>(hasher)
                     .AddSingleton(new SetupKeyEnvironment(null))
                     .AddSingleton(users.Object)
@@ -327,9 +360,120 @@ public sealed partial class LoggingTests : IDisposable
             outcomes.Add((message, entries));
         }
 
-        Assert.Equal(["[INF] Audit auth.sign_in.failed none", "[WRN] Operation refused: BusinessRuleException"], outcomes[0].Entries);
+        Assert.Equal(["[INF] Audit auth.sign_in.failed none"], outcomes[0].Entries);
         Assert.All(outcomes, o => Assert.Equal(outcomes[0].Entries, o.Entries));
         Assert.All(outcomes, o => Assert.Equal(AuthService.CredentialsInvalid, o.Message));
+    }
+
+    /// <summary>
+    /// Whoever can read the file knows when they acted. A sign-up with a new or a taken name, a registration
+    /// of an existing, unknown or already registered participant, a cancellation of an own, a foreign or a
+    /// missing registration and a scan of a valid, a used or an unknown ticket must leave identical entries.
+    /// </summary>
+    [Fact]
+    public async Task Outcomes_ThatWouldRevealExistence_LeaveIdenticalEntries()
+    {
+        var hasher = new PasswordHasher(iterations: 1_000);
+        var users = new Mock<IUserRepository>();
+        users.Setup(u => u.UserNameExistsAsync("alinmis", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        users.Setup(u => u.UserNameExistsAsync("yeniuye", It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        users.Setup(u => u.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>())).ReturnsAsync(7);
+        users.Setup(u => u.GetSessionStateAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, CancellationToken _) => new SessionState(id == 1 ? UserRole.Admin : UserRole.User, false));
+        var day = DateOnly.FromDateTime(Now.UtcDateTime).AddDays(10);
+        var events = new Mock<IEventRepository>();
+        events.Setup(e => e.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(1, EventName, day, 10, 0));
+        var participants = new Mock<IParticipantRepository>();
+        participants.Setup(p => p.FindByNationalIdAsync(It.IsAny<string>(), 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string id, int? _, CancellationToken _) => id == NationalId ? [new ParticipantRecord(3, NationalId, FullName, null, 7)] : []);
+        var registrations = new Mock<IRegistrationRepository>();
+        registrations.SetupSequence(r => r.AddAsync(3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RegistrationOutcome(5, RegistrationStatus.Active, null))
+            .ThrowsAsync(new AlreadyRegisteredException());
+        registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new RegistrationOwnership(5, 1, day, 7, RegistrationStatus.Active));
+        registrations.Setup(r => r.GetOwnershipAsync(6, It.IsAny<CancellationToken>())).ReturnsAsync(new RegistrationOwnership(6, 1, day, 9, RegistrationStatus.Active));
+        registrations.Setup(r => r.CancelAsync(5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CancellationOutcome.CancelledAndPromoted);
+        const string Valid = "ETK-AAAAAAAAAAAAAAAAAAAAAAAAAA";
+        const string Used = "ETK-BBBBBBBBBBBBBBBBBBBBBBBBBB";
+        var tickets = new Mock<ITicketRepository>();
+        tickets.Setup(t => t.FindForCheckInAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[] hash, CancellationToken _) =>
+                hash.SequenceEqual(TicketCodeHash.Of(Valid)) ? new TicketForCheckIn(1, Valid, 1, RegistrationStatus.Active, false, null, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
+                : hash.SequenceEqual(TicketCodeHash.Of(Used)) ? new TicketForCheckIn(2, Used, 1, RegistrationStatus.Active, false, Now.UtcDateTime, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
+                : null);
+        tickets.Setup(t => t.CheckInAsync(1, 1, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        tickets.Setup(t => t.GetCheckInCountAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new CheckInCount(1, 1));
+        var user = new UserSession(7, UserName, UserRole.User);
+        var admin = new UserSession(1, "yonetici", UserRole.Admin);
+
+        async Task<string[]> EntriesOf(string name, Func<IServiceProvider, Task> action)
+        {
+            var directory = Path.Combine(_directory, name);
+            using (var logger = AppLogging.CreateLogger(directory))
+            {
+                await using var provider = new ServiceCollection()
+                    .AddSingleton<IAuditLog>(new SerilogAuditLog(logger))
+                    .AddSingleton<TimeProvider>(new FakeTimeProvider(Now))
+                    .AddSingleton<IDatabaseClock>(new ComputerClock(new FakeTimeProvider(Now)))
+                    .AddSingleton<IPasswordHasher>(hasher)
+                    .AddSingleton(new SetupKeyEnvironment(null))
+                    .AddSingleton(users.Object)
+                    .AddSingleton(events.Object)
+                    .AddSingleton(participants.Object)
+                    .AddSingleton(registrations.Object)
+                    .AddSingleton(tickets.Object)
+                    .AddBusinessServices()
+                    .BuildServiceProvider();
+                try
+                {
+                    await action(provider);
+                }
+#pragma warning disable CA1031 // Every failure goes to the log, as the forms do.
+                catch (Exception ex)
+#pragma warning restore CA1031
+                {
+                    ErrorReporter.Record(logger, ex);
+                }
+            }
+
+            return Lines(File.ReadAllText(Assert.Single(Directory.GetFiles(directory))))
+                .Select(line => StampPattern().Replace(line, string.Empty))
+                .ToArray();
+        }
+
+        string[][] signUps =
+        [
+            await EntriesOf("yeni", p => p.GetRequiredService<IAuthService>().RegisterAsync("yeniuye", Password, Password, Ct)),
+            await EntriesOf("alinmis", p => p.GetRequiredService<IAuthService>().RegisterAsync("alinmis", Password, Password, Ct)),
+        ];
+        string[][] registrationsFor =
+        [
+            await EntriesOf("kayit", p => p.GetRequiredService<IRegistrationService>().RegisterAsync(user, 1, NationalId, Ct)),
+            await EntriesOf("tekrar", p => p.GetRequiredService<IRegistrationService>().RegisterAsync(user, 1, NationalId, Ct)),
+            await EntriesOf("bilinmeyen", p => p.GetRequiredService<IRegistrationService>().RegisterAsync(user, 1, "10000000146", Ct)),
+        ];
+        string[][] cancellations =
+        [
+            await EntriesOf("iptal", p => p.GetRequiredService<IRegistrationService>().CancelAsync(user, 5, Ct)),
+            await EntriesOf("baskasinin", p => p.GetRequiredService<IRegistrationService>().CancelAsync(user, 6, Ct)),
+            await EntriesOf("olmayan", p => p.GetRequiredService<IRegistrationService>().CancelAsync(user, 404, Ct)),
+        ];
+        string[][] scans =
+        [
+            await EntriesOf("gecerli", p => p.GetRequiredService<ICheckInService>().CheckInAsync(admin, 1, Valid, Ct)),
+            await EntriesOf("kullanilmis", p => p.GetRequiredService<ICheckInService>().CheckInAsync(admin, 1, Used, Ct)),
+            await EntriesOf("gecersiz", p => p.GetRequiredService<ICheckInService>().CheckInAsync(admin, 1, "ETK-CCCCCCCCCCCCCCCCCCCCCCCCCC", Ct)),
+        ];
+
+        Assert.Equal(["[INF] Audit auth.account.registration_submitted user"], signUps[0]);
+        Assert.Equal(["[INF] Audit registration.submitted user"], registrationsFor[0]);
+        Assert.Equal(["[INF] Audit registration.cancel_submitted user"], cancellations[0]);
+        Assert.Equal(["[INF] Audit ticket.check_in_submitted admin"], scans[0]);
+        foreach (var group in new[] { signUps, registrationsFor, cancellations, scans })
+        {
+            Assert.All(group, entries => Assert.Equal(group[0], entries));
+        }
     }
 
     public void Dispose()
@@ -371,7 +515,7 @@ public sealed partial class LoggingTests : IDisposable
     [GeneratedRegex(Stamp + @"\[INF\] Audit [a-z_]+(\.[a-z_]+)+ (admin|user|none)$")]
     private static partial Regex AuditLine();
 
-    [GeneratedRegex(Stamp + @"(\[INF\] Audit [a-z_]+(\.[a-z_]+)+ (admin|user|none)|\[WRN\] Operation refused: (BusinessRuleException|AccessDeniedException))$")]
+    [GeneratedRegex(Stamp + @"\[INF\] Audit [a-z_]+(\.[a-z_]+)+ (admin|user|none)$")]
     private static partial Regex AllowedLine();
 
     private string DatedFile(int age, int sequence = 0)

@@ -17,6 +17,7 @@ internal sealed class RegistrationConfiguration : IEntityTypeConfiguration<Regis
         builder.Property(r => r.CreatedAt).HasColumnName("KayitZamani");
         builder.Property(r => r.Status).HasColumnName("Durum").HasConversion<int>();
         builder.Property(r => r.CancelledAt).HasColumnName("IptalZamani");
+        builder.Property(r => r.QueueNumber).HasColumnName("SiraNo");
 
         // Registrations are history: deleting a participant or event that has registrations is refused.
         builder.HasOne<Participant>()
@@ -30,11 +31,17 @@ internal sealed class RegistrationConfiguration : IEntityTypeConfiguration<Regis
             .HasConstraintName("FK_Kayitlar_Etkinlikler")
             .OnDelete(DeleteBehavior.Restrict);
 
-        // One active registration per participant and event. This index is what prevents double
-        // registrations under concurrency; the service's own check only produces a friendlier message.
+        // One seat or waiting place per participant and event. This index is what prevents double
+        // registrations and double waiting under concurrency; the repository's own check only produces a
+        // friendlier message.
         builder.HasIndex(r => new { r.ParticipantId, r.EventId }, "IX_Kayitlar_KatilimciId_EtkinlikId")
             .IsUnique()
-            .HasFilter(SchemaLimits.ActiveRegistrationFilter);
+            .HasFilter(SchemaLimits.PlaceHoldingFilter);
+
+        // The order of the waiting list: one number per place, never given twice within an event.
+        builder.HasIndex(r => new { r.EventId, r.QueueNumber }, "IX_Kayitlar_EtkinlikId_SiraNo")
+            .IsUnique()
+            .HasFilter(SchemaLimits.QueueNumberFilter);
         builder.HasIndex(r => r.EventId, "IX_Kayitlar_EtkinlikId");
     }
 }
@@ -49,7 +56,9 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Property(t => t.Id).HasColumnName("Id").ValueGeneratedOnAdd();
         builder.Property(t => t.RegistrationId).HasColumnName("KayitId");
         builder.Property(t => t.Code).HasColumnName("BiletKodu").HasMaxLength(SchemaLimits.TicketCodeLength).IsRequired();
+        builder.Property(t => t.CodeHash).HasColumnName("BiletKoduOzeti").HasMaxLength(SchemaLimits.TicketCodeHashLength).IsFixedLength().IsRequired();
         builder.Property(t => t.IssuedAt).HasColumnName("OlusturmaZamani");
+        builder.Property(t => t.CheckedInAt).HasColumnName("GirisZamani");
 
         // A ticket always belongs to exactly one registration, and a registration has at most one ticket.
         builder.HasOne<Registration>()
@@ -60,5 +69,8 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         builder.HasIndex(t => t.RegistrationId, "IX_Biletler_KayitId").IsUnique();
         builder.HasIndex(t => t.Code, "IX_Biletler_BiletKodu").IsUnique();
+
+        // The entrance looks tickets up by the hash of the code, never by the code itself.
+        builder.HasIndex(t => t.CodeHash, "IX_Biletler_BiletKoduOzeti").IsUnique();
     }
 }

@@ -1,4 +1,5 @@
 using EtkinlikYonetim.Business;
+using EtkinlikYonetim.Business.Exports;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.UI.Infrastructure;
@@ -96,6 +97,32 @@ internal sealed class ControlledEventService : IEventService
     }
 
     public void CompleteCreate() => _create.SetResult(3);
+
+    public int UpdateCalls { get; private set; }
+
+    public int CancelCalls { get; private set; }
+
+    public List<(int EventId, DateTime Date, int Capacity, string? Description)> Updates { get; } = [];
+
+    /// <summary>The events as the window had loaded them when it saved.</summary>
+    public List<EventSummary> UpdatedOriginals { get; } = [];
+
+    /// <summary>When set, a save fails with it at once instead of staying pending.</summary>
+    public Exception? UpdateFailure { get; set; }
+
+    public Task UpdateAsync(UserSession session, EventSummary original, DateTime eventDate, int capacity, string? description, CancellationToken cancellationToken = default)
+    {
+        UpdateCalls++;
+        UpdatedOriginals.Add(original);
+        Updates.Add((original.Id, eventDate, capacity, description));
+        return UpdateFailure is { } failure ? Task.FromException(failure) : new TaskCompletionSource().Task;
+    }
+
+    public Task CancelAsync(UserSession session, int eventId, CancellationToken cancellationToken = default)
+    {
+        CancelCalls++;
+        return new TaskCompletionSource().Task;
+    }
 }
 
 /// <summary>
@@ -156,6 +183,96 @@ internal sealed class ControlledRegistrationService : IRegistrationService
 
     public void CompleteRegister() =>
         _register.SetResult(new RegistrationReceipt(9, "ETK-ABCDEFGHJK", "Bahar Konseri", new DateOnly(2027, 4, 17)));
+
+    /// <summary>Completes the pending registration with a place on the waiting list.</summary>
+    public void CompleteRegisterOnTheWaitingList(int position) =>
+        _register.SetResult(new RegistrationReceipt(10, null, "Bahar Konseri", new DateOnly(2027, 4, 17), position));
+}
+
+/// <summary>Account changes stay pending; the account list is answered at once, or refused when <see cref="Expired"/> is set.</summary>
+internal sealed class ControlledAccountService : IAccountService
+{
+    public List<AccountSummary> Accounts { get; } =
+    [
+        new(1, "admin", UserRole.Admin, false),
+        new(2, "ornek", UserRole.User, false),
+    ];
+
+    public bool Expired { get; set; }
+
+    public int ChangeCalls { get; private set; }
+
+    public List<(int UserId, string Change)> Changes { get; } = [];
+
+    public Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(UserSession session, CancellationToken cancellationToken = default) =>
+        Expired
+            ? Task.FromException<IReadOnlyList<AccountSummary>>(new SessionExpiredException())
+            : Task.FromResult<IReadOnlyList<AccountSummary>>(Accounts);
+
+    public Task SetEnabledAsync(UserSession session, int userId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        ChangeCalls++;
+        Changes.Add((userId, enabled ? "enable" : "disable"));
+        return new TaskCompletionSource().Task;
+    }
+
+    public Task ChangeRoleAsync(UserSession session, int userId, UserRole role, CancellationToken cancellationToken = default)
+    {
+        ChangeCalls++;
+        Changes.Add((userId, role.ToString()));
+        return new TaskCompletionSource().Task;
+    }
+}
+
+/// <summary>Check-ins stay pending until the test answers them; counters are answered by the test, in any order.</summary>
+internal sealed class ControlledCheckInService : ICheckInService
+{
+    public List<(int EventId, string? Code, TaskCompletionSource<CheckInResult> Answer)> CheckIns { get; } = [];
+
+    public List<(int EventId, TaskCompletionSource<CheckInCount> Answer)> CountRequests { get; } = [];
+
+    public Task<CheckInResult> CheckInAsync(UserSession session, int eventId, string? code, CancellationToken cancellationToken = default)
+    {
+        var answer = new TaskCompletionSource<CheckInResult>();
+        CheckIns.Add((eventId, code, answer));
+        return answer.Task;
+    }
+
+    public Task<CheckInCount> GetCountAsync(UserSession session, int eventId, CancellationToken cancellationToken = default)
+    {
+        var answer = new TaskCompletionSource<CheckInCount>();
+        CountRequests.Add((eventId, answer));
+        return answer.Task;
+    }
+}
+
+/// <summary>Exports stay pending until the test answers them.</summary>
+internal sealed class ControlledExportService : IParticipantExportService
+{
+    public List<(string Format, int EventId, TaskCompletionSource<ExportFile> Answer)> Requests { get; } = [];
+
+    public Task<ExportFile> ExportCsvAsync(UserSession session, int eventId, CancellationToken cancellationToken = default) => Request("csv", eventId);
+
+    public Task<ExportFile> ExportHtmlAsync(UserSession session, int eventId, CancellationToken cancellationToken = default) => Request("html", eventId);
+
+    private Task<ExportFile> Request(string format, int eventId)
+    {
+        var answer = new TaskCompletionSource<ExportFile>();
+        Requests.Add((format, eventId, answer));
+        return answer.Task;
+    }
+}
+
+/// <summary>Answers the save dialog with a fixed path (or a cancel) instead of showing it.</summary>
+internal sealed class FixedSavePrompt(string? path) : ISaveFilePrompt
+{
+    public List<(string SuggestedName, string Filter)> Questions { get; } = [];
+
+    public string? AskSavePath(string suggestedName, string filter)
+    {
+        Questions.Add((suggestedName, filter));
+        return path;
+    }
 }
 
 /// <summary>Answers confirmations with yes and records every message instead of showing a dialog.</summary>
