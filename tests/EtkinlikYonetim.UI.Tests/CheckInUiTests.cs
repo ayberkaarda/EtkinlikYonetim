@@ -27,34 +27,71 @@ public sealed class CheckInUiTests
         Assert.Empty(checkIns.CountRequests);
     });
 
-    /// <summary>The code leaves the field at once, a second scan while the first is pending is ignored, and the screen stays.</summary>
+    /// <summary>
+    /// The code leaves the field at once and the field stays open: a scanner types the next code while the
+    /// first check runs. Its Enter does not start a second check at the same time; the next code is checked
+    /// right after the first one, once, and the screen stays.
+    /// </summary>
     [Fact]
-    public void CheckIn_WhilePending_IsNotSentTwiceAndTheCodeIsNotKept() => Run(() =>
+    public void CheckIn_WhilePending_KeepsTheNextScanAndChecksItAfterwards() => Run(() =>
     {
+        const string Next = "ETK-BCDEFGHJKLMNPQRSTUVWXYZ234";
         var checkIns = new ControlledCheckInService();
         using var form = ChosenEvent(checkIns);
         var code = Find<TextBox>(form, "txtKod");
         code.Text = Code;
 
         var first = form.CheckInAsync();
-        code.Text = Code;
+        Assert.True(code.Enabled);
+        Assert.Equal(string.Empty, code.Text);
+        code.Text = Next; // the scanner types while the first check runs
         var second = form.CheckInAsync();
+        var third = form.CheckInAsync();
 
         var call = Assert.Single(checkIns.CheckIns);
         Assert.Equal((1, Code), (call.EventId, call.Code));
         Assert.True(second.IsCompletedSuccessfully && !second.Result);
-        Assert.False(first.IsCompleted);
-        Assert.False(Find<Button>(form, "btnKontrol").Enabled);
-        Assert.False(code.Enabled);
+        Assert.True(third.IsCompletedSuccessfully && !third.Result);
         Assert.False(Find<ComboBox>(form, "cmbEtkinlik").Enabled);
+        Assert.Equal(Next, code.Text);
 
         checkIns.CheckIns[0].Answer.SetResult(new CheckInResult(CheckInOutcome.CheckedIn, new CheckInCount(1, 5)));
 
+        Assert.Equal(2, checkIns.CheckIns.Count);
+        Assert.Equal((1, Next), (checkIns.CheckIns[1].EventId, checkIns.CheckIns[1].Code));
+        Assert.Equal(string.Empty, code.Text);
+        Assert.False(first.IsCompleted);
+
+        checkIns.CheckIns[1].Answer.SetResult(new CheckInResult(CheckInOutcome.AlreadyUsed, new CheckInCount(1, 5)));
+
         Assert.True(first.IsCompletedSuccessfully && first.Result);
-        Assert.Equal(BiletKontrolForm.CheckedInText, Find<Label>(form, "lblSonuc").Text);
+        Assert.Equal(2, checkIns.CheckIns.Count);
+        Assert.Equal(BiletKontrolForm.AlreadyUsedText, Find<Label>(form, "lblSonuc").Text);
         Assert.Equal("Giriş yapan: 1 / 5", Find<Label>(form, "lblSayac").Text);
-        Assert.True(Find<Button>(form, "btnKontrol").Enabled);
+        Assert.True(Find<ComboBox>(form, "cmbEtkinlik").Enabled);
         Assert.False(form.IsDisposed);
+    });
+
+    /// <summary>
+    /// The event is chosen and a ticket scanned at once: the counter loaded for the choice answers after the
+    /// check-in and must not replace the newer counter of the check-in, nor its result.
+    /// </summary>
+    [Fact]
+    public void Counter_LoadedBeforeACheckInButAnsweredAfterIt_DoesNotOverwriteIt() => Run(() =>
+    {
+        var checkIns = new ControlledCheckInService();
+        using var form = new BiletKontrolForm(new ControlledEventService(), checkIns, Sessions.Admin) { Prompts = new RecordingPrompts() };
+        Assert.True(form.LoadAsync().IsCompletedSuccessfully);
+        Find<ComboBox>(form, "cmbEtkinlik").SelectedIndex = 0;
+        Find<TextBox>(form, "txtKod").Text = Code;
+
+        var run = form.CheckInAsync();
+        checkIns.CheckIns[0].Answer.SetResult(new CheckInResult(CheckInOutcome.CheckedIn, new CheckInCount(1, 5)));
+        checkIns.CountRequests[0].Answer.SetResult(new CheckInCount(0, 5));
+
+        Assert.True(run.IsCompletedSuccessfully);
+        Assert.Equal("Giriş yapan: 1 / 5", Find<Label>(form, "lblSayac").Text);
+        Assert.Equal(BiletKontrolForm.CheckedInText, Find<Label>(form, "lblSonuc").Text);
     });
 
     /// <summary>A check-in shows the participant's name, so the staff can compare it with an identity document.</summary>

@@ -22,6 +22,7 @@ namespace EtkinlikYonetim.UI
         private readonly UserSession _session;
         private readonly ExclusiveOperation _check = new();
         private readonly RequestSequence _countRequests = new();
+        private bool _checkQueued;
 
         public BiletKontrolForm(IEventService events, ICheckInService checkIns, UserSession session)
         {
@@ -53,42 +54,62 @@ namespace EtkinlikYonetim.UI
                 cmbEtkinlik.ReplaceItems(events.Where(e => !e.Cancelled));
             });
 
-        /// <summary>Checks the typed code in for the chosen event; ignored while a check is running.</summary>
-        internal Task<bool> CheckInAsync() =>
-            this.RunExclusiveAsync(
-                _check,
-                async () =>
-                {
-                    // The code leaves the field before anything else happens, whatever the answer.
-                    var code = txtKod.Text;
-                    txtKod.Clear();
-                    _check.FocusAfterUnlock(txtKod);
-                    if (cmbEtkinlik.SelectedItem is not EventSummary selected)
-                    {
-                        Prompts.Warn("Lütfen önce etkinliği seçin.");
-                        return;
-                    }
+        /// <summary>
+        /// Checks the typed code in for the chosen event. The code field stays open while a check runs, so a
+        /// scanner can type the next code at once; its Enter is remembered and that code is checked as soon
+        /// as the running check has ended. Returns <see langword="false"/> for such a remembered call.
+        /// </summary>
+        internal async Task<bool> CheckInAsync()
+        {
+            if (_check.IsRunning)
+            {
+                _checkQueued = true;
+                return false;
+            }
 
-                    if (string.IsNullOrWhiteSpace(code))
-                    {
-                        return;
-                    }
+            var ran = await this.RunExclusiveAsync(_check, CheckOnceAsync, cmbEtkinlik);
+            if (ran && _checkQueued && !IsDisposed)
+            {
+                _checkQueued = false;
+                await CheckInAsync();
+            }
 
-                    var result = await _checkIns.CheckInAsync(_session, selected.Id, code);
-                    lblSonuc.Text = result.Outcome switch
-                    {
-                        // The name lets the staff compare the ticket with an identity document.
-                        CheckInOutcome.CheckedIn when result.ParticipantName is { Length: > 0 } name => CheckedInText + " - " + name,
-                        CheckInOutcome.CheckedIn => CheckedInText,
-                        CheckInOutcome.AlreadyUsed => AlreadyUsedText,
-                        CheckInOutcome.NotEventDay => NotEventDayText,
-                        _ => RejectedText,
-                    };
-                    ShowCount(result.Count);
-                },
-                btnKontrol,
-                txtKod,
-                cmbEtkinlik);
+            return ran;
+        }
+
+        private async Task CheckOnceAsync()
+        {
+            // The code leaves the field before anything else happens, whatever the answer.
+            var code = txtKod.Text;
+            txtKod.Clear();
+            _check.FocusAfterUnlock(txtKod);
+            if (cmbEtkinlik.SelectedItem is not EventSummary selected)
+            {
+                Prompts.Warn("Lütfen önce etkinliği seçin.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                return;
+            }
+
+            var result = await _checkIns.CheckInAsync(_session, selected.Id, code);
+            lblSonuc.Text = result.Outcome switch
+            {
+                // The name lets the staff compare the ticket with an identity document.
+                CheckInOutcome.CheckedIn when result.ParticipantName is { Length: > 0 } name => CheckedInText + " - " + name,
+                CheckInOutcome.CheckedIn => CheckedInText,
+                CheckInOutcome.AlreadyUsed => AlreadyUsedText,
+                CheckInOutcome.NotEventDay => NotEventDayText,
+                _ => RejectedText,
+            };
+
+            // The counter of the check-in is newer than any counter still being loaded for the choice of the
+            // event, so such an older answer must not overwrite it.
+            _ = _countRequests.Next();
+            ShowCount(result.Count);
+        }
 
         /// <summary>Shows the counter of the chosen event; only the answer to the latest choice is shown.</summary>
         internal async Task LoadCountAsync()
