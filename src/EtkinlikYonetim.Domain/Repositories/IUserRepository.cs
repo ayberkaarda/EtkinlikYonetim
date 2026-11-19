@@ -77,7 +77,7 @@ public enum FirstAdminStatus
 
 /// <summary>
 /// A setup key given by someone, checked by a repository inside its write transaction. The repository
-/// passes every key usable at <see cref="Now"/> (unused and unexpired); <see cref="FindMatch"/> compares
+/// passes every key usable now (unused and unexpired); <see cref="FindMatch"/> compares
 /// the given key with each of them in constant time and returns the id of the matching one, or
 /// <see langword="null"/>. Wrong keys are never counted against a stored key, so nobody can make the
 /// founder's key unusable by guessing.
@@ -94,7 +94,12 @@ public sealed class SetupKeyAttempt
         Now = now;
     }
 
-    /// <summary>UTC time of the attempt; decides expiry.</summary>
+    /// <summary>
+    /// UTC time of the attempt by the computer's clock. On SQL Server it plays no part: both the
+    /// selection of the usable keys and the final UPDATE that uses one up compare the expiry with the
+    /// database's clock, at the moment of use. Providers without such a clock (the tests' SQLite) use
+    /// this time instead.
+    /// </summary>
     public DateTime Now { get; }
 
     public int? FindMatch(IReadOnlyList<StoredSetupKey> usableKeys) => _findMatch(usableKeys);
