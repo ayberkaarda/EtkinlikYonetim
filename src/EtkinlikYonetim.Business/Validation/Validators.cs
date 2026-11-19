@@ -122,6 +122,27 @@ internal sealed class EventInputValidator : AbstractValidator<EventInput>
 }
 
 /// <summary>
+/// A change of an event: a day that is today or later, a capacity from <see cref="InputRules.MinCapacity"/>
+/// to <see cref="InputRules.MaxCapacity"/> and a description of at most
+/// <see cref="InputRules.EventDescriptionMaxLength"/> characters. Whether the capacity still holds the seats
+/// taken is decided by the repository, inside its transaction.
+/// </summary>
+internal sealed class EventUpdateInputValidator : AbstractValidator<EventUpdateInput>
+{
+    public EventUpdateInputValidator()
+    {
+        ClassLevelCascadeMode = CascadeMode.Stop;
+
+        RuleFor(e => e.Day)
+            .Must((e, day) => day >= e.Today).WithMessage(EventService.NewDateInPast);
+        RuleFor(e => e.Capacity)
+            .InclusiveBetween(InputRules.MinCapacity, InputRules.MaxCapacity).WithMessage(EventService.CapacityInvalid);
+        RuleFor(e => e.Description)
+            .MaximumLength(InputRules.EventDescriptionMaxLength).WithMessage(EventService.DescriptionTooLong);
+    }
+}
+
+/// <summary>
 /// A registration request: an event is chosen and the national id has eleven digits. Rows of the
 /// original application were checked for the format only, so the lookup does not require a valid
 /// checksum; new participants are checked fully when they are added.

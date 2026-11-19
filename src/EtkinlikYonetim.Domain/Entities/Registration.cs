@@ -43,6 +43,9 @@ public enum RegistrationStatus
     /// first waiting registration moves up to <see cref="Active"/> in the same transaction.
     /// </summary>
     Waiting = 2,
+
+    /// <summary>Closed because an admin cancelled the event; shown to the participant's account as cancelled.</summary>
+    EventCancelled = 3,
 }
 
 /// <summary>The ticket of exactly one registration (table: Biletler).</summary>

@@ -27,6 +27,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IValidator<SignInInput>, SignInInputValidator>();
         services.AddSingleton<IValidator<ParticipantInput>, ParticipantInputValidator>();
         services.AddSingleton<IValidator<EventInput>, EventInputValidator>();
+        services.AddSingleton<IValidator<EventUpdateInput>, EventUpdateInputValidator>();
         services.AddSingleton<IValidator<RegistrationRequestInput>, RegistrationRequestInputValidator>();
         services.AddSingleton<IValidator<RegistrationTargetInput>, RegistrationTargetInputValidator>();
         services.AddSingleton<IValidator<CancellationInput>, CancellationInputValidator>();

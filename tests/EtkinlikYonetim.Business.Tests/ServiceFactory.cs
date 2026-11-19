@@ -25,7 +25,7 @@ internal static class ServiceFactory
         new(users, hasher, gate, environment, new AccountInputValidator(), audit ?? NullAuditLog.Instance);
 
     public static EventService Event(IEventRepository events, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
-        new(events, time, new EventInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+        new(events, time, new EventInputValidator(), new EventUpdateInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
     public static ParticipantService Participant(IParticipantRepository participants, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
         new(participants, new ParticipantInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);

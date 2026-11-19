@@ -86,6 +86,12 @@ namespace EtkinlikYonetim.UI
             SessionEnd.Close(this);
         }
 
+        private void btnEtkinlikYonet_Click(object? sender, EventArgs e)
+        {
+            using var form = _forms.Create<EtkinlikYonetForm>(_session);
+            form.ShowDialog(this);
+        }
+
         private void btnKullanicilar_Click(object? sender, EventArgs e)
         {
             using var form = _forms.Create<KullaniciYonetForm>(_session);

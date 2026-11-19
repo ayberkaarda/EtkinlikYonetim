@@ -12,7 +12,7 @@ public interface IRegistrationRepository
     /// joins the end of the event's waiting list without a ticket.
     /// </summary>
     /// <exception cref="AlreadyRegisteredException">The participant already holds a seat or waits for one at the event.</exception>
-    /// <exception cref="EventClosedException">The event does not exist or is in the past.</exception>
+    /// <exception cref="EventClosedException">The event does not exist, is cancelled or is in the past.</exception>
     Task<RegistrationOutcome> AddAsync(
         int participantId,
         int eventId,
@@ -22,8 +22,9 @@ public interface IRegistrationRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Registrations that hold a seat or wait for one, of the participants owned by
-    /// <paramref name="ownerUserId"/>, or of everyone when it is <see langword="null"/>; latest event first.
+    /// Registrations that hold a seat or wait for one, and those closed by the cancellation of their event,
+    /// of the participants owned by <paramref name="ownerUserId"/>, or of everyone when it is
+    /// <see langword="null"/>; latest event first.
     /// </summary>
     Task<IReadOnlyList<RegistrationDetails>> GetActiveAsync(int? ownerUserId, CancellationToken cancellationToken = default);
 

@@ -74,6 +74,12 @@ public enum AuditEvent
 
     /// <summary>A cancellation freed a seat and the first waiting participant moved up to it with a new ticket.</summary>
     RegistrationPromoted = 18,
+
+    /// <summary>An admin changed the date, capacity or description of an event.</summary>
+    EventUpdated = 19,
+
+    /// <summary>An admin cancelled an event; its registrations and waiting places were closed.</summary>
+    EventCancelled = 20,
 }
 
 /// <summary>Receives <see cref="AuditEvent"/>s; the application writes them to its log file.</summary>
@@ -106,6 +112,8 @@ public static class AuditCodes
         AuditEvent.RoleChanged => "admin.account.role_changed",
         AuditEvent.RegistrationWaitlisted => "registration.waitlisted",
         AuditEvent.RegistrationPromoted => "registration.promoted",
+        AuditEvent.EventUpdated => "event.updated",
+        AuditEvent.EventCancelled => "event.cancelled",
         _ => throw new ArgumentOutOfRangeException(nameof(auditEvent), auditEvent, "Unknown audit event."),
     };
 

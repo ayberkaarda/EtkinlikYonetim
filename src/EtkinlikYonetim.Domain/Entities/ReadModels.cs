@@ -20,13 +20,24 @@ public sealed record AccountSummary(int Id, string UserName, UserRole Role, bool
 /// <summary>A usable setup key, as a given key is compared with it.</summary>
 public sealed record StoredSetupKey(int Id, byte[] KeyHash);
 
-/// <summary>An event with its seat usage and the length of its waiting list, for pickers and rule checks.</summary>
-public sealed record EventSummary(int Id, string Name, DateOnly Date, int Capacity, int RegisteredCount, int WaitingCount = 0)
+/// <summary>
+/// An event with its seat usage, the length of its waiting list, its description and whether it was
+/// cancelled, for pickers, the event management and rule checks.
+/// </summary>
+public sealed record EventSummary(
+    int Id,
+    string Name,
+    DateOnly Date,
+    int Capacity,
+    int RegisteredCount,
+    int WaitingCount = 0,
+    string? Description = null,
+    bool Cancelled = false)
 {
     public int FreeSeats => Math.Max(0, Capacity - RegisteredCount);
 
     public override string ToString() =>
-        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Name} - {Date:dd.MM.yyyy}");
+        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Name} - {Date:dd.MM.yyyy}{(Cancelled ? " (İptal edildi)" : string.Empty)}");
 }
 
 /// <summary>A participant as found by national id, with its owner for the ownership check.</summary>

@@ -30,7 +30,7 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
         }
 
         var date = await db.Events
-            .Where(e => e.Id == eventId)
+            .Where(e => e.Id == eventId && !e.Cancelled)
             .Select(e => (DateOnly?)e.Date)
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -109,7 +109,7 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
                 from r in db.Registrations.AsNoTracking()
                 join p in participants on r.ParticipantId equals p.Id
                 join e in db.Events on r.EventId equals e.Id
-                where r.Status == RegistrationStatus.Active || r.Status == RegistrationStatus.Waiting
+                where r.Status == RegistrationStatus.Active || r.Status == RegistrationStatus.Waiting || r.Status == RegistrationStatus.EventCancelled
                 orderby e.Date descending, r.Id descending
                 select new RegistrationDetails(
                     r.Id,
@@ -250,7 +250,7 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
     /// <summary>Raises the seat counter by one while a seat is free and the event is not past; returns the rows changed.</summary>
     private static Task<int> TakeSeatAsync(EventDbContext db, int eventId, DateOnly today, CancellationToken cancellationToken) =>
         db.Events
-            .Where(e => e.Id == eventId && e.Date >= today && e.RegisteredCount < e.Capacity)
+            .Where(e => e.Id == eventId && !e.Cancelled && e.Date >= today && e.RegisteredCount < e.Capacity)
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.RegisteredCount, e => e.RegisteredCount + 1), cancellationToken);
 
     private static Task<int> QueuePositionAsync(EventDbContext db, int eventId, int queueNumber, CancellationToken cancellationToken) =>

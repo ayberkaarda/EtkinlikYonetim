@@ -51,6 +51,8 @@ public sealed class AuditTests
         { AuditEvent.RoleChanged, 16, "admin.account.role_changed" },
         { AuditEvent.RegistrationWaitlisted, 17, "registration.waitlisted" },
         { AuditEvent.RegistrationPromoted, 18, "registration.promoted" },
+        { AuditEvent.EventUpdated, 19, "event.updated" },
+        { AuditEvent.EventCancelled, 20, "event.cancelled" },
     };
 
     [Theory]

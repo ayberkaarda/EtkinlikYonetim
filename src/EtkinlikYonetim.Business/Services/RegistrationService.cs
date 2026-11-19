@@ -59,6 +59,7 @@ internal sealed class RegistrationService(
     internal const string ParticipantNotFound = "Bu TC Kimlik numarasıyla sistemde kayıtlı bir katılımcı bulunamadı.";
     internal const string ParticipantAmbiguous = "Bu TC Kimlik numarası birden fazla hesabın katılımcısıyla eşleşiyor. Kaydı katılımcıyı ekleyen hesapla yapın.";
     internal const string PastEvent = "Geçmiş tarihli bir etkinliğe kayıt yapılamaz.";
+    internal const string CancelledEvent = "İptal edilmiş bir etkinliğe kayıt yapılamaz.";
     internal const string AlreadyRegistered = "Bu katılımcı bu etkinliğe zaten kayıtlı veya bekleme listesinde.";
     internal const string AlreadyCancelled = "Bu kayıt zaten iptal edilmiş.";
     internal const string PastCannotCancel = "Geçmiş bir etkinliğin kaydı iptal edilemez.";
@@ -93,6 +94,11 @@ internal sealed class RegistrationService(
         var target = await events.GetByIdAsync(eventId, cancellationToken).ConfigureAwait(false)
             ?? throw new BusinessRuleException(EventRequired);
         var today = timeProvider.Today();
+        if (target.Cancelled)
+        {
+            throw new BusinessRuleException(CancelledEvent);
+        }
+
         targetValidator.ValidateOrThrow(new RegistrationTargetInput(target.Date, today));
 
         string? code = null;

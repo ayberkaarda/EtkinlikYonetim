@@ -20,6 +20,8 @@ public static partial class InputRules
 
     public const int EventNameMaxLength = 80;
 
+    public const int EventDescriptionMaxLength = 500;
+
     public const int MinCapacity = 1;
 
     public const int MaxCapacity = 1000;

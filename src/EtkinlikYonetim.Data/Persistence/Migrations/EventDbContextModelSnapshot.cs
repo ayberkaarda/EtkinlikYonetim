@@ -110,7 +110,7 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     b.ToTable("Kayitlar", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Kayitlar_Durum", "[Durum] IN (0, 1, 2)");
+                            t.HasCheckConstraint("CK_Kayitlar_Durum", "[Durum] IN (0, 1, 2, 3)");
                         });
                 });
 
@@ -123,6 +123,14 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Cancelled")
+                        .HasColumnType("bit")
+                        .HasColumnName("IptalEdildi");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("IptalZamani");
+
                     b.Property<int>("Capacity")
                         .HasColumnType("int")
                         .HasColumnName("Kapasite");
@@ -130,6 +138,11 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date")
                         .HasColumnName("Tarih");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("Aciklama");
 
                     b.Property<string>("Name")
                         .IsRequired()

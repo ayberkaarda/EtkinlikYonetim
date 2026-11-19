@@ -9,6 +9,7 @@ internal static class SchemaLimits
     /// <summary>Sizes of the original columns (NVARCHAR(50) and NVARCHAR(100)).</summary>
     public const int UserNameLength = 50;
     public const int EventNameLength = 100;
+    public const int EventDescriptionLength = 500;
     public const int PersonNameLength = 100;
     public const int EmailLength = 100;
     public const int NationalIdLength = 11;
@@ -38,8 +39,11 @@ internal static class SchemaLimits
     /// <summary>The seat counter can neither go negative nor exceed the capacity: no event is ever overbooked.</summary>
     public const string RegisteredCountCheck = "[KayitSayisi] >= 0 AND [KayitSayisi] <= [Kapasite]";
 
-    /// <summary>Values of <see cref="Domain.Entities.RegistrationStatus"/>: 0 active, 1 cancelled, 2 waiting.</summary>
-    public const string StatusCheck = "[Durum] IN (0, 1, 2)";
+    /// <summary>
+    /// Values of <see cref="Domain.Entities.RegistrationStatus"/>: 0 active, 1 cancelled, 2 waiting, 3 closed
+    /// by the cancellation of the event.
+    /// </summary>
+    public const string StatusCheck = "[Durum] IN (0, 1, 2, 3)";
 
     /// <summary>
     /// The filter of the one-registration-per-participant index as InitialCreate made it (active only);

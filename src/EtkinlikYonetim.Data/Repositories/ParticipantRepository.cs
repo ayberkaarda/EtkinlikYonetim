@@ -67,7 +67,8 @@ internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> co
         return await (
                 from r in db.Registrations.AsNoTracking()
                 join p in db.Participants on r.ParticipantId equals p.Id
-                where r.EventId == eventId && (r.Status == RegistrationStatus.Active || r.Status == RegistrationStatus.Waiting)
+                where r.EventId == eventId
+                    && (r.Status == RegistrationStatus.Active || r.Status == RegistrationStatus.Waiting || r.Status == RegistrationStatus.EventCancelled)
                 orderby r.Status, r.QueueNumber, p.FullName, r.Id
                 select new EventParticipant(
                     r.Id,

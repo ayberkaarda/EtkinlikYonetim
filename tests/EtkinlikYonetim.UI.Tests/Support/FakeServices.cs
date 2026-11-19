@@ -96,6 +96,25 @@ internal sealed class ControlledEventService : IEventService
     }
 
     public void CompleteCreate() => _create.SetResult(3);
+
+    public int UpdateCalls { get; private set; }
+
+    public int CancelCalls { get; private set; }
+
+    public List<(int EventId, DateTime Date, int Capacity, string? Description)> Updates { get; } = [];
+
+    public Task UpdateAsync(UserSession session, int eventId, DateTime eventDate, int capacity, string? description, CancellationToken cancellationToken = default)
+    {
+        UpdateCalls++;
+        Updates.Add((eventId, eventDate, capacity, description));
+        return new TaskCompletionSource().Task;
+    }
+
+    public Task CancelAsync(UserSession session, int eventId, CancellationToken cancellationToken = default)
+    {
+        CancelCalls++;
+        return new TaskCompletionSource().Task;
+    }
 }
 
 /// <summary>

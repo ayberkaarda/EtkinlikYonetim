@@ -20,6 +20,9 @@ internal sealed class EventConfiguration : IEntityTypeConfiguration<ScheduledEve
         builder.Property(e => e.Date).HasColumnName("Tarih").HasColumnType("date");
         builder.Property(e => e.Capacity).HasColumnName("Kapasite");
         builder.Property(e => e.RegisteredCount).HasColumnName("KayitSayisi");
+        builder.Property(e => e.Description).HasColumnName("Aciklama").HasMaxLength(SchemaLimits.EventDescriptionLength);
+        builder.Property(e => e.Cancelled).HasColumnName("IptalEdildi");
+        builder.Property(e => e.CancelledAt).HasColumnName("IptalZamani");
 
         builder.HasIndex(e => e.Date, "IX_Etkinlikler_Tarih");
     }

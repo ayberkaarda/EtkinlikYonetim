@@ -22,6 +22,7 @@ internal sealed record RegistrationItem(RegistrationDetails Registration)
     private static string State(RegistrationDetails registration) => registration.Status switch
     {
         RegistrationStatus.Waiting => $"Bekleme listesi, sıra: {registration.QueuePosition}",
+        RegistrationStatus.EventCancelled => "Etkinlik iptal edildi",
         _ => $"Bilet: {registration.TicketCode ?? "-"}",
     };
 }
