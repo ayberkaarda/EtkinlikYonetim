@@ -42,7 +42,7 @@ public interface ICheckInService
 
 internal sealed class CheckInService(
     ITicketRepository tickets,
-    TimeProvider timeProvider,
+    IDatabaseClock clock,
     ISessionGuard sessions,
     IAuditLog audit) : ICheckInService
 {
@@ -97,7 +97,9 @@ internal sealed class CheckInService(
             return CheckInOutcome.AlreadyUsed;
         }
 
-        if (await tickets.CheckInAsync(ticket.TicketId, eventId, timeProvider.GetUtcNow().UtcDateTime, cancellationToken).ConfigureAwait(false))
+        // The check-in time is the database's, so the clock of the scanning computer cannot change it.
+        var checkedInAt = await clock.GetUtcNowAsync(cancellationToken).ConfigureAwait(false);
+        if (await tickets.CheckInAsync(ticket.TicketId, eventId, checkedInAt, cancellationToken).ConfigureAwait(false))
         {
             return CheckInOutcome.CheckedIn;
         }

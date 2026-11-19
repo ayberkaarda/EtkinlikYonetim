@@ -245,6 +245,42 @@ public sealed class RegistrationServiceTests
         await Service().CancelAsync(Sessions.User, 8, Ct);
     }
 
+    /// <summary>
+    /// The computer's clock is two days behind the database's. Yesterday by the database is still ahead
+    /// by the computer's clock, but the database's day decides, and the registration is written with the
+    /// database's day and time (the mock answers only to those).
+    /// </summary>
+    [Fact]
+    public async Task Register_ComputerClockBehind_TheDatabaseDayAndTimeDecide()
+    {
+        var service = BehindByTwoDays();
+        SetupAdd(1, 1, 41);
+
+        var past = await Assert.ThrowsAsync<BusinessRuleException>(() => service.RegisterAsync(Sessions.User, 3, OwnNationalId, Ct));
+
+        Assert.Equal(RegistrationService.PastEvent, past.Message);
+        Assert.Equal(41, (await service.RegisterAsync(Sessions.User, 1, OwnNationalId, Ct)).RegistrationId);
+    }
+
+    /// <summary>A registration of yesterday's event (by the database) cannot be cancelled from a computer whose clock is behind.</summary>
+    [Fact]
+    public async Task Cancel_ComputerClockBehind_TheDatabaseDayAndTimeDecide()
+    {
+        var service = BehindByTwoDays();
+        SetupOwnership(6, Sessions.User.UserId, eventDate: Today.AddDays(-1));
+        SetupOwnership(7, Sessions.User.UserId);
+        _registrations.Setup(r => r.CancelAsync(7, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
+
+        Assert.Equal(RegistrationService.PastCannotCancel, (await Assert.ThrowsAsync<BusinessRuleException>(() => service.CancelAsync(Sessions.User, 6, Ct))).Message);
+        await service.CancelAsync(Sessions.User, 7, Ct);
+    }
+
+    private RegistrationService BehindByTwoDays()
+    {
+        var behind = new FakeTimeProvider(Now - TimeSpan.FromDays(2));
+        return ServiceFactory.Registration(_registrations.Object, _participants.Object, _events.Object, behind, clock: new TestDatabaseClock(behind, TimeSpan.FromDays(2)));
+    }
+
     private static string Message(string name) => name switch
     {
         nameof(RegistrationService.EventRequired) => RegistrationService.EventRequired,

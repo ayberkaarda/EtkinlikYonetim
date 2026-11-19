@@ -21,7 +21,7 @@ public interface IAuthService
 internal sealed class AuthService(
     IUserRepository users,
     IPasswordHasher passwordHasher,
-    TimeProvider timeProvider,
+    IDatabaseClock clock,
     IValidator<SignInInput> signInValidator,
     IValidator<AccountInput> accountValidator,
     IAuditLog audit) : IAuthService
@@ -58,6 +58,9 @@ internal sealed class AuthService(
         var name = input.UserName;
         password = input.Password!;
 
+        // Locks are set and ended by the database's clock, so a computer whose clock is ahead cannot end
+        // one early. Read for every attempt, so an unknown account takes the same round trips.
+        var now = await clock.GetUtcNowAsync(cancellationToken).ConfigureAwait(false);
         var account = await users.FindByUserNameAsync(name, cancellationToken).ConfigureAwait(false);
         if (account is null)
         {
@@ -65,7 +68,6 @@ internal sealed class AuthService(
             throw SignInRefused();
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
         if (account.Disabled || account.LockoutEnd > now)
         {
             // Same answer and about the same cost as a wrong password; nothing is written, so the

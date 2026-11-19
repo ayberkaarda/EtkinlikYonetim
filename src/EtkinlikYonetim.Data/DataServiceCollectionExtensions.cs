@@ -3,6 +3,7 @@ using EtkinlikYonetim.Data.Repositories;
 using EtkinlikYonetim.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EtkinlikYonetim.Data;
 
@@ -44,6 +45,8 @@ public static class DataServiceCollectionExtensions
         services.AddSingleton<IParticipantRepository, ParticipantRepository>();
         services.AddSingleton<IRegistrationRepository, RegistrationRepository>();
         services.AddSingleton<ITicketRepository, TicketRepository>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<IDatabaseClock, DatabaseClock>();
         return services;
     }
 }

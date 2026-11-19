@@ -1,8 +1,9 @@
 using EtkinlikYonetim.Business.Auditing;
+using EtkinlikYonetim.Domain.Repositories;
 
 namespace EtkinlikYonetim.Business.Services;
 
-/// <summary>Session and role checks and the local calendar day shared by the services.</summary>
+/// <summary>Session and role checks and the database's time shared by the services.</summary>
 internal static class Access
 {
     /// <summary>
@@ -37,7 +38,17 @@ internal static class Access
     /// </summary>
     public static int? OwnerFilter(UserSession session) => session.IsAdmin ? null : session.UserId;
 
-    /// <summary>Today's date on the local wall clock; event dates are local calendar days.</summary>
-    public static DateOnly Today(this TimeProvider timeProvider) =>
-        DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
+    /// <summary>
+    /// The database's UTC time now and the calendar day it falls on in this computer's time zone (event
+    /// dates are local calendar days). Computers whose clocks are wrong still agree on both, as long as
+    /// their time zone is set right; the computer's own clock plays no part.
+    /// </summary>
+    public static async Task<DatabaseNow> NowAsync(this IDatabaseClock clock, TimeProvider timeProvider, CancellationToken cancellationToken)
+    {
+        var utc = DateTime.SpecifyKind(await clock.GetUtcNowAsync(cancellationToken).ConfigureAwait(false), DateTimeKind.Utc);
+        return new DatabaseNow(utc, DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(utc, timeProvider.LocalTimeZone)));
+    }
 }
+
+/// <summary>The database's UTC time and its local calendar day, read once for one operation.</summary>
+internal readonly record struct DatabaseNow(DateTime Utc, DateOnly Today);

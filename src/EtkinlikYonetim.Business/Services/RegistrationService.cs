@@ -50,6 +50,7 @@ internal sealed class RegistrationService(
     IRegistrationRepository registrations,
     IParticipantRepository participants,
     IEventRepository events,
+    IDatabaseClock clock,
     TimeProvider timeProvider,
     IValidator<RegistrationRequestInput> requestValidator,
     IValidator<RegistrationTargetInput> targetValidator,
@@ -113,13 +114,13 @@ internal sealed class RegistrationService(
 
         var target = await events.GetByIdAsync(eventId, cancellationToken).ConfigureAwait(false)
             ?? throw new BusinessRuleException(EventRequired);
-        var today = timeProvider.Today();
         if (target.Cancelled)
         {
             throw new BusinessRuleException(CancelledEvent);
         }
 
-        targetValidator.ValidateOrThrow(new RegistrationTargetInput(target.Date, today));
+        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        targetValidator.ValidateOrThrow(new RegistrationTargetInput(target.Date, now.Today));
 
         string? code = null;
         try
@@ -130,8 +131,8 @@ internal sealed class RegistrationService(
             var outcome = await registrations.AddAsync(
                 participant.Id,
                 eventId,
-                today,
-                timeProvider.GetUtcNow().UtcDateTime,
+                now.Today,
+                now.Utc,
                 () => code = TicketCode.New(),
                 cancellationToken).ConfigureAwait(false);
             if (outcome.Status == RegistrationStatus.Waiting)
@@ -180,8 +181,8 @@ internal sealed class RegistrationService(
             throw new AccessDeniedException();
         }
 
-        var today = timeProvider.Today();
-        var check = cancellationValidator.Validate(new CancellationInput(registration.Status, registration.EventDate, today));
+        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        var check = cancellationValidator.Validate(new CancellationInput(registration.Status, registration.EventDate, now.Today));
         if (!check.IsValid)
         {
             audit.Record(AuditEvent.RegistrationCancelRefused, session.Role);
@@ -193,8 +194,8 @@ internal sealed class RegistrationService(
         var outcome = await registrations.CancelAsync(
             registrationId,
             Access.OwnerFilter(session),
-            today,
-            timeProvider.GetUtcNow().UtcDateTime,
+            now.Today,
+            now.Utc,
             TicketCode.New,
             cancellationToken).ConfigureAwait(false);
         if (outcome == CancellationOutcome.NotCancelled)

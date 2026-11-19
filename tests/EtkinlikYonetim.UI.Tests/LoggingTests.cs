@@ -7,6 +7,7 @@ using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
 using EtkinlikYonetim.UI.Infrastructure;
+using EtkinlikYonetim.UI.Tests.Support;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
@@ -242,6 +243,7 @@ public sealed partial class LoggingTests : IDisposable
         await using var provider = new ServiceCollection()
             .AddSingleton<IAuditLog>(new SerilogAuditLog(logger))
             .AddSingleton<TimeProvider>(clock)
+            .AddSingleton<IDatabaseClock>(new ComputerClock(clock))
             .AddSingleton<IPasswordHasher>(hasher)
             .AddSingleton(new SetupKeyThrottle(TimeSpan.Zero))
             .AddSingleton(new SetupKeyEnvironment(null))
@@ -336,6 +338,7 @@ public sealed partial class LoggingTests : IDisposable
                 await using var provider = new ServiceCollection()
                     .AddSingleton<IAuditLog>(new SerilogAuditLog(logger))
                     .AddSingleton<TimeProvider>(new FakeTimeProvider(Now))
+                    .AddSingleton<IDatabaseClock>(new ComputerClock(new FakeTimeProvider(Now)))
                     .AddSingleton<IPasswordHasher>(hasher)
                     .AddSingleton(new SetupKeyEnvironment(null))
                     .AddSingleton(users.Object)
@@ -412,6 +415,7 @@ public sealed partial class LoggingTests : IDisposable
                 await using var provider = new ServiceCollection()
                     .AddSingleton<IAuditLog>(new SerilogAuditLog(logger))
                     .AddSingleton<TimeProvider>(new FakeTimeProvider(Now))
+                    .AddSingleton<IDatabaseClock>(new ComputerClock(new FakeTimeProvider(Now)))
                     .AddSingleton<IPasswordHasher>(hasher)
                     .AddSingleton(new SetupKeyEnvironment(null))
                     .AddSingleton(users.Object)

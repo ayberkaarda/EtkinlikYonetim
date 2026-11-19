@@ -14,7 +14,7 @@ namespace EtkinlikYonetim.Business.Tests;
 internal static class ServiceFactory
 {
     public static AuthService Auth(IUserRepository users, IPasswordHasher hasher, TimeProvider time, IAuditLog? audit = null) =>
-        new(users, hasher, time, new SignInInputValidator(), new AccountInputValidator(), audit ?? NullAuditLog.Instance);
+        new(users, hasher, new TestDatabaseClock(time), new SignInInputValidator(), new AccountInputValidator(), audit ?? NullAuditLog.Instance);
 
     public static SetupService Setup(
         IUserRepository users,
@@ -24,8 +24,8 @@ internal static class ServiceFactory
         IAuditLog? audit = null) =>
         new(users, hasher, gate, environment, new AccountInputValidator(), audit ?? NullAuditLog.Instance);
 
-    public static EventService Event(IEventRepository events, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
-        new(events, time, new EventInputValidator(), new EventUpdateInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+    public static EventService Event(IEventRepository events, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null, IDatabaseClock? clock = null) =>
+        new(events, clock ?? new TestDatabaseClock(time), time, new EventInputValidator(), new EventUpdateInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
     public static ParticipantService Participant(IParticipantRepository participants, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
         new(participants, new ParticipantInputValidator(), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
@@ -36,11 +36,13 @@ internal static class ServiceFactory
         IEventRepository events,
         TimeProvider time,
         IAuditLog? audit = null,
-        ISessionGuard? sessions = null) =>
+        ISessionGuard? sessions = null,
+        IDatabaseClock? clock = null) =>
         new(
             registrations,
             participants,
             events,
+            clock ?? new TestDatabaseClock(time),
             time,
             new RegistrationRequestInputValidator(),
             new RegistrationTargetInputValidator(),
@@ -52,7 +54,7 @@ internal static class ServiceFactory
         new(users, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
     public static CheckInService CheckIn(ITicketRepository tickets, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
-        new(tickets, time, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+        new(tickets, new TestDatabaseClock(time), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
     public static Exports.ParticipantExportService Export(
         IEventRepository events,
@@ -72,4 +74,14 @@ internal static class ServiceFactory
 
         public Task EnsureCurrentAsync(UserSession session, CancellationToken cancellationToken) => Task.CompletedTask;
     }
+}
+
+/// <summary>
+/// A database clock at <paramref name="time"/> plus <paramref name="offset"/>: with no offset, a database
+/// whose clock agrees with the computer's; with one, a computer whose clock is wrong by minus that much.
+/// </summary>
+internal sealed class TestDatabaseClock(TimeProvider time, TimeSpan offset = default) : IDatabaseClock
+{
+    public Task<DateTime> GetUtcNowAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(time.GetUtcNow().UtcDateTime + offset);
 }

@@ -35,6 +35,7 @@ public interface IEventService
 
 internal sealed class EventService(
     IEventRepository events,
+    IDatabaseClock clock,
     TimeProvider timeProvider,
     IValidator<EventInput> validator,
     IValidator<EventUpdateInput> updateValidator,
@@ -69,7 +70,8 @@ internal sealed class EventService(
     public async Task<IReadOnlyList<EventSummary>> GetOpenEventsAsync(UserSession session, CancellationToken cancellationToken = default)
     {
         await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
-        return await events.GetFromAsync(timeProvider.Today(), cancellationToken).ConfigureAwait(false);
+        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        return await events.GetFromAsync(now.Today, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<int> CreateAsync(
@@ -81,7 +83,8 @@ internal sealed class EventService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var input = EventInput.Create(name, eventDate, capacity, timeProvider.Today());
+        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        var input = EventInput.Create(name, eventDate, capacity, now.Today);
         validator.ValidateOrThrow(input);
 
         var id = await events.AddAsync(
@@ -101,8 +104,8 @@ internal sealed class EventService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var today = timeProvider.Today();
-        var input = EventUpdateInput.Create(eventDate, capacity, description, today);
+        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        var input = EventUpdateInput.Create(eventDate, capacity, description, now.Today);
         updateValidator.ValidateOrThrow(input);
 
         // The repository decides whether the event is still open and the capacity still holds its seats,
@@ -112,8 +115,8 @@ internal sealed class EventService(
             input.Day,
             input.Capacity,
             input.Description,
-            today,
-            timeProvider.GetUtcNow().UtcDateTime,
+            now.Today,
+            now.Utc,
             TicketCode.New,
             cancellationToken).ConfigureAwait(false);
         Complete(status);
@@ -124,7 +127,8 @@ internal sealed class EventService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var status = await events.CancelAsync(eventId, timeProvider.Today(), timeProvider.GetUtcNow().UtcDateTime, cancellationToken).ConfigureAwait(false);
+        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        var status = await events.CancelAsync(eventId, now.Today, now.Utc, cancellationToken).ConfigureAwait(false);
         Complete(status);
         audit.Record(AuditEvent.EventCancelled, session.Role);
     }
