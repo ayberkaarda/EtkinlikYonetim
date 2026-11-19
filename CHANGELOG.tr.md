@@ -34,9 +34,24 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
   kendi hesabı ve son etkin yönetici korunur (`AddAccountDisabledFlag` migration'ı).
 - Bekleme listesi, kapasite değişikliği, etkinlik iptali, eşzamanlı giriş kontrolü ve birbirinin rolünü düşüren
   yöneticiler için SQL Server yarış testleri.
+- Kendine özgü kimliğiyle yeniden tasarlanan ekranlar: özgün bir bilet logosu (`assets/logo.svg`, simgeye
+  `tools/Screenshots` ile dönüştürülür), serin mürekkep grisi nötrler üzerinde kobalt ve macenta bir palet,
+  Bahnschrift başlıklar ve Segoe UI metin. Açık, koyu ve Windows yüksek karşıtlık temaları; `Appearance:Theme` ayarı
+  (`Light`, `Dark`, `System`) ve uygulama çalışırken karşıtlık ile uygulama modu değişikliklerini izleyen açık
+  pencereler.
+- Başlık, pencere içi ileti şeridi, kayan gövde ve alt şeritten oluşan ortak bir ekran çerçevesi; her ekran
+  içeriğine göre, ekranının çalışma alanı içinde boyutlanır ve monitör başına DPI uyumludur.
+- Sezonun etkinliklerini yer sayılarıyla ve her ekrana kısayolları gösteren bir yönetim paneli, bilet biçiminde bir
+  bilet penceresi, türünün renginde bir panelde büyük gösterilen giriş yanıtı, listelerde yer, bekleme sırası, iptal,
+  giriş ve hesap durumları için etiketler ve giriş ekranına döndüren bir oturum kapatma ("Oturumu kapat").
+- Uydurma verilerle 1x ve 2x pencere açmadan ekran görüntüleri (`tools/Screenshots`) ve her ekranı göstermeden
+  kurup yerleşimini 1024x600, 1366x768 ve 1920x1040 çalışma alanlarında 1-2 yazı ölçeğinde denetleyen arayüz testleri.
 
 ### Değişti
 
+- Sonuçlar ve kural retleri pencerenin içinde gösterilir; yalnızca sorular ve bir pencereden uzun yaşaması gereken
+  iletiler, ekrandan büyük açılmayan temalı bir ileti penceresi açar. Girişten sonraki karşılama kutusu kaldırıldı.
+- Eski üçüncü taraf denetim kütüphanesi ve özgün ekranların arka plan görseli artık kullanılmaz.
 - Hatalar izleme çıktısı yerine log dosyasına yazılır; hata pencereleri değişmedi.
 - Bilet kodları artık `ETK-` ve 26 karakterdir (130 rastgele bit); migration mevcut her bilete 128 rastgele bitlik
   yeni bir kod verir, bu yüzden yükseltmeden önce gösterilen kodlar artık çalışmaz.

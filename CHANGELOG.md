@@ -34,9 +34,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   admin are protected (migration `AddAccountDisabledFlag`).
 - SQL Server race tests for the waiting list, capacity changes, event cancellation, simultaneous check-ins and
   admins demoting each other.
+- Redesigned screens with an own identity: an original ticket logo (`assets/logo.svg`, rasterized into the icon by
+  `tools/Screenshots`), a cobalt and magenta palette on cool ink-grey neutrals, Bahnschrift headings and Segoe UI
+  text. Light, dark and Windows high contrast themes; the `Appearance:Theme` setting (`Light`, `Dark`, `System`) and
+  open windows follow contrast and app mode changes while the application runs.
+- A shared screen frame with a header, an inline message strip, a scrolling body and a footer; every screen is sized
+  for its content inside the working area of its screen and is per-monitor DPI aware.
+- An admin panel with the season's events and their seats and shortcuts to every screen, a ticket window shaped like
+  a ticket, an entrance answer shown large on a panel of its kind, pills for seats, waiting places, cancellations,
+  check-ins and account states in the lists, and a sign-out ("Oturumu kapat") that returns to the sign-in.
+- Offscreen screenshots at 1x and 2x from invented data (`tools/Screenshots`), and UI tests that build every screen
+  without showing it and check its layout on 1024x600, 1366x768 and 1920x1040 working areas at text scales 1 to 2.
 
 ### Changed
 
+- Results and rule refusals are shown inside the window; only questions and messages that outlive a window open a
+  themed message window, which never grows larger than the screen. The greeting box after sign-in is gone.
+- The old third-party control library and the background artwork of the original screens are no longer used.
 - Errors are written to the log file instead of the trace output; the error dialogs are unchanged.
 - Ticket codes are now `ETK-` and 26 characters (130 random bits); the migration gives every existing ticket a new
   code of 128 random bits, so codes shown before the upgrade stop working.
