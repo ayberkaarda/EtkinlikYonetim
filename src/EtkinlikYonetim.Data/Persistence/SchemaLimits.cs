@@ -27,6 +27,11 @@ internal static class SchemaLimits
     public const string RoleCheck = "[Rol] IN ('Kullanici', 'Admin')";
     public const string FailedLoginCheck = "[BasarisizGiris] >= 0";
 
+    /// <summary>Length of a SHA-256 hash of a setup key.</summary>
+    public const int SetupKeyHashLength = 32;
+
+    public const string SetupKeyFailedAttemptsCheck = "[BasarisizDeneme] >= 0";
+
     /// <summary>Values of <see cref="Domain.Entities.PasswordFormat"/>: 0 PBKDF2 hash, 1 legacy plain text.</summary>
     public const string PasswordFormatCheck = "[SifreBicimi] IN (0, 1)";
 

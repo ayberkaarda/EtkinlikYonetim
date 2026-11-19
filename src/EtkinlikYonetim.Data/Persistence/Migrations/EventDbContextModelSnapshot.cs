@@ -146,6 +146,47 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EtkinlikYonetim.Domain.Entities.SetupKeyRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("Id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("KullanimZamani");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("OlusturmaZamani");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("GecerlilikBitis");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("int")
+                        .HasColumnName("BasarisizDeneme");
+
+                    b.Property<byte[]>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)")
+                        .HasColumnName("AnahtarOzeti")
+                        .IsFixedLength();
+
+                    b.HasKey("Id")
+                        .HasName("PK_KurulumAnahtarlari");
+
+                    b.ToTable("KurulumAnahtarlari", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_KurulumAnahtarlari_BasarisizDeneme", "[BasarisizDeneme] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("EtkinlikYonetim.Domain.Entities.Ticket", b =>
                 {
                     b.Property<int>("Id")

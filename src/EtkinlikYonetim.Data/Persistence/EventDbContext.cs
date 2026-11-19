@@ -19,6 +19,8 @@ public sealed class EventDbContext(DbContextOptions<EventDbContext> options) : D
 
     public DbSet<Ticket> Tickets => Set<Ticket>();
 
+    public DbSet<SetupKeyRecord> SetupKeys => Set<SetupKeyRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
