@@ -37,7 +37,7 @@ public sealed class LegacyUpgradeTests
     // Fictional rows. Identity values deliberately do not start at 1 so overwritten or re-seeded rows
     // would show. "admin" in lower case and a missing role are what the original application allowed.
     // The open events are dated by the database's clock, which decides what is past: today and in 30 days.
-    private const string LegacyData = """
+    internal const string LegacyData = """
         SET IDENTITY_INSERT dbo.Kullanicilar ON;
         INSERT dbo.Kullanicilar (Id, KullaniciAdi, Sifre, Rol) VALUES
             (3, N'yonetici', N'admin1', N'admin'),

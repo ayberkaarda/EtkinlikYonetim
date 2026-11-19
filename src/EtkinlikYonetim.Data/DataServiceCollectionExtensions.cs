@@ -15,6 +15,12 @@ public static class DataServiceCollectionExtensions
     /// <summary>Environment variable that turns the demonstration data on ("1" or "true").</summary>
     public const string DemoEnvironmentVariable = "ETKINLIK_DEMO";
 
+    /// <summary>
+    /// Seconds SqlClient lets a statement run before it cancels it. Well above the wait for an application
+    /// lock, so a busy lock is reported as such and not as a client side timeout.
+    /// </summary>
+    public const int CommandTimeoutSeconds = 60;
+
     /// <summary>Registers the data access layer on SQL Server.</summary>
     public static IServiceCollection AddSqlServerDataAccess(
         this IServiceCollection services,
@@ -22,7 +28,7 @@ public static class DataServiceCollectionExtensions
         DataAccessOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-        return services.AddDataAccess(builder => builder.UseSqlServer(connectionString), options);
+        return services.AddDataAccess(builder => builder.UseSqlServer(connectionString, sql => sql.CommandTimeout(CommandTimeoutSeconds)), options);
     }
 
     /// <summary>
