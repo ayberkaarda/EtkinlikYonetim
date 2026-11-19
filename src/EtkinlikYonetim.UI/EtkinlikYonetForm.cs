@@ -10,7 +10,8 @@ namespace EtkinlikYonetim.UI
 {
     /// <summary>
     /// Event management for admins: changes the date, capacity and description of an event and cancels
-    /// it. Past and cancelled events are shown but cannot be changed; the services decide every rule again.
+    /// it. Past and cancelled events are shown but cannot be changed; "past" is decided by the database's day,
+    /// loaded with the list, never by this computer's clock. The services decide every rule again.
     /// </summary>
     public sealed class EtkinlikYonetForm : AppDialog
     {
@@ -20,7 +21,7 @@ namespace EtkinlikYonetim.UI
         private readonly UserSession _session;
         private readonly ExclusiveOperation _change = new();
         private readonly RequestSequence _listRequests = new();
-        private readonly TimeProvider _time;
+        private DateOnly? _today;
         private bool _binding;
 
         private readonly ThemedListBox lstEtkinlikler = new() { Name = nameof(lstEtkinlikler) };
@@ -32,16 +33,14 @@ namespace EtkinlikYonetim.UI
         private readonly ThemedButton btnKaydet = FormLayout.Button(nameof(btnKaydet), "Değişiklikleri kaydet", ButtonKind.Primary, Glyphs.Save);
         private readonly ThemedButton btnIptalEt = FormLayout.Button(nameof(btnIptalEt), "Etkinliği iptal et", ButtonKind.Danger, Glyphs.Cancel);
 
-        public EtkinlikYonetForm(IEventService events, UserSession session, TimeProvider time)
+        public EtkinlikYonetForm(IEventService events, UserSession session)
             : base("Etkinlik yönetimi", "Tarihi, kapasiteyi ve açıklamayı değiştirin ya da etkinliği iptal edin.", Glyphs.Calendar, new Size(980, 600), new Size(820, 520), modal: true)
         {
             ArgumentNullException.ThrowIfNull(events);
             ArgumentNullException.ThrowIfNull(session);
-            ArgumentNullException.ThrowIfNull(time);
 
             _events = events;
             _session = session;
-            _time = time;
             BuildLayout();
             ShowSelection(null);
 
@@ -129,16 +128,17 @@ namespace EtkinlikYonetim.UI
             return ran;
         }
 
-        private DateOnly Today => DateOnly.FromDateTime(_time.GetLocalNow().DateTime);
-
         private async Task RefreshAsync()
         {
             var request = _listRequests.Next();
             var selectedId = Selected?.Id;
             lstEtkinlikler.IsLoading = true;
             IReadOnlyList<EventSummary> events;
+            DateOnly today;
             try
             {
+                // The database's day decides which events have passed, as it does in the services.
+                today = await _events.GetTodayAsync(_session);
                 events = await _events.GetEventsAsync(_session);
             }
             finally
@@ -153,6 +153,8 @@ namespace EtkinlikYonetim.UI
             {
                 return;
             }
+
+            _today = today;
 
             // Restoring the selection is not a choice of the user: the fields are bound once, below.
             _binding = true;
@@ -169,11 +171,14 @@ namespace EtkinlikYonetim.UI
             ShowSelection(Selected);
         }
 
-        /// <summary>Shows the event's fields; only an event that is neither past nor cancelled can be changed.</summary>
+        /// <summary>
+        /// Shows the event's fields; only an event that is neither past (by the database's day) nor cancelled
+        /// can be changed. Until the day is known nothing can be changed.
+        /// </summary>
         private void ShowSelection(EventSummary? selected)
         {
-            var today = Today;
-            var editable = selected is { Cancelled: false } && selected.Date >= today;
+            var today = _today;
+            var editable = selected is { Cancelled: false } && today is { } day && selected.Date >= day;
 
             _binding = true;
             try
@@ -187,7 +192,7 @@ namespace EtkinlikYonetim.UI
                 else
                 {
                     lblSecili.Text = selected.ToString()
-                        + (selected.Cancelled ? string.Empty : selected.Date < today ? " (Geçmiş etkinlik, düzenlenemez)" : string.Empty);
+                        + (selected.Cancelled ? string.Empty : today is { } past && selected.Date < past ? " (Geçmiş etkinlik, düzenlenemez)" : string.Empty);
                     lblDoluluk.Text = string.Create(
                         CultureInfo.InvariantCulture,
                         $"Kayıtlı: {selected.RegisteredCount} / {selected.Capacity}, bekleme listesi: {selected.WaitingCount}");
@@ -214,7 +219,7 @@ namespace EtkinlikYonetim.UI
             Name = nameof(EtkinlikYonetForm);
 
             // Every event, with its seats and its state.
-            lstEtkinlikler.Describe = item => item is EventSummary summary ? EventRows.Describe(summary, Today) : new ListRow(item.ToString() ?? string.Empty);
+            lstEtkinlikler.Describe = item => item is EventSummary summary ? EventRows.Describe(summary, _today) : new ListRow(item.ToString() ?? string.Empty);
             lstEtkinlikler.EmptyText = "Henüz etkinlik yok. Yönetim panelindeki Yeni etkinlik kartıyla ekleyin.";
             var listCard = FormLayout.Card("eventsCard", "Etkinlikler", lstEtkinlikler);
 

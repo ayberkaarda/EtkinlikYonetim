@@ -32,10 +32,10 @@ internal static class Screens
         return form;
     }
 
-    /// <summary>Event management with an upcoming event selected; the clock stands before the season.</summary>
+    /// <summary>Event management with an upcoming event selected; the database's day stands before the season.</summary>
     private static EtkinlikYonetForm EventManagement(SyntheticFestival festival)
     {
-        var form = new EtkinlikYonetForm(festival, festival.Admin, new FixedClock(new DateTimeOffset(2027, 3, 1, 10, 0, 0, TimeSpan.Zero)));
+        var form = new EtkinlikYonetForm(festival, festival.Admin);
         Run(form.LoadAsync());
         Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = 0;
         return form;
@@ -55,14 +55,6 @@ internal static class Screens
         "Onay",
         MessageBoxButtons.YesNo,
         MessageBoxIcon.Question);
-
-    /// <summary>A clock that always shows the same moment, so "past" does not depend on the day the tool runs.</summary>
-    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => now;
-
-        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
-    }
 
     /// <summary>The entrance right after a ticket was scanned: the participant's name and the counter.</summary>
     private static BiletKontrolForm CheckIn(SyntheticFestival festival)

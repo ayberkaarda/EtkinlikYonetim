@@ -16,6 +16,13 @@ public interface IEventService
     /// <summary>Events that still accept registrations (today or later, not cancelled), earliest first.</summary>
     Task<IReadOnlyList<EventSummary>> GetOpenEventsAsync(UserSession session, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Today by the database's clock, in this computer's time zone: the day the services decide with. Screens
+    /// use it to show which events can still be changed, so a computer whose clock is wrong neither locks a
+    /// current event nor offers to change a past one.
+    /// </summary>
+    Task<DateOnly> GetTodayAsync(UserSession session, CancellationToken cancellationToken = default);
+
     /// <summary>Creates an event without a description; admins only. Returns the new event id.</summary>
     Task<int> CreateAsync(UserSession session, string? name, DateTime eventDate, int capacity, CancellationToken cancellationToken = default);
 
@@ -74,6 +81,12 @@ internal sealed class EventService(
         await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
         var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
         return await events.GetFromAsync(now.Today, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<DateOnly> GetTodayAsync(UserSession session, CancellationToken cancellationToken = default)
+    {
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
+        return (await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false)).Today;
     }
 
     public async Task<int> CreateAsync(

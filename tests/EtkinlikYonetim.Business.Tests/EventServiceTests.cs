@@ -16,6 +16,16 @@ public sealed class EventServiceTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    /// <summary>The day screens decide editability with is the database's, also when this computer's clock is days off.</summary>
+    [Fact]
+    public async Task Today_IsTheDatabasesDay()
+    {
+        var service = ServiceFactory.Event(_events.Object, _time, clock: new TestDatabaseClock(_time, TimeSpan.FromDays(5)));
+
+        Assert.Equal(new DateOnly(2026, 3, 7), await service.GetTodayAsync(Sessions.User, Ct));
+        _events.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task Create_ByAUser_IsDeniedWithoutTouchingTheRepository()
     {
