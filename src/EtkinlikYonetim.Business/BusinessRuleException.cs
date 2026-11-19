@@ -4,7 +4,7 @@ namespace EtkinlikYonetim.Business;
 /// Raised when an operation violates a business rule. The message is user facing (Turkish), fixed
 /// and free of entered values, so it can be shown to the user and written to a log as is.
 /// </summary>
-public sealed class BusinessRuleException : Exception
+public class BusinessRuleException : Exception
 {
     public BusinessRuleException()
     {
@@ -16,6 +16,28 @@ public sealed class BusinessRuleException : Exception
     }
 
     public BusinessRuleException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
+/// Raised when the record being changed was changed by somebody else after it was loaded; nothing was
+/// written. The caller shows the message and loads the record again, so the change can be made on the
+/// current values.
+/// </summary>
+public sealed class StaleDataException : BusinessRuleException
+{
+    public StaleDataException()
+    {
+    }
+
+    public StaleDataException(string message)
+        : base(message)
+    {
+    }
+
+    public StaleDataException(string message, Exception innerException)
         : base(message, innerException)
     {
     }

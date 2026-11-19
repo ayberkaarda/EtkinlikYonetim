@@ -26,7 +26,7 @@ public sealed class EventManagementTests : IAsyncLifetime
     [Fact]
     public async Task Update_StoresTheDateCapacityAndDescription()
     {
-        await Events.UpdateAsync(Admin(SeedAdminId), ConcertId, new DateTime(2027, 5, 1), 200, "  Açık hava sahnesi  ", Ct);
+        await Events.UpdateAsync(Admin(SeedAdminId), await LoadedAsync(ConcertId), new DateTime(2027, 5, 1), 200, "  Açık hava sahnesi  ", Ct);
 
         var stored = (await Events.GetEventsAsync(Admin(SeedAdminId), Ct)).Single(e => e.Id == ConcertId);
         Assert.Equal((new DateOnly(2027, 5, 1), 200, "Açık hava sahnesi", "Bahar Konseri"), (stored.Date, stored.Capacity, stored.Description, stored.Name));
@@ -41,11 +41,12 @@ public sealed class EventManagementTests : IAsyncLifetime
         await Registrations.RegisterAsync(admin, id, DenizNationalId, Ct);
         await Registrations.RegisterAsync(admin, id, EceNationalId, Ct);
 
-        var below = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, id, Today.AddDays(5), 1, null, Ct));
+        var loaded = await LoadedAsync(id);
+        var below = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, loaded, Today.AddDays(5), 1, null, Ct));
         Assert.Equal(EventService.CapacityBelowRegistrations, below.Message);
         Assert.Equal(3, (await Events.GetEventsAsync(admin, Ct)).Single(e => e.Id == id).Capacity);
 
-        await Events.UpdateAsync(admin, id, Today.AddDays(5), 2, null, Ct);
+        await Events.UpdateAsync(admin, loaded, Today.AddDays(5), 2, null, Ct);
         var full = (await Events.GetEventsAsync(admin, Ct)).Single(e => e.Id == id);
         Assert.Equal((2, 2, 0), (full.Capacity, full.RegisteredCount, full.FreeSeats));
         Assert.True((await Registrations.RegisterAsync(admin, id, MertNationalId, Ct)).Waitlisted);
@@ -57,7 +58,8 @@ public sealed class EventManagementTests : IAsyncLifetime
     [InlineData(1001)]
     public async Task Update_CapacityOutsideTheLimits_IsRefused(int capacity)
     {
-        var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(Admin(SeedAdminId), SmallEventId, Today.AddDays(5), capacity, null, Ct));
+        var loaded = await LoadedAsync(SmallEventId);
+        var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(Admin(SeedAdminId), loaded, Today.AddDays(5), capacity, null, Ct));
 
         Assert.Equal(EventService.CapacityInvalid, error.Message);
     }
@@ -72,7 +74,7 @@ public sealed class EventManagementTests : IAsyncLifetime
         var first = await Registrations.RegisterAsync(admin, id, EceNationalId, Ct);
         var second = await Registrations.RegisterAsync(admin, id, MertNationalId, Ct);
 
-        await Events.UpdateAsync(admin, id, Today.AddDays(5), 2, null, Ct);
+        await Events.UpdateAsync(admin, await LoadedAsync(id), Today.AddDays(5), 2, null, Ct);
 
         // Ece belongs to the user account, which is the one that sees her new ticket; Mert belongs to the admin.
         var promoted = (await Registrations.GetMyRegistrationsAsync(User(SeedUserId), Ct)).Single(r => r.Id == first.RegistrationId);
@@ -89,11 +91,13 @@ public sealed class EventManagementTests : IAsyncLifetime
     {
         var admin = Admin(SeedAdminId);
         var id = await Events.CreateAsync(admin, "Bugün", Today, 5, Ct);
+        var loaded = await LoadedAsync(id);
+        var concert = await LoadedAsync(ConcertId);
         _db.Clock.Advance(TimeSpan.FromDays(1));
 
-        var update = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, id, Today.AddDays(10), 5, null, Ct));
+        var update = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, loaded, Today.AddDays(10), 5, null, Ct));
         var cancel = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.CancelAsync(admin, id, Ct));
-        var newDate = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, ConcertId, Today, 5, null, Ct));
+        var newDate = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, concert, Today, 5, null, Ct));
 
         Assert.Equal(EventService.EventClosed, update.Message);
         Assert.Equal(EventService.EventClosed, cancel.Message);
@@ -112,6 +116,7 @@ public sealed class EventManagementTests : IAsyncLifetime
     {
         var admin = Admin(SeedAdminId);
         var user = User(SeedUserId);
+        var loaded = await LoadedAsync(SmallEventId);
         var seat = await Registrations.RegisterAsync(user, SmallEventId, DenizNationalId, Ct);
         await Registrations.RegisterAsync(user, SmallEventId, EceNationalId, Ct);
         await Registrations.RegisterAsync(admin, SmallEventId, MertNationalId, Ct); // waits
@@ -135,7 +140,7 @@ public sealed class EventManagementTests : IAsyncLifetime
         Assert.Equal(RegistrationService.AlreadyCancelled, cancel.Message);
         var twice = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.CancelAsync(admin, SmallEventId, Ct));
         Assert.Equal(EventService.EventClosed, twice.Message);
-        var change = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, SmallEventId, Today.AddDays(400), 5, null, Ct));
+        var change = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(admin, loaded, Today.AddDays(400), 5, null, Ct));
         Assert.Equal(EventService.EventClosed, change.Message);
 
         await using var context = _db.CreateContext();
@@ -146,10 +151,40 @@ public sealed class EventManagementTests : IAsyncLifetime
     [Fact]
     public async Task UnknownEvent_IsReportedAsNotFound()
     {
-        var update = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(Admin(SeedAdminId), 999, Today, 5, null, Ct));
+        var update = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.UpdateAsync(Admin(SeedAdminId), new EventSummary(999, "Yok", DateOnly.FromDateTime(Today), 5, 0), Today, 5, null, Ct));
         var cancel = await Assert.ThrowsAsync<BusinessRuleException>(() => Events.CancelAsync(Admin(SeedAdminId), 999, Ct));
 
         Assert.Equal(EventService.EventNotFound, update.Message);
         Assert.Equal(EventService.EventNotFound, cancel.Message);
     }
+
+    /// <summary>
+    /// Two admins open the same event. B moves it a week later; A, whose form still shows the old date, then
+    /// raises only the capacity. A's save is refused and writes nothing, so B's date is not silently put
+    /// back; reloaded, A's change goes through on the current values.
+    /// </summary>
+    [Fact]
+    public async Task Update_FromAFormLoadedBeforeAnotherAdminsChange_IsRefusedAndKeepsTheOtherChange()
+    {
+        var a = Admin(SeedAdminId);
+        var b = await _db.Get<IAuthService>().SignInAsync("admin", "Demo.Admin1", Ct);
+        var seenByA = await LoadedAsync(ConcertId);
+        var seenByB = await LoadedAsync(ConcertId);
+        var moved = seenByB.Date.AddDays(7).ToDateTime(TimeOnly.MinValue);
+
+        await Events.UpdateAsync(b, seenByB, moved, seenByB.Capacity, "Yeni yer", Ct);
+        var stale = await Assert.ThrowsAsync<StaleDataException>(
+            () => Events.UpdateAsync(a, seenByA, seenByA.Date.ToDateTime(TimeOnly.MinValue), seenByA.Capacity + 50, seenByA.Description, Ct));
+
+        Assert.Equal(EventService.ChangedElsewhere, stale.Message);
+        var current = await LoadedAsync(ConcertId);
+        Assert.Equal((DateOnly.FromDateTime(moved), seenByA.Capacity, "Yeni yer"), (current.Date, current.Capacity, current.Description));
+
+        await Events.UpdateAsync(a, current, moved, current.Capacity + 50, current.Description, Ct);
+        Assert.Equal(seenByA.Capacity + 50, (await LoadedAsync(ConcertId)).Capacity);
+    }
+
+    /// <summary>The event as an admin's window shows it after loading the list.</summary>
+    private async Task<EventSummary> LoadedAsync(int id) =>
+        (await Events.GetEventsAsync(Admin(SeedAdminId), Ct)).Single(e => e.Id == id);
 }

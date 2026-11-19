@@ -16,16 +16,16 @@ public interface IEventRepository
     Task<int> AddAsync(ScheduledEvent newEvent, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Changes the date, capacity and description of an event that is neither cancelled nor before
-    /// <paramref name="today"/>, in one transaction under the event's lock. The capacity cannot go below the
-    /// seats held (the UPDATE checks it, and so does the check constraint); seats added by a larger capacity go
-    /// to the waiting list in order, each with the ticket <paramref name="newTicketCode"/> returns.
+    /// Changes the date, capacity and description of an event to <paramref name="changed"/>, only while the
+    /// event still has the <paramref name="expected"/> values the caller loaded and is neither cancelled nor
+    /// before <paramref name="today"/>, in one transaction under the event's lock. The capacity cannot go below
+    /// the seats held (the UPDATE checks it, and so does the check constraint); seats added by a larger capacity
+    /// go to the waiting list in order, each with the ticket <paramref name="newTicketCode"/> returns.
     /// </summary>
     Task<EventChangeStatus> UpdateAsync(
         int id,
-        DateOnly day,
-        int capacity,
-        string? description,
+        EventValues expected,
+        EventValues changed,
         DateOnly today,
         DateTime nowUtc,
         Func<string> newTicketCode,
@@ -53,4 +53,10 @@ public enum EventChangeStatus
 
     /// <summary>The new capacity is below the seats held; nothing was written.</summary>
     CapacityBelowRegistrations = 3,
+
+    /// <summary>The event no longer has the values the caller loaded (somebody else changed it); nothing was written.</summary>
+    ChangedElsewhere = 4,
 }
+
+/// <summary>The fields of an event an admin edits.</summary>
+public readonly record struct EventValues(DateOnly Date, int Capacity, string? Description);

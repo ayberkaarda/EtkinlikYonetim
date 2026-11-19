@@ -32,11 +32,12 @@ public sealed class SqlServerEventManagementTests
             var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Küçülen " + round, database.Today.AddDays(30), 3, ct);
             await registrations.RegisterAsync(Admin(SeedAdminId), eventId, ids[0], ct);
             await registrations.RegisterAsync(Admin(SeedAdminId), eventId, ids[1], ct);
+            var loaded = (await a.GetRequiredService<IEventService>().GetEventsAsync(Admin(SeedAdminId), ct)).Single(e => e.Id == eventId);
 
             var results = await SqlServerWaitingListTests.RaceAsync(
                 ["update", "register"],
                 step => step == "update"
-                    ? a.GetRequiredService<IEventService>().UpdateAsync(Admin(SeedAdminId), eventId, database.Today.AddDays(30), 2, null, ct)
+                    ? a.GetRequiredService<IEventService>().UpdateAsync(Admin(SeedAdminId), loaded, database.Today.AddDays(30), 2, null, ct)
                     : b.GetRequiredService<IRegistrationService>().RegisterAsync(Admin(SeedAdminId), eventId, ids[2], ct),
                 ct);
 

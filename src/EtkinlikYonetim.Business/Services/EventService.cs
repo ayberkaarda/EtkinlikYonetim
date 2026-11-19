@@ -20,11 +20,12 @@ public interface IEventService
     Task<int> CreateAsync(UserSession session, string? name, DateTime eventDate, int capacity, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Changes the date, capacity and description of an event; admins only. Past and cancelled events
-    /// cannot be changed, and the capacity cannot go below the seats held. Seats added by a larger
-    /// capacity go to the waiting list in order.
+    /// Changes the date, capacity and description of the event <paramref name="original"/> (as the caller
+    /// loaded it); admins only. Past and cancelled events cannot be changed, and the capacity cannot go below
+    /// the seats held. Seats added by a larger capacity go to the waiting list in order. When somebody else
+    /// changed the event since it was loaded, nothing is written and <see cref="StaleDataException"/> is thrown.
     /// </summary>
-    Task UpdateAsync(UserSession session, int eventId, DateTime eventDate, int capacity, string? description, CancellationToken cancellationToken = default);
+    Task UpdateAsync(UserSession session, EventSummary original, DateTime eventDate, int capacity, string? description, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Cancels an event; admins only. The event stays in the lists as cancelled, its registrations and
@@ -48,6 +49,7 @@ internal sealed class EventService(
     internal const string EventNotFound = "Etkinlik bulunamadı.";
     internal const string EventClosed = "Geçmiş veya iptal edilmiş bir etkinlik değiştirilemez ya da iptal edilemez.";
     internal const string CapacityBelowRegistrations = "Kapasite, etkinliğin mevcut kayıt sayısının altına indirilemez.";
+    internal const string ChangedElsewhere = "Etkinlik siz düzenlerken başka biri tarafından değiştirildi; değişikliğiniz kaydedilmedi. Liste yenilendi, lütfen değişikliği güncel bilgiler üzerinde yeniden yapın.";
 
     internal static readonly string NameTooLong = string.Create(
         CultureInfo.InvariantCulture,
@@ -96,25 +98,25 @@ internal sealed class EventService(
 
     public async Task UpdateAsync(
         UserSession session,
-        int eventId,
+        EventSummary original,
         DateTime eventDate,
         int capacity,
         string? description,
         CancellationToken cancellationToken = default)
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(original);
 
         var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
         var input = EventUpdateInput.Create(eventDate, capacity, description, now.Today);
         updateValidator.ValidateOrThrow(input);
 
-        // The repository decides whether the event is still open and the capacity still holds its seats,
-        // in the transaction that writes.
+        // The repository decides whether the event is still open, still as the caller loaded it and whether
+        // the capacity still holds its seats, in the transaction that writes.
         var status = await events.UpdateAsync(
-            eventId,
-            input.Day,
-            input.Capacity,
-            input.Description,
+            original.Id,
+            new EventValues(original.Date, original.Capacity, original.Description),
+            new EventValues(input.Day, input.Capacity, input.Description),
             now.Today,
             now.Utc,
             TicketCode.New,
@@ -143,6 +145,8 @@ internal sealed class EventService(
                 throw new BusinessRuleException(EventClosed);
             case EventChangeStatus.CapacityBelowRegistrations:
                 throw new BusinessRuleException(CapacityBelowRegistrations);
+            case EventChangeStatus.ChangedElsewhere:
+                throw new StaleDataException(ChangedElsewhere);
             default:
                 throw new BusinessRuleException(EventNotFound);
         }

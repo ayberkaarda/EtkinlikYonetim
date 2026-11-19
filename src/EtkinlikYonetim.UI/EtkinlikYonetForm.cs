@@ -1,4 +1,5 @@
 using System.Globalization;
+using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
@@ -60,7 +61,19 @@ namespace EtkinlikYonetim.UI
                         return;
                     }
 
-                    await _events.UpdateAsync(_session, selected.Id, dtpTarih.Value.Date, (int)numKapasite.Value, txtAciklama.Text);
+                    try
+                    {
+                        // The event as it was loaded goes along: the service refuses to write over a change
+                        // another admin made in the meantime.
+                        await _events.UpdateAsync(_session, selected, dtpTarih.Value.Date, (int)numKapasite.Value, txtAciklama.Text);
+                    }
+                    catch (StaleDataException)
+                    {
+                        // Show the event as it is now before the message, so the change can be made again on it.
+                        await RefreshAsync();
+                        throw;
+                    }
+
                     Prompts.Inform("Etkinlik güncellendi.");
                     _change.FocusAfterUnlock(lstEtkinlikler);
                     await RefreshAsync();

@@ -1,3 +1,4 @@
+using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.UI.Tests.Support;
 using Microsoft.Extensions.Time.Testing;
@@ -96,6 +97,34 @@ public sealed class EventManagementUiTests
 
         Assert.Equal(0, events.UpdateCalls);
         Assert.Equal(["Lütfen bir etkinlik seçin."], prompts.Messages);
+    });
+
+    /// <summary>
+    /// The window sends the event as it loaded it. When another admin changed it in the meantime the service
+    /// refuses; the window then shows the event as it is now and the message, and keeps nothing of the old form.
+    /// </summary>
+    [Fact]
+    public void Save_EventChangedElsewhere_ReloadsTheEventAndSaysSo() => Run(() =>
+    {
+        var events = EventsWithStates();
+        using var form = new EtkinlikYonetForm(events, Sessions.Admin, Clock) { Prompts = new RecordingPrompts() };
+        Assert.True(form.LoadAsync().IsCompletedSuccessfully);
+        Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = 0;
+        var loaded = events.Events[0];
+        Find<NumericUpDown>(form, "numKapasite").Value = 120;
+
+        // Another admin moves the event a week later while this form is open.
+        events.Events[0] = loaded with { Date = new DateOnly(2027, 4, 24) };
+        events.UpdateFailure = new StaleDataException("Etkinlik başka biri tarafından değiştirildi.");
+        var dialogs = NoDialogs.Requested.Count;
+
+        Assert.True(form.SaveAsync().IsCompletedSuccessfully);
+
+        Assert.Same(loaded, Assert.Single(events.UpdatedOriginals));
+        Assert.Equal(new DateTime(2027, 4, 24), Find<DateTimePicker>(form, "dtpTarih").Value);
+        Assert.Equal(150, Find<NumericUpDown>(form, "numKapasite").Value);
+        Assert.Equal(["Uyarı: Etkinlik başka biri tarafından değiştirildi."], NoDialogs.Requested.Skip(dialogs));
+        Assert.True(Find<Button>(form, "btnKaydet").Enabled);
     });
 
     private static ControlledEventService EventsWithStates()

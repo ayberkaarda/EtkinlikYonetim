@@ -104,11 +104,18 @@ internal sealed class ControlledEventService : IEventService
 
     public List<(int EventId, DateTime Date, int Capacity, string? Description)> Updates { get; } = [];
 
-    public Task UpdateAsync(UserSession session, int eventId, DateTime eventDate, int capacity, string? description, CancellationToken cancellationToken = default)
+    /// <summary>The events as the window had loaded them when it saved.</summary>
+    public List<EventSummary> UpdatedOriginals { get; } = [];
+
+    /// <summary>When set, a save fails with it at once instead of staying pending.</summary>
+    public Exception? UpdateFailure { get; set; }
+
+    public Task UpdateAsync(UserSession session, EventSummary original, DateTime eventDate, int capacity, string? description, CancellationToken cancellationToken = default)
     {
         UpdateCalls++;
-        Updates.Add((eventId, eventDate, capacity, description));
-        return new TaskCompletionSource().Task;
+        UpdatedOriginals.Add(original);
+        Updates.Add((original.Id, eventDate, capacity, description));
+        return UpdateFailure is { } failure ? Task.FromException(failure) : new TaskCompletionSource().Task;
     }
 
     public Task CancelAsync(UserSession session, int eventId, CancellationToken cancellationToken = default)

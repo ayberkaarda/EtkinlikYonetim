@@ -45,9 +45,8 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
 
     public async Task<EventChangeStatus> UpdateAsync(
         int id,
-        DateOnly day,
-        int capacity,
-        string? description,
+        EventValues expected,
+        EventValues changed,
         DateOnly today,
         DateTime nowUtc,
         Func<string> newTicketCode,
@@ -60,9 +59,19 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         await AppLocks.AcquireAsync(db, AppLocks.Event(id), cancellationToken).ConfigureAwait(false);
 
         // The conditions are the WHERE clause: whatever changed since the caller read the event (a
-        // registration took a seat, someone cancelled the event) is decided by this statement.
+        // registration took a seat, someone cancelled the event, another admin changed its date, capacity
+        // or description) is decided by this statement. Without the expected values a form loaded earlier
+        // would silently write another admin's change back.
+        var (expectedDate, expectedCapacity, expectedDescription) = expected;
+        var (day, capacity, description) = changed;
         var updated = await db.Events
-            .Where(e => e.Id == id && !e.Cancelled && e.Date >= today && e.RegisteredCount <= capacity)
+            .Where(e => e.Id == id
+                && !e.Cancelled
+                && e.Date >= today
+                && e.RegisteredCount <= capacity
+                && e.Date == expectedDate
+                && e.Capacity == expectedCapacity
+                && e.Description == expectedDescription)
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(e => e.Date, day)
@@ -74,12 +83,13 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         {
             var current = await db.Events
                 .Where(e => e.Id == id)
-                .Select(e => new { e.Cancelled, e.Date })
+                .Select(e => new { e.Cancelled, e.Date, e.Capacity, e.Description })
                 .SingleOrDefaultAsync(cancellationToken)
                 .ConfigureAwait(false);
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             return current is null ? EventChangeStatus.NotFound
                 : current.Cancelled || current.Date < today ? EventChangeStatus.Closed
+                : new EventValues(current.Date, current.Capacity, current.Description) != expected ? EventChangeStatus.ChangedElsewhere
                 : EventChangeStatus.CapacityBelowRegistrations;
         }
 

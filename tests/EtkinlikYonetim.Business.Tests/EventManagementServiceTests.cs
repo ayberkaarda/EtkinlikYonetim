@@ -23,7 +23,7 @@ public sealed class EventManagementServiceTests
     [Fact]
     public async Task UpdateAndCancel_ByAUser_AreDeniedWithoutTouchingTheRepository()
     {
-        await Assert.ThrowsAsync<AccessDeniedException>(() => Service().UpdateAsync(Sessions.User, 1, Now.Date, 10, null, Ct));
+        await Assert.ThrowsAsync<AccessDeniedException>(() => Service().UpdateAsync(Sessions.User, Loaded(1), Now.Date, 10, null, Ct));
         await Assert.ThrowsAsync<AccessDeniedException>(() => Service().CancelAsync(Sessions.User, 1, Ct));
 
         _events.VerifyNoOtherCalls();
@@ -38,7 +38,7 @@ public sealed class EventManagementServiceTests
     public async Task Update_InvalidInput_IsRejectedBeforeWriting(int days, int capacity, int descriptionLength, string expected)
     {
         var error = await Assert.ThrowsAsync<BusinessRuleException>(
-            () => Service().UpdateAsync(Sessions.Admin, 1, Now.Date.AddDays(days), capacity, new string('a', descriptionLength), Ct));
+            () => Service().UpdateAsync(Sessions.Admin, Loaded(1), Now.Date.AddDays(days), capacity, new string('a', descriptionLength), Ct));
 
         Assert.Equal(Message(expected), error.Message);
         _events.VerifyNoOtherCalls();
@@ -49,13 +49,13 @@ public sealed class EventManagementServiceTests
     public async Task Update_AtTheLimits_IsPassedOnTrimmed()
     {
         var description = " " + new string('a', 500) + " ";
-        _events.Setup(e => e.UpdateAsync(1, Today, 1, description.Trim(), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _events.Setup(e => e.UpdateAsync(1, Expected(1), new EventValues(Today, 1, description.Trim()), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(EventChangeStatus.Changed);
-        _events.Setup(e => e.UpdateAsync(2, Today.AddDays(3), 1000, null, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _events.Setup(e => e.UpdateAsync(2, Expected(2), new EventValues(Today.AddDays(3), 1000, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(EventChangeStatus.Changed);
 
-        await Service().UpdateAsync(Sessions.Admin, 1, Now.Date.AddHours(20), 1, description, Ct);
-        await Service().UpdateAsync(Sessions.Admin, 2, Now.Date.AddDays(3), 1000, "   ", Ct);
+        await Service().UpdateAsync(Sessions.Admin, Loaded(1), Now.Date.AddHours(20), 1, description, Ct);
+        await Service().UpdateAsync(Sessions.Admin, Loaded(2), Now.Date.AddDays(3), 1000, "   ", Ct);
 
         Assert.Equal([(AuditEvent.EventUpdated, UserRole.Admin), (AuditEvent.EventUpdated, UserRole.Admin)], _audit.Events);
     }
@@ -66,12 +66,28 @@ public sealed class EventManagementServiceTests
     [InlineData(EventChangeStatus.NotFound, nameof(EventService.EventNotFound))]
     public async Task Update_RefusedByTheRepository_IsReportedAndNotAudited(EventChangeStatus status, string expected)
     {
-        _events.Setup(e => e.UpdateAsync(1, Today, 5, null, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _events.Setup(e => e.UpdateAsync(1, Expected(1), new EventValues(Today, 5, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(status);
 
-        var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().UpdateAsync(Sessions.Admin, 1, Now.Date, 5, null, Ct));
+        var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().UpdateAsync(Sessions.Admin, Loaded(1), Now.Date, 5, null, Ct));
 
         Assert.Equal(Message(expected), error.Message);
+        Assert.Empty(_audit.Events);
+    }
+
+    /// <summary>
+    /// The repository found the event no longer as the admin loaded it: the answer is its own exception, so
+    /// the window can load the event again, with a fixed message; nothing is audited.
+    /// </summary>
+    [Fact]
+    public async Task Update_EventChangedElsewhere_IsReportedAsStale()
+    {
+        _events.Setup(e => e.UpdateAsync(1, Expected(1), new EventValues(Today, 5, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(EventChangeStatus.ChangedElsewhere);
+
+        var error = await Assert.ThrowsAsync<StaleDataException>(() => Service().UpdateAsync(Sessions.Admin, Loaded(1), Now.Date, 5, null, Ct));
+
+        Assert.Equal(EventService.ChangedElsewhere, error.Message);
         Assert.Empty(_audit.Events);
     }
 
@@ -118,6 +134,11 @@ public sealed class EventManagementServiceTests
         nameof(EventService.EventNotFound) => EventService.EventNotFound,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
+
+    /// <summary>Event <paramref name="id"/> as an admin's window loaded it.</summary>
+    private static EventSummary Loaded(int id) => new(id, "Konser " + id, Today.AddDays(10), 50, 0, 0, id == 1 ? "Eski açıklama" : null);
+
+    private static EventValues Expected(int id) => new(Loaded(id).Date, Loaded(id).Capacity, Loaded(id).Description);
 
     private EventService Service() => ServiceFactory.Event(_events.Object, _time, _audit);
 }
