@@ -4,10 +4,11 @@ using System.Globalization;
 using System.Text;
 using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Data.Persistence;
+using Serilog;
 
 namespace EtkinlikYonetim.UI.Infrastructure;
 
-/// <summary>Turns exceptions into short, user friendly Turkish messages.</summary>
+/// <summary>Logs exceptions and turns them into short, user friendly Turkish messages.</summary>
 internal static class ErrorReporter
 {
     private const int MaxLoggedExceptions = 8;
@@ -21,6 +22,8 @@ internal static class ErrorReporter
             return;
         }
 
+        Record(Log.Logger, exception);
+
         // Rule and permission messages are fixed texts written for the user; they are shown as warnings.
         if (exception is BusinessRuleException or AccessDeniedException)
         {
@@ -28,8 +31,27 @@ internal static class ErrorReporter
             return;
         }
 
-        Trace.TraceError(FormatForLog(exception));
         Dialogs.Show(owner, Describe(exception), AppText.Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+
+    /// <summary>
+    /// Writes <paramref name="exception"/> to <paramref name="logger"/> without its message. Rule and
+    /// permission refusals are expected and logged as a warning with their type only; the audit log
+    /// already counts the security relevant ones. Every other exception is logged through
+    /// <see cref="FormatForLog"/>.
+    /// </summary>
+    internal static void Record(ILogger logger, Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(exception);
+
+        if (exception is BusinessRuleException or AccessDeniedException)
+        {
+            logger.Warning("Operation refused: {Type}", exception.GetType().Name);
+            return;
+        }
+
+        logger.Error("Operation failed: {Details}", FormatForLog(exception));
     }
 
     /// <summary>
