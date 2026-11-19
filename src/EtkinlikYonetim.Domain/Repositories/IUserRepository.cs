@@ -20,30 +20,19 @@ public interface IUserRepository
     Task<bool> AnyUserAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Stores a new setup key by its hash, only while no admin exists, and withdraws every unused key
-    /// issued before, so at most one key is valid. The check and the write are one atomic step with
-    /// the first-admin setup.
-    /// </summary>
-    /// <returns><see langword="false"/> when an admin exists; nothing is written then.</returns>
-    Task<bool> IssueSetupKeyAsync(byte[] keyHash, DateTime now, DateTime expiresAt, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Stores <paramref name="admin"/> as the first admin account, only while no admin exists. The
-    /// check and the insert are one atomic step, so of concurrent setups exactly one succeeds. When the
-    /// database already has accounts, the setup key whose hash is <paramref name="setupKeyHash"/> is the
-    /// final decision about the caller's right: inside the same write transaction, after the checks
-    /// found no admin and a free user name, the valid issued key (unused, not expired at
-    /// <paramref name="now"/>, fewer than <paramref name="maxFailedAttempts"/> wrong attempts) is
-    /// compared in constant time and used up by a conditional UPDATE. A wrong key is counted on that
-    /// key. When the insert fails the transaction rolls back and the key stays unused. An empty
-    /// database needs no key.
+    /// check and the insert are one atomic step, so of concurrent setups exactly one succeeds. An empty
+    /// database needs no key. A database that already has accounts needs <paramref name="setupKey"/>:
+    /// inside the same serializable write transaction, after the checks found no admin and a free user
+    /// name, the key is compared with every usable stored key and the matching one is used up by a
+    /// conditional UPDATE. When the insert or the commit fails the use rolls back with it; a wrong key
+    /// writes nothing, so wrong keys can never revoke the founder's key. There is no way to create a
+    /// key here: keys come only from the database owner's script.
     /// </summary>
     /// <exception cref="DuplicateUserNameException">The user name is taken by another account.</exception>
     Task<FirstAdminResult> AddFirstAdminAsync(
         User admin,
-        byte[]? setupKeyHash,
-        DateTime now,
-        int maxFailedAttempts,
+        SetupKeyAttempt? setupKey,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -79,11 +68,36 @@ public enum FirstAdminStatus
     /// <summary>An admin existed already; nothing was written.</summary>
     AdminExists = 1,
 
-    /// <summary>
-    /// The database has accounts and no valid setup key matched; no account was written (a wrong key
-    /// was counted on the issued key).
-    /// </summary>
+    /// <summary>The database has accounts and the setup key was wrong, expired or used; nothing was written.</summary>
     NotAuthorized = 2,
+
+    /// <summary>The database has accounts, so a setup key is needed and none was given; nothing was written.</summary>
+    KeyRequired = 3,
+}
+
+/// <summary>
+/// A setup key given by someone, checked by a repository inside its write transaction. The repository
+/// passes every key usable at <see cref="Now"/> (unused and unexpired); <see cref="FindMatch"/> compares
+/// the given key with each of them in constant time and returns the id of the matching one, or
+/// <see langword="null"/>. Wrong keys are never counted against a stored key, so nobody can make the
+/// founder's key unusable by guessing.
+/// </summary>
+public sealed class SetupKeyAttempt
+{
+    private readonly Func<IReadOnlyList<StoredSetupKey>, int?> _findMatch;
+
+    public SetupKeyAttempt(Func<IReadOnlyList<StoredSetupKey>, int?> findMatch, DateTime now)
+    {
+        ArgumentNullException.ThrowIfNull(findMatch);
+
+        _findMatch = findMatch;
+        Now = now;
+    }
+
+    /// <summary>UTC time of the attempt; decides expiry.</summary>
+    public DateTime Now { get; }
+
+    public int? FindMatch(IReadOnlyList<StoredSetupKey> usableKeys) => _findMatch(usableKeys);
 }
 
 /// <summary>Result of an attempt to store the first admin.</summary>

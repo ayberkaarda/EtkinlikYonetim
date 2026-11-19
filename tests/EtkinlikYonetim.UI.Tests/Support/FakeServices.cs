@@ -52,7 +52,10 @@ internal sealed class PendingSetupService : ISetupService
 
     public Task<bool> IsAdminMissingAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
 
-    public Task<string> CreateSetupKeyAsync(CancellationToken cancellationToken = default) => Task.FromResult("ABCDE-FGHJK-MNPQR-STVWX");
+    /// <summary>What the fake ETKINLIK_SETUP_KEY fills in.</summary>
+    public SetupKeyPrefill Prefill { get; set; } = new(null, false);
+
+    public SetupKeyPrefill GetEnvironmentKey() => Prefill;
 
     public Task<UserSession> CreateFirstAdminAsync(string? setupKey, string? userName, string? password, string? passwordRepeat, CancellationToken cancellationToken = default)
     {

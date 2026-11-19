@@ -211,13 +211,13 @@ public sealed class SqlServerConcurrencyTests
             await first.GetRequiredService<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", ct);
 
             // The key is issued for the database; the two instances stand for two profiles or computers.
-            var key = await first.GetRequiredService<ISetupService>().CreateSetupKeyAsync(ct);
+            var key = await AddSetupKeyAsync(first, database.Clock.GetUtcNow());
             await using var a = database.BuildServices();
             await using var b = database.BuildServices();
             var providers = new[] { a, b };
             var names = Enumerable.Range(0, 8).Select(i => "kurucu" + (char)('a' + round) + (char)('a' + i)).ToList();
 
-            // Every third attempt uses a wrong key (three in all, below the lockout limit).
+            // Every third attempt uses a wrong key; wrong keys write nothing.
             var results = await RaceAsync(
                 names,
                 name => providers[name[^1] % 2].GetRequiredService<ISetupService>()
@@ -230,7 +230,7 @@ public sealed class SqlServerConcurrencyTests
                 r => Assert.Contains(Assert.IsType<BusinessRuleException>(r).Message, new[] { SetupService.AlreadyDone, SetupService.SetupKeyInvalid }));
             Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar", ct));
             Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar WHERE Rol = N'Admin' AND SifreBicimi = 0", ct));
-            Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE KullanimZamani IS NOT NULL", ct));
+            Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE Tuketildi = 1 AND TuketimTarihi IS NOT NULL", ct));
         }
     }
 

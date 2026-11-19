@@ -55,11 +55,8 @@ internal static class SuccessWriteGateExtensions
         public Task<bool> AnyUserAsync(CancellationToken cancellationToken = default) =>
             inner.AnyUserAsync(cancellationToken);
 
-        public Task<bool> IssueSetupKeyAsync(byte[] keyHash, DateTime now, DateTime expiresAt, CancellationToken cancellationToken = default) =>
-            inner.IssueSetupKeyAsync(keyHash, now, expiresAt, cancellationToken);
-
-        public Task<FirstAdminResult> AddFirstAdminAsync(User admin, byte[]? setupKeyHash, DateTime now, int maxFailedAttempts, CancellationToken cancellationToken = default) =>
-            inner.AddFirstAdminAsync(admin, setupKeyHash, now, maxFailedAttempts, cancellationToken);
+        public Task<FirstAdminResult> AddFirstAdminAsync(User admin, SetupKeyAttempt? setupKey, CancellationToken cancellationToken = default) =>
+            inner.AddFirstAdminAsync(admin, setupKey, cancellationToken);
 
         public Task RecordFailedLoginAsync(int userId, int maxAttempts, DateTime lockoutEnd, CancellationToken cancellationToken = default) =>
             inner.RecordFailedLoginAsync(userId, maxAttempts, lockoutEnd, cancellationToken);

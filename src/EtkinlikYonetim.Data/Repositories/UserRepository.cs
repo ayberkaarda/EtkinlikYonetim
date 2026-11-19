@@ -1,6 +1,5 @@
 using System.Data;
 using System.Data.Common;
-using System.Security.Cryptography;
 using EtkinlikYonetim.Data.Persistence;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
@@ -76,35 +75,9 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return await db.Users.AnyAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<bool> IssueSetupKeyAsync(byte[] keyHash, DateTime now, DateTime expiresAt, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(keyHash);
-
-        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-
-        // The same lock as the first-admin setup: a key is never issued next to an admin, and a setup
-        // in progress finishes before an older key is withdrawn.
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
-        if (await AccountStateLockedAsync(db, cancellationToken).ConfigureAwait(false) == AccountState.AdminExists)
-        {
-            return false;
-        }
-
-        await db.SetupKeys
-            .Where(k => k.ConsumedAt == null && k.ExpiresAt > now)
-            .ExecuteUpdateAsync(s => s.SetProperty(k => k.ExpiresAt, now), cancellationToken)
-            .ConfigureAwait(false);
-        db.SetupKeys.Add(new SetupKeyRecord { KeyHash = keyHash, CreatedAt = now, ExpiresAt = expiresAt });
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return true;
-    }
-
     public async Task<FirstAdminResult> AddFirstAdminAsync(
         User admin,
-        byte[]? setupKeyHash,
-        DateTime now,
-        int maxFailedAttempts,
+        SetupKeyAttempt? setupKey,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(admin);
@@ -126,6 +99,11 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
 
             if (state == AccountState.UsersOnly)
             {
+                if (setupKey is null)
+                {
+                    return new FirstAdminResult(FirstAdminStatus.KeyRequired, 0);
+                }
+
                 // A taken name is refused before the authority is asked, so it does not use up the key.
                 var name = admin.UserName;
                 if (await db.Users.AnyAsync(u => u.UserName == name, cancellationToken).ConfigureAwait(false))
@@ -134,10 +112,10 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
                 }
 
                 // Decided while the lock is held: only the setup that gets here first can use the key, and
-                // the key is used up in this transaction, so a failed insert leaves it unused.
-                if (!await TryConsumeSetupKeyAsync(db, setupKeyHash, now, maxFailedAttempts, cancellationToken).ConfigureAwait(false))
+                // the key is used up in this transaction, so a failed insert or commit leaves it unused.
+                // A wrong key writes nothing and is rolled back with the rest.
+                if (!await UseSetupKeyAsync(db, setupKey, cancellationToken).ConfigureAwait(false))
                 {
-                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                     return new FirstAdminResult(FirstAdminStatus.NotAuthorized, 0);
                 }
             }
@@ -223,43 +201,29 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
     }
 
     /// <summary>
-    /// Compares <paramref name="candidateHash"/> with the valid issued key in constant time and uses the
-    /// key up with a conditional UPDATE. A wrong key is counted on the valid key (committed by the
-    /// caller); after <paramref name="maxFailedAttempts"/> the key is no longer valid.
+    /// Checks <paramref name="attempt"/> against the usable setup keys and, when one matches, uses it up
+    /// with a conditional UPDATE of Tuketildi and TuketimTarihi (the only columns the application's
+    /// login may change) inside the caller's transaction, so the use commits or rolls back with the
+    /// admin write. A wrong key writes nothing: there is no attempt counter that a guesser could exhaust.
     /// </summary>
-    private static async Task<bool> TryConsumeSetupKeyAsync(
-        EventDbContext db,
-        byte[]? candidateHash,
-        DateTime now,
-        int maxFailedAttempts,
-        CancellationToken cancellationToken)
+    private static async Task<bool> UseSetupKeyAsync(EventDbContext db, SetupKeyAttempt attempt, CancellationToken cancellationToken)
     {
-        var key = await db.SetupKeys
-            .AsNoTracking()
-            .Where(k => k.ConsumedAt == null && k.ExpiresAt > now && k.FailedAttempts < maxFailedAttempts)
-            .OrderByDescending(k => k.Id)
-            .Select(k => new { k.Id, k.KeyHash })
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-        if (key is null)
+        var now = attempt.Now;
+        var keys = await AccountLocks.UsableSetupKeysLockedAsync(db, now, cancellationToken).ConfigureAwait(false);
+        if (attempt.FindMatch(keys) is not { } id)
         {
             return false;
         }
 
-        var given = candidateHash is { Length: SchemaLimits.SetupKeyHashLength } ? candidateHash : new byte[SchemaLimits.SetupKeyHashLength];
-        var id = key.Id;
-        if (candidateHash is null || !CryptographicOperations.FixedTimeEquals(key.KeyHash, given))
-        {
-            await db.SetupKeys
-                .Where(k => k.Id == id)
-                .ExecuteUpdateAsync(s => s.SetProperty(k => k.FailedAttempts, k => k.FailedAttempts + 1), cancellationToken)
-                .ConfigureAwait(false);
-            return false;
-        }
-
+        // The WHERE clause is the final decision: of two transactions with the same key only one can
+        // match the unused row.
         var consumed = await db.SetupKeys
-            .Where(k => k.Id == id && k.ConsumedAt == null && k.ExpiresAt > now && k.FailedAttempts < maxFailedAttempts)
-            .ExecuteUpdateAsync(s => s.SetProperty(k => k.ConsumedAt, now), cancellationToken)
+            .Where(k => k.Id == id && !k.Consumed && k.ExpiresAt > now)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(k => k.Consumed, true)
+                    .SetProperty(k => k.ConsumedAt, now),
+                cancellationToken)
             .ConfigureAwait(false);
         return consumed == 1;
     }

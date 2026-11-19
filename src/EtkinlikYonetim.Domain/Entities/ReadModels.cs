@@ -10,6 +10,9 @@ public sealed record AccountCredentials(
     int FailedLoginCount,
     DateTime? LockoutEnd);
 
+/// <summary>A usable setup key, as a given key is compared with it.</summary>
+public sealed record StoredSetupKey(int Id, byte[] KeyHash);
+
 /// <summary>An event with its seat usage, for pickers and rule checks.</summary>
 public sealed record EventSummary(int Id, string Name, DateOnly Date, int Capacity, int RegisteredCount)
 {

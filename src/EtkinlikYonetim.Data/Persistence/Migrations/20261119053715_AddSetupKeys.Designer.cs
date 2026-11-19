@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EtkinlikYonetim.Data.Persistence.Migrations
 {
     [DbContext(typeof(EventDbContext))]
-    [Migration("20261119045530_AddSetupKeys")]
+    [Migration("20261119053715_AddSetupKeys")]
     partial class AddSetupKeys
     {
         /// <inheritdoc />
@@ -149,30 +149,30 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("EtkinlikYonetim.Domain.Entities.SetupKeyRecord", b =>
+            modelBuilder.Entity("EtkinlikYonetim.Domain.Entities.SetupKey", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
-                        .HasColumnName("Id");
+                        .HasColumnName("AnahtarID");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Consumed")
+                        .HasColumnType("bit")
+                        .HasColumnName("Tuketildi");
+
                     b.Property<DateTime?>("ConsumedAt")
                         .HasColumnType("datetime2")
-                        .HasColumnName("KullanimZamani");
+                        .HasColumnName("TuketimTarihi");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2")
-                        .HasColumnName("OlusturmaZamani");
+                        .HasColumnName("Olusturma");
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2")
-                        .HasColumnName("GecerlilikBitis");
-
-                    b.Property<int>("FailedAttempts")
-                        .HasColumnType("int")
-                        .HasColumnName("BasarisizDeneme");
+                        .HasColumnName("SonKullanma");
 
                     b.Property<byte[]>("KeyHash")
                         .IsRequired()
@@ -184,10 +184,7 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("PK_KurulumAnahtarlari");
 
-                    b.ToTable("KurulumAnahtarlari", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_KurulumAnahtarlari_BasarisizDeneme", "[BasarisizDeneme] >= 0");
-                        });
+                    b.ToTable("KurulumAnahtarlari", (string)null);
                 });
 
             modelBuilder.Entity("EtkinlikYonetim.Domain.Entities.Ticket", b =>

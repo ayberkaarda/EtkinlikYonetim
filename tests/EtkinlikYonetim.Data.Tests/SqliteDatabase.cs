@@ -45,11 +45,15 @@ public sealed class SqliteDatabase(bool demo = true) : IAsyncLifetime
     /// Another, independent set of the application's services on the same database, as a second
     /// application instance (another Windows profile or computer) has; the caller disposes it.
     /// </summary>
-    public ServiceProvider BuildServices(params IInterceptor[] interceptors)
+    public ServiceProvider BuildServices(params IInterceptor[] interceptors) => BuildServices(null, interceptors);
+
+    /// <summary>As <see cref="BuildServices(IInterceptor[])"/>, with registrations of the caller replacing the defaults.</summary>
+    public ServiceProvider BuildServices(Action<IServiceCollection>? configure, params IInterceptor[] interceptors)
     {
         var services = new ServiceCollection();
         services.AddDataAccess(options => options.UseSqlite(_connection).AddInterceptors(interceptors), new DataAccessOptions { SeedDemoData = false });
         services.AddTestBusinessServices(Clock);
+        configure?.Invoke(services);
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
     }
 

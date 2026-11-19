@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Services;
+using EtkinlikYonetim.Data.Persistence;
 using EtkinlikYonetim.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
@@ -34,13 +38,31 @@ internal static class TestServices
     {
         services.AddSingleton<TimeProvider>(clock);
         services.AddSingleton<IPasswordHasher>(new PasswordHasher(iterations: 1_000));
+        services.AddSingleton(new SetupKeyThrottle(TimeSpan.Zero));
+        services.AddSingleton(new SetupKeyEnvironment(null));
         services.AddBusinessServices();
         return services;
     }
 
-    /// <summary>Issues a setup key for the database of <paramref name="provider"/>, as the --create-setup-key command does.</summary>
-    public static Task<string> CreateSetupKeyAsync(IServiceProvider provider) =>
-        provider.GetRequiredService<ISetupService>().CreateSetupKeyAsync(TestContext.Current.CancellationToken);
+    /// <summary>
+    /// Stores a new setup key for the database of <paramref name="provider"/> as the database owner's
+    /// script does (16 random bytes, SHA-256 of the 32 hexadecimal characters, 24 hours from
+    /// <paramref name="now"/>) and returns it in groups of four. On SQL Server the tests run the script
+    /// itself; this stands in for it where there is no T-SQL.
+    /// </summary>
+    public static async Task<string> AddSetupKeyAsync(IServiceProvider provider, DateTimeOffset now)
+    {
+        var key = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+        await using var db = await provider.GetRequiredService<IDbContextFactory<EventDbContext>>().CreateDbContextAsync(TestContext.Current.CancellationToken);
+        db.SetupKeys.Add(new SetupKey
+        {
+            KeyHash = SHA256.HashData(Encoding.ASCII.GetBytes(key)),
+            CreatedAt = now.UtcDateTime,
+            ExpiresAt = now.UtcDateTime + SetupKeyPolicy.Lifetime,
+        });
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return SetupKeyPolicy.Format(key);
+    }
 
     public static UserSession User(int id) => new(id, "kullanici" + id, UserRole.User);
 

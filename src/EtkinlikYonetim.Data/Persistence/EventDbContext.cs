@@ -19,7 +19,7 @@ public sealed class EventDbContext(DbContextOptions<EventDbContext> options) : D
 
     public DbSet<Ticket> Tickets => Set<Ticket>();
 
-    public DbSet<SetupKeyRecord> SetupKeys => Set<SetupKeyRecord>();
+    public DbSet<SetupKey> SetupKeys => Set<SetupKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

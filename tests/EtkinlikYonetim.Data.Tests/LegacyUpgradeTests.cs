@@ -296,9 +296,9 @@ public sealed class LegacyUpgradeTests
 
         Assert.False(await setup.IsSetupRequiredAsync(ct));
         Assert.True(await setup.IsAdminMissingAsync(ct));
-        var key = await TestServices.CreateSetupKeyAsync(provider);
+        var key = await TestServices.AddSetupKeyAsync(provider, database.Clock.GetUtcNow());
         var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(null, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));
-        Assert.Equal(SetupService.SetupKeyInvalid, refused.Message);
+        Assert.Equal(SetupService.SetupKeyRequired, refused.Message);
         Assert.Equal(0, await database.ScalarAsync(Admins, ct));
 
         Assert.True((await setup.CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct)).IsAdmin);
@@ -433,7 +433,7 @@ public sealed class LegacyUpgradeTests
             "FK_Katilimcilar_Kullanicilar", "FK_Kayitlar_Katilimcilar", "FK_Kayitlar_Etkinlikler", "FK_Biletler_Kayitlar",
             "CK_Kullanicilar_Rol", "CK_Kullanicilar_BasarisizGiris", "CK_Kullanicilar_SifreBicimi",
             "CK_Etkinlikler_Kapasite", "CK_Etkinlikler_KayitSayisi", "CK_Kayitlar_Durum",
-            "PK_KurulumAnahtarlari", "CK_KurulumAnahtarlari_BasarisizDeneme",
+            "PK_KurulumAnahtarlari",
         ];
         foreach (var name in expected)
         {
@@ -443,7 +443,7 @@ public sealed class LegacyUpgradeTests
         // The system-named unique, default and check constraints are replaced by named ones.
         Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.key_constraints WHERE type = 'UQ'", ct));
         Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.default_constraints", ct));
-        Assert.Equal(17, await database.ScalarAsync("SELECT COUNT(*) FROM sys.objects WHERE type IN ('PK', 'F', 'C') AND parent_object_id <> OBJECT_ID(N'dbo.__EFMigrationsHistory')", ct));
+        Assert.Equal(expected.Length, await database.ScalarAsync("SELECT COUNT(*) FROM sys.objects WHERE type IN ('PK', 'F', 'C') AND parent_object_id <> OBJECT_ID(N'dbo.__EFMigrationsHistory')", ct));
         Assert.Equal(4, await database.ScalarAsync(
             "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 1 AND has_filter = 0 AND name IN (N'IX_Kullanicilar_KullaniciAdi', N'IX_Katilimcilar_KullaniciId_TcKimlikNo', N'IX_Biletler_KayitId', N'IX_Biletler_BiletKodu')",
             ct));
