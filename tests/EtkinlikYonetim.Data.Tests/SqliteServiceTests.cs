@@ -401,6 +401,45 @@ public sealed class SqliteServiceTests : IAsyncLifetime
         await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.RegisterAsync(user, SmallEventId, DenizNationalId, Ct));
     }
 
+    /// <summary>
+    /// The same participant is cancelled and registered again several times: every new registration
+    /// succeeds, the cancelled rows stay as history, and the seat counter always equals the number of
+    /// active registrations.
+    /// </summary>
+    [Fact]
+    public async Task Cancel_SameParticipantRegistersAgain_CounterMatchesActiveRegistrations()
+    {
+        var user = User(SeedUserId);
+        var other = await Registrations.RegisterAsync(user, SmallEventId, EceNationalId, Ct);
+        var ids = new List<int>();
+
+        for (var round = 0; round < 3; round++)
+        {
+            var receipt = await Registrations.RegisterAsync(user, SmallEventId, DenizNationalId, Ct);
+            ids.Add(receipt.RegistrationId);
+            Assert.Equal(2, await ActiveAndCounterAsync());
+            await Registrations.CancelAsync(user, receipt.RegistrationId, Ct);
+            Assert.Equal(1, await ActiveAndCounterAsync());
+        }
+
+        var final = await Registrations.RegisterAsync(user, SmallEventId, DenizNationalId, Ct);
+        Assert.Equal(2, await ActiveAndCounterAsync());
+        Assert.Equal(ids.Count + 1, ids.Append(final.RegistrationId).Distinct().Count());
+        Assert.Contains(await Registrations.GetMyRegistrationsAsync(user, Ct), r => r.Id == final.RegistrationId);
+        Assert.Contains(await Registrations.GetMyRegistrationsAsync(user, Ct), r => r.Id == other.RegistrationId);
+        await using var context = _db.CreateContext();
+        Assert.Equal(3, await context.Registrations.CountAsync(r => r.EventId == SmallEventId && r.Status == RegistrationStatus.Cancelled, Ct));
+    }
+
+    /// <summary>The active registrations of the small event, after checking that its seat counter is the same.</summary>
+    private async Task<int> ActiveAndCounterAsync()
+    {
+        await using var context = _db.CreateContext();
+        var active = await context.Registrations.CountAsync(r => r.EventId == SmallEventId && r.Status == RegistrationStatus.Active, Ct);
+        Assert.Equal(active, (await context.Events.SingleAsync(e => e.Id == SmallEventId, Ct)).RegisteredCount);
+        return active;
+    }
+
     [Fact]
     public async Task Cancel_PastEvent_IsRefused()
     {

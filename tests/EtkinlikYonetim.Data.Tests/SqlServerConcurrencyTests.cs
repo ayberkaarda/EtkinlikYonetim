@@ -73,6 +73,58 @@ public sealed class SqlServerConcurrencyTests
         }
     }
 
+    /// <summary>
+    /// Two application instances: one cancels a participant's registration while the other registers
+    /// the same participant again, twice. Whatever the order, the participant has at most one active
+    /// registration and the seat counter equals the number of active registrations.
+    /// </summary>
+    [Fact]
+    public async Task CancelAndRegisterAgain_Race_CounterMatchesActiveRegistrations()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+        await using var a = database.BuildServices(demo: true);
+        await a.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+        await using var b = database.BuildServices();
+        var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İptal yarışı", new DateTime(2026, 4, 1), 2, ct);
+        const string Active = "SELECT COUNT(*) FROM dbo.Kayitlar WHERE EtkinlikId = @id AND Durum = 0";
+        const string Counter = "SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = @id";
+        string[] allowed = ["Bu katılımcı bu etkinliğe zaten kayıtlı.", "Bu kayıt zaten iptal edilmiş."];
+
+        for (var round = 0; round < 12; round++)
+        {
+            if (await database.ScalarAsync(Active, ct, ("@id", eventId)) == 0)
+            {
+                await a.GetRequiredService<IRegistrationService>().RegisterAsync(User(SeedUserId), eventId, DenizNationalId, ct);
+            }
+
+            var registrationId = await database.ScalarAsync("SELECT Id FROM dbo.Kayitlar WHERE EtkinlikId = @id AND Durum = 0", ct, ("@id", eventId));
+            var results = await RaceAsync(
+                ["cancel", "register", "register"],
+                async step =>
+                {
+                    if (step == "cancel")
+                    {
+                        await a.GetRequiredService<IRegistrationService>().CancelAsync(User(SeedUserId), registrationId, ct);
+                    }
+                    else
+                    {
+                        await b.GetRequiredService<IRegistrationService>().RegisterAsync(User(SeedUserId), eventId, DenizNationalId, ct);
+                    }
+
+                    return step;
+                },
+                ct);
+
+            Assert.Null(results[0]); // the only cancel of an active registration always succeeds
+            Assert.All(results.Where(r => r is not null), r => Assert.Contains(Assert.IsType<BusinessRuleException>(r).Message, allowed));
+            var active = await database.ScalarAsync(Active, ct, ("@id", eventId));
+            Assert.InRange(active, 0, 1);
+            Assert.Equal(results.Skip(1).Count(r => r is null), active);
+            Assert.Equal(active, await database.ScalarAsync(Counter, ct, ("@id", eventId)));
+        }
+    }
+
     [Fact]
     public async Task Database_RejectsDuplicatesAndOverbookingWrittenPastTheServices()
     {
