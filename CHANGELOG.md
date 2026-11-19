@@ -60,6 +60,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   or cancelled, sign-in locks, and the times written for registrations, tickets, cancellations and check-ins. A
   computer whose clock is wrong, or was set back on purpose, can no longer register for a past event, cancel its
   registrations, end a sign-in lock early or write false check-in times.
+- A registration whose ticket was scanned at the entrance can no longer be cancelled ("Giriş yapılmış bir kayıt
+  iptal edilemez."), and the check-in takes the event's lock: a participant who is inside keeps the seat instead of
+  it going to the next one waiting, so the room never holds more people than seats.
 
 ## Foundation
 

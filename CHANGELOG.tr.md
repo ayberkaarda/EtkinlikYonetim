@@ -60,6 +60,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
   yapılamayacağı veya iptal edilip edilemeyeceği, giriş kilitleri ve kayıtlar, biletler, iptaller ve girişler için
   yazılan zamanlar. Saati yanlış olan ya da bilerek geri alınmış bir bilgisayar artık geçmiş bir etkinliğe kayıt
   yapamaz, kayıtlarını iptal edemez, bir giriş kilidini erken bitiremez ve sahte giriş zamanları yazamaz.
+- Bileti girişte okutulmuş bir kayıt artık iptal edilemez ("Giriş yapılmış bir kayıt iptal edilemez.") ve giriş
+  işlemi etkinliğin kilidini alır: içerideki katılımcı yerini korur, yer sıradaki bekleyene geçmez; böylece salonda
+  yer sayısından fazla kişi olmaz.
 
 ## Temel
 
