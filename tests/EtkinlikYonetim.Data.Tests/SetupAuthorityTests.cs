@@ -100,7 +100,8 @@ public sealed class SetupAuthorityTests
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
-        await using var provider = database.BuildServices();
+        var behind = await database.ClockAsync(TimeSpan.FromDays(-30), ct);
+        await using var provider = database.BuildServices(clock: behind);
         await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
         await provider.GetRequiredService<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", ct);
         var setup = provider.GetRequiredService<ISetupService>();
@@ -165,7 +166,7 @@ public sealed class SetupAuthorityTests
     /// <summary>
     /// The key is valid when the setup reads the usable keys, and expires by the database's clock while
     /// the setup is paused just before its final UPDATE. The UPDATE must refuse it: no admin, and the
-    /// key stays unused with no use time. The test clock (2 March 2026) is far behind the database's,
+    /// key stays unused with no use time. The computer's clock is a month behind the database's,
     /// so a check against the computer's clock would accept the key.
     /// </summary>
     [Fact]
@@ -182,7 +183,7 @@ public sealed class SetupAuthorityTests
         var key = await database.IssueSetupKeyAsync(ct);
         await database.ExecuteAsync("UPDATE dbo.KurulumAnahtarlari SET SonKullanma = DATEADD(SECOND, 3, SYSUTCDATETIME())", ct);
         var pause = new KeyUpdatePause(database);
-        await using var app = database.BuildServices(configureContext: b => b.AddInterceptors(pause));
+        await using var app = database.BuildServices(configureContext: b => b.AddInterceptors(pause), clock: await database.ClockAsync(TimeSpan.FromDays(-30), ct));
 
         var refused = await Assert.ThrowsAsync<BusinessRuleException>(
             () => app.GetRequiredService<ISetupService>().CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));
@@ -204,14 +205,15 @@ public sealed class SetupAuthorityTests
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
-        await using var provider = database.BuildServices();
+        var behind = await database.ClockAsync(TimeSpan.FromDays(-30), ct);
+        await using var provider = database.BuildServices(clock: behind);
         await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
         await provider.GetRequiredService<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", ct);
         var setup = provider.GetRequiredService<ISetupService>();
 
         var expired = await database.IssueSetupKeyAsync(ct);
         await database.ExecuteAsync("UPDATE dbo.KurulumAnahtarlari SET SonKullanma = DATEADD(SECOND, -1, SYSUTCDATETIME())", ct);
-        var clientNow = database.Clock.GetUtcNow().UtcDateTime;
+        var clientNow = behind.GetUtcNow().UtcDateTime;
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE SonKullanma > @client", ct, ("@client", clientNow)));
 
         var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(expired, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));

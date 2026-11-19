@@ -24,7 +24,7 @@ public sealed class SqlServerCheckInTests
 
         for (var round = 0; round < 8; round++)
         {
-            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Giriş " + round, new DateTime(2026, 3, 2), 5, ct);
+            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Giriş " + round, database.Today, 5, ct);
             var receipt = await a.GetRequiredService<IRegistrationService>().RegisterAsync(Admin(SeedAdminId), eventId, ids[0], ct);
             var outcomes = new List<CheckInOutcome>();
 

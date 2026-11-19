@@ -36,7 +36,7 @@ public sealed class SqlServerWaitingListTests
 
         for (var round = 0; round < Rounds; round++)
         {
-            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Tek koltuk " + round, new DateTime(2026, 4, 1), 1, ct);
+            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Tek koltuk " + round, database.Today.AddDays(30), 1, ct);
             var holder = await a.GetRequiredService<IRegistrationService>().RegisterAsync(Admin(SeedAdminId), eventId, ids[0], ct);
             var waiting = await a.GetRequiredService<IRegistrationService>().RegisterAsync(Admin(SeedAdminId), eventId, ids[1], ct);
             Assert.Equal(1, waiting.QueuePosition);
@@ -70,7 +70,7 @@ public sealed class SqlServerWaitingListTests
         for (var round = 0; round < Rounds; round++)
         {
             var service = a.GetRequiredService<IRegistrationService>();
-            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İki koltuk " + round, new DateTime(2026, 4, 1), 2, ct);
+            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İki koltuk " + round, database.Today.AddDays(30), 2, ct);
             var first = await service.RegisterAsync(Admin(SeedAdminId), eventId, ids[0], ct);
             var second = await service.RegisterAsync(Admin(SeedAdminId), eventId, ids[1], ct);
             var third = await service.RegisterAsync(Admin(SeedAdminId), eventId, ids[2], ct);
@@ -106,7 +106,7 @@ public sealed class SqlServerWaitingListTests
 
         for (var round = 0; round < Rounds; round++)
         {
-            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Dolu " + round, new DateTime(2026, 4, 1), 1, ct);
+            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Dolu " + round, database.Today.AddDays(30), 1, ct);
             await a.GetRequiredService<IRegistrationService>().RegisterAsync(Admin(SeedAdminId), eventId, ids[0], ct);
             var places = new List<int>();
 

@@ -29,14 +29,14 @@ public sealed class SqlServerEventManagementTests
         for (var round = 0; round < Rounds; round++)
         {
             var registrations = a.GetRequiredService<IRegistrationService>();
-            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Küçülen " + round, new DateTime(2026, 4, 1), 3, ct);
+            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Küçülen " + round, database.Today.AddDays(30), 3, ct);
             await registrations.RegisterAsync(Admin(SeedAdminId), eventId, ids[0], ct);
             await registrations.RegisterAsync(Admin(SeedAdminId), eventId, ids[1], ct);
 
             var results = await SqlServerWaitingListTests.RaceAsync(
                 ["update", "register"],
                 step => step == "update"
-                    ? a.GetRequiredService<IEventService>().UpdateAsync(Admin(SeedAdminId), eventId, new DateTime(2026, 4, 1), 2, null, ct)
+                    ? a.GetRequiredService<IEventService>().UpdateAsync(Admin(SeedAdminId), eventId, database.Today.AddDays(30), 2, null, ct)
                     : b.GetRequiredService<IRegistrationService>().RegisterAsync(Admin(SeedAdminId), eventId, ids[2], ct),
                 ct);
 
@@ -74,7 +74,7 @@ public sealed class SqlServerEventManagementTests
 
         for (var round = 0; round < Rounds; round++)
         {
-            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İptal " + round, new DateTime(2026, 4, 1), 5, ct);
+            var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İptal " + round, database.Today.AddDays(30), 5, ct);
 
             var results = await SqlServerWaitingListTests.RaceAsync(
                 ["cancel", "register"],

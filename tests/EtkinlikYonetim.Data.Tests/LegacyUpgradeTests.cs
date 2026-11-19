@@ -36,6 +36,7 @@ public sealed class LegacyUpgradeTests
 
     // Fictional rows. Identity values deliberately do not start at 1 so overwritten or re-seeded rows
     // would show. "admin" in lower case and a missing role are what the original application allowed.
+    // The open events are dated by the database's clock, which decides what is past: today and in 30 days.
     private const string LegacyData = """
         SET IDENTITY_INSERT dbo.Kullanicilar ON;
         INSERT dbo.Kullanicilar (Id, KullaniciAdi, Sifre, Rol) VALUES
@@ -45,9 +46,9 @@ public sealed class LegacyUpgradeTests
         SET IDENTITY_INSERT dbo.Kullanicilar OFF;
         SET IDENTITY_INSERT dbo.Etkinlikler ON;
         INSERT dbo.Etkinlikler (Id, EtkinlikAdi, Tarih, Kapasite) VALUES
-            (2, N'Eski Konser', '2026-03-10', 2),
+            (2, N'Eski Konser', CAST(SYSUTCDATETIME() AS date), 2),
             (4, N'Geçmiş Etkinlik', '2025-05-17', 10),
-            (7, N'Boş Etkinlik', '2026-04-01', 5);
+            (7, N'Boş Etkinlik', DATEADD(DAY, 30, CAST(SYSUTCDATETIME() AS date)), 5);
         SET IDENTITY_INSERT dbo.Etkinlikler OFF;
         SET IDENTITY_INSERT dbo.Katilimcilar ON;
         INSERT dbo.Katilimcilar (Id, EtkinlikAdi, TcKimlikNo, AdSoyad, Email) VALUES

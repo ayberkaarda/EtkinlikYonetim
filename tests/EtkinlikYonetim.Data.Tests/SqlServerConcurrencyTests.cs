@@ -36,7 +36,7 @@ public sealed class SqlServerConcurrencyTests
         for (var round = 0; round < 4; round++)
         {
             const int Seats = 3;
-            var eventId = await events.CreateAsync(Admin(SeedAdminId), "Yarış " + round, new DateTime(2026, 4, 1), Seats, ct);
+            var eventId = await events.CreateAsync(Admin(SeedAdminId), "Yarış " + round, database.Today.AddDays(30), Seats, ct);
 
             var results = await RaceAsync(nationalIds, id => service.RegisterAsync(Admin(SeedAdminId), eventId, id, ct), ct);
 
@@ -60,7 +60,7 @@ public sealed class SqlServerConcurrencyTests
 
         for (var round = 0; round < 4; round++)
         {
-            var eventId = await provider.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Tekrar " + round, new DateTime(2026, 4, 1), 100, ct);
+            var eventId = await provider.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Tekrar " + round, database.Today.AddDays(30), 100, ct);
 
             var results = await RaceAsync(
                 Enumerable.Repeat(DenizNationalId, Contenders).ToList(),
@@ -89,7 +89,7 @@ public sealed class SqlServerConcurrencyTests
         await using var a = database.BuildServices(demo: true);
         await a.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
         await using var b = database.BuildServices();
-        var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İptal yarışı", new DateTime(2026, 4, 1), 2, ct);
+        var eventId = await a.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "İptal yarışı", database.Today.AddDays(30), 2, ct);
         const string Active = "SELECT COUNT(*) FROM dbo.Kayitlar WHERE EtkinlikId = @id AND Durum = 0";
         const string Counter = "SELECT KayitSayisi FROM dbo.Etkinlikler WHERE Id = @id";
         string[] allowed = [RegistrationService.AlreadyRegistered, RegistrationService.AlreadyCancelled];
