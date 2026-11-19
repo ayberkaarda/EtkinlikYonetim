@@ -76,7 +76,13 @@ internal sealed record RegistrationItem(RegistrationDetails Registration)
 internal sealed record AccountItem(AccountSummary Account)
 {
     public override string ToString() =>
-        $"{Account.UserName} - {(Account.Role == UserRole.Admin ? "Yönetici" : "Kullanıcı")} - {(Account.Disabled ? "Devre dışı" : "Etkin")}";
+        $"{Account.UserName} - {RoleName} - {(Account.Disabled ? "Devre dışı" : "Etkin")}";
+
+    /// <summary>The row: the user name, the role below it and a pill for the state, which a long name never hides.</summary>
+    public ListRow Row() =>
+        new(Account.UserName, RoleName, RowTone.Neutral, Account.Disabled ? "Devre dışı" : "Etkin", Account.Disabled ? RowTone.Warning : RowTone.Accent);
+
+    private string RoleName => Account.Role == UserRole.Admin ? "Yönetici" : "Kullanıcı";
 }
 
 /// <summary>A participant of an event with the national id masked and the state of the registration; no ticket code.</summary>
@@ -84,4 +90,21 @@ internal sealed record ParticipantItem(ParticipantView Participant)
 {
     public override string ToString() =>
         $"{Participant.FullName} - {Participant.MaskedNationalId} - {Participant.Email} - {Participant.State}";
+
+    /// <summary>Whether the participant's ticket was used at the entrance.</summary>
+    public bool CheckedIn => Participant.State == "Giriş yapıldı";
+
+    /// <summary>
+    /// The row: the name, then the masked national id and the e-mail address, and the state as a pill: inside,
+    /// not yet inside, waiting or cancelled with the event. An unknown state is shown as it is.
+    /// </summary>
+    public ListRow Row()
+    {
+        var state = Participant.State;
+        var tone = CheckedIn ? RowTone.Accent
+            : state.StartsWith("Bekleme", StringComparison.Ordinal) ? RowTone.Warm
+            : state.Contains("iptal", StringComparison.OrdinalIgnoreCase) ? RowTone.Warning
+            : RowTone.Neutral;
+        return new ListRow(Participant.FullName, $"{Participant.MaskedNationalId} · {Participant.Email}", RowTone.Neutral, state, tone);
+    }
 }

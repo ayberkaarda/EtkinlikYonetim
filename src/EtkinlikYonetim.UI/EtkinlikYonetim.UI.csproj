@@ -8,7 +8,7 @@
     <AssemblyName>EtkinlikYonetim</AssemblyName>
     <Product>Etkinlik Yönetim</Product>
     <NeutralLanguage>tr-TR</NeutralLanguage>
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
     <UserSecretsId>etkinlik-yonetim-ui</UserSecretsId>
   </PropertyGroup>
@@ -41,7 +41,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
     <!-- QR code of the ticket: MIT licensed, managed encoder; its PNG renderer needs no GDI+. Pinned to exactly one version. -->
     <PackageReference Include="QRCoder" Version="[1.6.0]" />
-    <PackageReference Include="ReaLTaiizor" Version="3.8.1.2" />
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
