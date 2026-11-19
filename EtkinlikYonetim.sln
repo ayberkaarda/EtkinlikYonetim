@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtkinlikYonetim.Business", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtkinlikYonetim.Data", "src\EtkinlikYonetim.Data\EtkinlikYonetim.Data.csproj", "{6A4B238F-8A0C-4F6E-8128-A839D8376523}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtkinlikYonetim.Data.Tests", "tests\EtkinlikYonetim.Data.Tests\EtkinlikYonetim.Data.Tests.csproj", "{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +75,18 @@ Global
 		{6A4B238F-8A0C-4F6E-8128-A839D8376523}.Release|x64.Build.0 = Release|Any CPU
 		{6A4B238F-8A0C-4F6E-8128-A839D8376523}.Release|x86.ActiveCfg = Release|Any CPU
 		{6A4B238F-8A0C-4F6E-8128-A839D8376523}.Release|x86.Build.0 = Release|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Debug|x64.Build.0 = Debug|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Debug|x86.Build.0 = Debug|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Release|x64.ActiveCfg = Release|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Release|x64.Build.0 = Release|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Release|x86.ActiveCfg = Release|Any CPU
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -79,5 +95,6 @@ Global
 		{622A9EFD-0116-4325-BB53-35B79ECBBC8A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{182BB050-DA69-49BC-ABF1-F86A70831C86} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{6A4B238F-8A0C-4F6E-8128-A839D8376523} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{0BCBC4AF-A7D8-494A-9593-B43DE045A64E} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
