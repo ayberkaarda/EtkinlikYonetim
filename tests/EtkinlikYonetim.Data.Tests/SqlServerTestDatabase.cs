@@ -10,12 +10,15 @@ namespace EtkinlikYonetim.Data.Tests;
 /// <summary>
 /// Throw-away database on a real SQL Server instance. Set ETKINLIK_TEST_SQLSERVER to a server-level
 /// connection string to choose the instance (default: local SQL Express with Windows authentication)
-/// and ETKINLIK_SKIP_SQL_TESTS=1 to skip every test that needs SQL Server.
+/// and ETKINLIK_SKIP_SQL_TESTS=1 to skip every test that needs SQL Server. With
+/// ETKINLIK_REQUIRE_SQL_TESTS=1 (the SQL Server job of the CI) an unreachable server fails the tests
+/// instead of skipping them.
 /// </summary>
 internal sealed class SqlServerTestDatabase : IAsyncDisposable
 {
     private const string ServerEnvironmentVariable = "ETKINLIK_TEST_SQLSERVER";
     private const string SkipEnvironmentVariable = "ETKINLIK_SKIP_SQL_TESTS";
+    private const string RequireEnvironmentVariable = "ETKINLIK_REQUIRE_SQL_TESTS";
     private const string DefaultServer =
         @"Server=localhost\SQLEXPRESS;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=5;";
 
@@ -197,8 +200,7 @@ internal sealed class SqlServerTestDatabase : IAsyncDisposable
 
     private static async Task<string> ResolveServerOrSkipAsync(CancellationToken ct)
     {
-        var skip = Environment.GetEnvironmentVariable(SkipEnvironmentVariable);
-        if (skip is "1" || string.Equals(skip, "true", StringComparison.OrdinalIgnoreCase))
+        if (IsYes(Environment.GetEnvironmentVariable(SkipEnvironmentVariable)))
         {
             Assert.Skip($"{SkipEnvironmentVariable} is set.");
         }
@@ -214,11 +216,14 @@ internal sealed class SqlServerTestDatabase : IAsyncDisposable
             await using var connection = new SqlConnection(server);
             await connection.OpenAsync(ct);
         }
-        catch (SqlException ex)
+        catch (SqlException ex) when (!IsYes(Environment.GetEnvironmentVariable(RequireEnvironmentVariable)))
         {
             Assert.Skip($"No SQL Server available ({ex.Number}). Set {ServerEnvironmentVariable} to run this test.");
         }
 
         return server;
     }
+
+    private static bool IsYes(string? value) =>
+        value is "1" || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
 }
