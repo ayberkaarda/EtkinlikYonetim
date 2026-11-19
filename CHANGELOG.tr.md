@@ -56,7 +56,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
   dolan ya da yalnızca geri kalmış bir saatin kabul edeceği anahtar reddedilir ve kullanılmamış kalır.
 - Adlar, e-posta adresleri, kimlik numaraları, şifreler, kurulum anahtarları ve istisna mesajları loga asla yazılmaz.
 - Açık oturumlar her işlemde veritabanına göre denetlenir: rolü düşürülen, devre dışı bırakılan veya silinen bir
-  hesap hâlâ açık bir pencereden işlem yapamaz; devre dışı hesaplar giriş yapamaz.
+  hesap hâlâ açık bir pencereden işlem yapamaz; devre dışı hesaplar giriş yapamaz. Bir hesabın erişimindeki her
+  değişiklik oturum sürümünü artırır (migration `AddSessionVersion`); hesap devre dışı bırakılmadan veya rolü
+  düşürülmeden önce açılan bir pencere, hesap yeniden etkinleştirilse ya da yönetici yapılsa da kapalı kalır; hesap
+  yeniden giriş yapar.
 - Bilet kodları SHA-256 özetleriyle bulunur ve sabit zamanda karşılaştırılır; loga ve dışa aktarımlara asla yazılmaz.
 - Log dosyası kayıt olma, etkinlik kaydı, iptal ve girişte okutmanın her sonucu için tek bir nötr kod yazar; artık
   hangi hesapların, kayıtların veya biletlerin var olduğunu belli etmez.

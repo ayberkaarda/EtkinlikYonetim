@@ -84,8 +84,9 @@ otomatik olarak oluşturulup güncellenir.
   metin şifreleri bir sonraki başarılı girişte özetle değiştirilir.
 - ✅ 5 hatalı giriş hesabı 15 dakika kilitler; bilinmeyen hesap, yanlış şifre ve kilitli hesap aynı yanıtı alır.
 - ✅ Her çağrı oturum açmış hesaba, oturum da veritabanına göre denetlenir: rolü düşürülen, devre dışı bırakılan
-  veya silinen bir hesap hâlâ açık olan bir pencereyi kullanamaz. Kullanıcılar yalnızca kendi katılımcılarına ve
-  kayıtlarına erişir; olmayan bir kayıt ile başkasının kaydı aynı yanıtı alır.
+  veya silinen bir hesap hâlâ açık olan bir pencereyi kullanamaz; hesap yeniden etkinleştirilse veya yeniden yönetici
+  yapılsa da o pencere kapalı kalır (her erişim değişikliğinde oturum sürümü değişir). Kullanıcılar yalnızca kendi
+  katılımcılarına ve kayıtlarına erişir; olmayan bir kayıt ile başkasının kaydı aynı yanıtı alır.
 - ✅ Bilet kodları SHA-256 özetleriyle bulunduktan sonra sabit zamanda karşılaştırılır; loga ve dışa aktarımlara asla
   yazılmaz.
 - ✅ Türkçe mesajlı merkezi FluentValidation doğrulayıcıları; yazma düğmeleri bir işlem sürerken tekrarlanan

@@ -86,8 +86,9 @@ startup.
 - ✅ 5 failed sign-ins lock the account for 15 minutes; unknown accounts, wrong passwords and locked accounts get
   the same answer.
 - ✅ Every call is checked against the signed-in session and the session against the database: a demoted,
-  disabled or deleted account cannot use a window that is still open. Users reach only their own participants and
-  registrations, and a missing record and somebody else's record get the same answer.
+  disabled or deleted account cannot use a window that is still open, and such a window stays closed when the
+  account is enabled or promoted again (a session version changes with every change of access). Users reach only
+  their own participants and registrations, and a missing record and somebody else's record get the same answer.
 - ✅ Ticket codes are compared in constant time after a lookup by their SHA-256; they are never logged or exported.
 - ✅ Central FluentValidation validators with Turkish messages; write buttons ignore repeated clicks while an
   operation is pending.

@@ -56,7 +56,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   clock running behind would accept, is refused and stays unused.
 - Names, e-mail addresses, national ids, passwords, setup keys and exception messages are never written to the log.
 - Open sessions are checked against the database on every operation: a demoted, disabled or deleted account can no
-  longer act from a window that is still open, and disabled accounts cannot sign in.
+  longer act from a window that is still open, and disabled accounts cannot sign in. Every change of an account's
+  access raises its session version (migration `AddSessionVersion`), so a window opened before the account was
+  disabled or demoted stays closed after it is enabled or promoted again; the account signs in anew.
 - Ticket codes are found by their SHA-256 and compared in constant time; they are never logged or exported.
 - The log file writes one neutral code for every outcome of a sign-up, a registration, a cancellation and a scan at
   the entrance, so it no longer tells which accounts, registrations or tickets exist.
