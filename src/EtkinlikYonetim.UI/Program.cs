@@ -12,10 +12,14 @@ namespace EtkinlikYonetim.UI
     {
         internal const string ConnectionStringName = "EtkinlikYonetim";
 
-        /// <summary>Application entry point and composition root.</summary>
+        /// <summary>
+        /// Application entry point and composition root. With <see cref="SetupKeyCommand.Argument"/> the
+        /// application issues a setup key on the console instead of opening a window.
+        /// </summary>
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
+            var createSetupKey = SetupKeyCommand.IsRequested(args);
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (_, e) => ErrorReporter.Show(e.Exception);
             AppDomain.CurrentDomain.UnhandledException += (_, e) => ErrorReporter.Show(e.ExceptionObject as Exception);
@@ -24,6 +28,14 @@ namespace EtkinlikYonetim.UI
 
             var configuration = BuildConfiguration();
             var connectionString = AppConfiguration.ResolveConnectionString(configuration);
+            if (string.IsNullOrWhiteSpace(connectionString) && createSetupKey)
+            {
+                using var console = SetupKeyCommand.OpenConsole();
+                console.WriteLine("Veritabanı bağlantı ayarı bulunamadı (appsettings.json veya ETKINLIK_CONNECTION).");
+                Environment.ExitCode = 1;
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 Dialogs.Show(
@@ -39,6 +51,12 @@ namespace EtkinlikYonetim.UI
 
             var options = new DataAccessOptions { SeedDemoData = AppConfiguration.IsDemoRequested(configuration) };
             using var serviceProvider = ConfigureServices(connectionString, options);
+            if (createSetupKey)
+            {
+                using var console = SetupKeyCommand.OpenConsole();
+                Environment.ExitCode = SetupKeyCommand.Run(serviceProvider, console);
+                return;
+            }
 
             bool setupRequired;
             bool adminMissing;
