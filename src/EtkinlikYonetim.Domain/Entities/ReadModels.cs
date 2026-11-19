@@ -94,13 +94,17 @@ public enum CancellationOutcome
     CancelledAndPromoted = 2,
 }
 
-/// <summary>The parts of a registration that decide who may cancel it and whether it still can be.</summary>
+/// <summary>
+/// The parts of a registration that decide who may cancel it and whether it still can be;
+/// <paramref name="CheckedIn"/> tells whether its ticket was used at the entrance.
+/// </summary>
 public sealed record RegistrationOwnership(
     int Id,
     int EventId,
     DateOnly EventDate,
     int? OwnerUserId,
-    RegistrationStatus Status);
+    RegistrationStatus Status,
+    bool CheckedIn = false);
 
 /// <summary>What the entrance needs to know about a ticket found by the hash of its code.</summary>
 public sealed record TicketForCheckIn(int TicketId, string Code, int EventId, RegistrationStatus Status, bool EventCancelled, DateTime? CheckedInAt);

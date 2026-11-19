@@ -1,3 +1,4 @@
+using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
@@ -103,6 +104,35 @@ public sealed class CheckInTests : IAsyncLifetime
 
         Assert.NotNull(await _db.Get<ITicketRepository>().FindForCheckInAsync(TicketCodeHash.Of(receipt.TicketCode!), Ct));
         Assert.Equal(CheckInOutcome.Rejected, (await CheckIns.CheckInAsync(Admin(SeedAdminId), ConcertId, receipt.TicketCode, Ct)).Outcome);
+    }
+
+    /// <summary>
+    /// A participant who has been let in cannot be cancelled afterwards, neither through the service nor by a
+    /// repository call that skips its checks: the seat stays taken, the counter says so and the one waiting
+    /// stays waiting, so the room never holds more people than the event has seats.
+    /// </summary>
+    [Fact]
+    public async Task Cancel_AfterCheckIn_IsRefusedAndTheSeatStaysTaken()
+    {
+        var admin = Admin(SeedAdminId);
+        var id = await _db.Get<IEventService>().CreateAsync(admin, "Tek", Start.UtcDateTime.Date, 1, Ct);
+        var inside = await Registrations.RegisterAsync(User(SeedUserId), id, DenizNationalId, Ct);
+        var waiting = await Registrations.RegisterAsync(User(SeedUserId), id, EceNationalId, Ct);
+        Assert.Equal(CheckInOutcome.CheckedIn, (await CheckIns.CheckInAsync(admin, id, inside.TicketCode, Ct)).Outcome);
+
+        var byUser = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.CancelAsync(User(SeedUserId), inside.RegistrationId, Ct));
+        var byAdmin = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.CancelAsync(admin, inside.RegistrationId, Ct));
+        var direct = await _db.Get<IRegistrationRepository>().CancelAsync(
+            inside.RegistrationId, null, DateOnly.FromDateTime(Start.UtcDateTime), Start.UtcDateTime, () => "ETK-" + new string('C', 26), Ct);
+
+        Assert.Equal(RegistrationService.CheckedInCannotCancel, byUser.Message);
+        Assert.Equal(RegistrationService.CheckedInCannotCancel, byAdmin.Message);
+        Assert.Equal(CancellationOutcome.NotCancelled, direct);
+        Assert.Equal(new CheckInCount(1, 1), await CheckIns.GetCountAsync(admin, id, Ct));
+        await using var context = _db.CreateContext();
+        Assert.Equal(RegistrationStatus.Active, (await context.Registrations.SingleAsync(r => r.Id == inside.RegistrationId, Ct)).Status);
+        Assert.Equal(RegistrationStatus.Waiting, (await context.Registrations.SingleAsync(r => r.Id == waiting.RegistrationId, Ct)).Status);
+        Assert.Equal(1, (await context.Events.SingleAsync(e => e.Id == id, Ct)).RegisteredCount);
     }
 
     /// <summary>A participant who moves up from the waiting list gets a ticket that works at the entrance.</summary>

@@ -136,7 +136,13 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
                 join p in db.Participants on r.ParticipantId equals p.Id
                 join e in db.Events on r.EventId equals e.Id
                 where r.Id == id
-                select new RegistrationOwnership(r.Id, e.Id, e.Date, p.OwnerUserId, r.Status))
+                select new RegistrationOwnership(
+                    r.Id,
+                    e.Id,
+                    e.Date,
+                    p.OwnerUserId,
+                    r.Status,
+                    db.Tickets.Any(t => t.RegistrationId == r.Id && t.CheckedInAt != null)))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -170,11 +176,15 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
             .AnyAsync(r => r.Id == id && r.Status == RegistrationStatus.Active, cancellationToken)
             .ConfigureAwait(false);
 
-        // The ownership, status and date conditions are part of the UPDATE, so whatever changed since the
-        // caller's read is decided here.
+        // The ownership, status, date and check-in conditions are part of the UPDATE, so whatever changed
+        // since the caller's read is decided here. A participant who has been let in keeps the seat: giving
+        // it to the next one waiting would put one person more in the room than the event has seats. The
+        // entrance takes the same event lock, so a check-in and a cancellation of one registration are
+        // decided one after the other.
         var query = db.Registrations.Where(r => r.Id == id
             && (r.Status == RegistrationStatus.Active || r.Status == RegistrationStatus.Waiting)
-            && db.Events.Any(e => e.Id == r.EventId && e.Date >= today));
+            && db.Events.Any(e => e.Id == r.EventId && e.Date >= today)
+            && !db.Tickets.Any(t => t.RegistrationId == r.Id && t.CheckedInAt != null));
         if (ownerUserId is int owner)
         {
             query = query.Where(r => db.Participants.Any(p => p.Id == r.ParticipantId && p.OwnerUserId == owner));

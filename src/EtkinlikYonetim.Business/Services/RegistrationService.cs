@@ -67,6 +67,7 @@ internal sealed class RegistrationService(
     internal const string AlreadyRegistered = "Bu katılımcı bu etkinliğe zaten kayıtlı veya bekleme listesinde.";
     internal const string AlreadyCancelled = "Bu kayıt zaten iptal edilmiş.";
     internal const string PastCannotCancel = "Geçmiş bir etkinliğin kaydı iptal edilemez.";
+    internal const string CheckedInCannotCancel = "Giriş yapılmış bir kayıt iptal edilemez.";
     internal const string CancelFailed = "Kayıt iptal edilemedi.";
 
     public async Task<RegistrationReceipt> RegisterAsync(
@@ -182,7 +183,7 @@ internal sealed class RegistrationService(
         }
 
         var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
-        var check = cancellationValidator.Validate(new CancellationInput(registration.Status, registration.EventDate, now.Today));
+        var check = cancellationValidator.Validate(new CancellationInput(registration.Status, registration.EventDate, now.Today, registration.CheckedIn));
         if (!check.IsValid)
         {
             audit.Record(AuditEvent.RegistrationCancelRefused, session.Role);

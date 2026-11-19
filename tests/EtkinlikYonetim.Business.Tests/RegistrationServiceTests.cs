@@ -235,6 +235,21 @@ public sealed class RegistrationServiceTests
         Assert.Equal(RegistrationService.CancelFailed, (await Assert.ThrowsAsync<BusinessRuleException>(() => Service().CancelAsync(Sessions.User, 7, Ct))).Message);
     }
 
+    /// <summary>A participant who has been let in keeps the seat: the cancellation is refused before any write.</summary>
+    [Fact]
+    public async Task Cancel_CheckedInRegistration_IsRefused()
+    {
+        _registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RegistrationOwnership(5, 1, Today, Sessions.User.UserId, RegistrationStatus.Active, CheckedIn: true));
+
+        var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().CancelAsync(Sessions.User, 5, Ct));
+
+        Assert.Equal(RegistrationService.CheckedInCannotCancel, error.Message);
+        _registrations.Verify(
+            r => r.CancelAsync(It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     /// <summary>A participant can leave the waiting list like a seat.</summary>
     [Fact]
     public async Task Cancel_WaitingPlace_IsAllowed()

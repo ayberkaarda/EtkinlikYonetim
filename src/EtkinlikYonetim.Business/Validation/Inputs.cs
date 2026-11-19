@@ -65,7 +65,8 @@ internal sealed record RegistrationRequestInput(int EventId, string NationalId)
 internal sealed record RegistrationTargetInput(DateOnly EventDate, DateOnly Today);
 
 /// <summary>
-/// A cancellation of a registration the caller may see, checked against the local date
-/// <paramref name="Today"/>. Ownership is decided before this input is built.
+/// A cancellation of a registration the caller may see, checked against the database's day
+/// <paramref name="Today"/>; <paramref name="CheckedIn"/> tells whether its ticket was used at the entrance.
+/// Ownership is decided before this input is built.
 /// </summary>
-internal sealed record CancellationInput(RegistrationStatus Status, DateOnly EventDate, DateOnly Today);
+internal sealed record CancellationInput(RegistrationStatus Status, DateOnly EventDate, DateOnly Today, bool CheckedIn = false);

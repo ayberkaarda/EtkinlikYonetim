@@ -170,7 +170,10 @@ internal sealed class RegistrationTargetInputValidator : AbstractValidator<Regis
     }
 }
 
-/// <summary>A cancellation: the registration still holds a seat or waits for one, and its event is today or later.</summary>
+/// <summary>
+/// A cancellation: the registration still holds a seat or waits for one, its ticket has not been used at the
+/// entrance, and its event is today or later.
+/// </summary>
 internal sealed class CancellationInputValidator : AbstractValidator<CancellationInput>
 {
     public CancellationInputValidator()
@@ -179,6 +182,8 @@ internal sealed class CancellationInputValidator : AbstractValidator<Cancellatio
 
         RuleFor(c => c.Status)
             .Must(s => s is RegistrationStatus.Active or RegistrationStatus.Waiting).WithMessage(RegistrationService.AlreadyCancelled);
+        RuleFor(c => c.CheckedIn)
+            .Equal(false).WithMessage(RegistrationService.CheckedInCannotCancel);
         RuleFor(c => c.EventDate)
             .Must((c, day) => day >= c.Today).WithMessage(RegistrationService.PastCannotCancel);
     }
