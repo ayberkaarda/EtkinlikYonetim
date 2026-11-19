@@ -57,6 +57,9 @@ public sealed class AuditTests
         { AuditEvent.TicketAlreadyUsed, 22, "ticket.already_used" },
         { AuditEvent.TicketRejected, 23, "ticket.rejected" },
         { AuditEvent.ParticipantListExported, 24, "participant.list_exported" },
+        { AuditEvent.AccountRegistrationRefused, 25, "auth.account.registration_refused" },
+        { AuditEvent.RegistrationRefused, 26, "registration.refused" },
+        { AuditEvent.RegistrationCancelRefused, 27, "registration.cancel_refused" },
     };
 
     [Theory]
@@ -132,7 +135,7 @@ public sealed class AuditTests
     }
 
     [Fact]
-    public async Task Register_RecordsTheNewAccountOnlyWhenItIsStored()
+    public async Task Register_RecordsATakenNameAndTheNewAccount()
     {
         _users.Setup(u => u.UserNameExistsAsync("yeni", It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _users.Setup(u => u.UserNameExistsAsync("alinmis", It.IsAny<CancellationToken>())).ReturnsAsync(true);
@@ -143,7 +146,7 @@ public sealed class AuditTests
         await Assert.ThrowsAsync<BusinessRuleException>(() => auth.RegisterAsync("yeni", Password, "baska", Ct));
         await auth.RegisterAsync("yeni", Password, Password, Ct);
 
-        Assert.Equal([(AuditEvent.AccountRegistered, (UserRole?)UserRole.User)], _audit.Events);
+        Assert.Equal([(AuditEvent.AccountRegistrationRefused, UserRole.User), (AuditEvent.AccountRegistered, (UserRole?)UserRole.User)], _audit.Events);
     }
 
     [Fact]
@@ -215,7 +218,7 @@ public sealed class AuditTests
             [
                 (AuditEvent.RegistrationCreated, UserRole.User),
                 (AuditEvent.RegistrationWaitlisted, UserRole.User),
-                (AuditEvent.AccessDenied, UserRole.User),
+                (AuditEvent.RegistrationCancelRefused, UserRole.User),
                 (AuditEvent.RegistrationCancelled, UserRole.User),
                 (AuditEvent.RegistrationPromoted, UserRole.User),
             ],

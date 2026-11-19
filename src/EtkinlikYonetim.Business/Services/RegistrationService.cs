@@ -79,6 +79,23 @@ internal sealed class RegistrationService(
         var request = RegistrationRequestInput.Create(eventId, nationalId);
         requestValidator.ValidateOrThrow(request);
 
+        try
+        {
+            return await RegisterValidAsync(session, request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (BusinessRuleException)
+        {
+            // Every refusal of a valid request records one event; the log file writes it with the code of
+            // a success, so it cannot tell which national ids or registrations exist.
+            audit.Record(AuditEvent.RegistrationRefused, session.Role);
+            throw;
+        }
+    }
+
+    private async Task<RegistrationReceipt> RegisterValidAsync(UserSession session, RegistrationRequestInput request, CancellationToken cancellationToken)
+    {
+        var eventId = request.EventId;
+
         // Users look only in their own list; admins see every account's participants and prefer their own.
         var candidates = await participants.FindByNationalIdAsync(request.NationalId, Access.OwnerFilter(session), cancellationToken).ConfigureAwait(false);
         var participant = candidates.FirstOrDefault(p => p.OwnerUserId == session.UserId)
@@ -159,12 +176,17 @@ internal sealed class RegistrationService(
         // A missing registration and somebody else's registration get the same answer, so ids cannot be probed.
         if (registration is null || !(session.IsAdmin || registration.OwnerUserId == session.UserId))
         {
-            audit.Record(AuditEvent.AccessDenied, session.Role);
+            audit.Record(AuditEvent.RegistrationCancelRefused, session.Role);
             throw new AccessDeniedException();
         }
 
         var today = timeProvider.Today();
-        cancellationValidator.ValidateOrThrow(new CancellationInput(registration.Status, registration.EventDate, today));
+        var check = cancellationValidator.Validate(new CancellationInput(registration.Status, registration.EventDate, today));
+        if (!check.IsValid)
+        {
+            audit.Record(AuditEvent.RegistrationCancelRefused, session.Role);
+            throw new BusinessRuleException(check.Errors[0].ErrorMessage);
+        }
 
         // The repository repeats the ownership, status and date conditions in the same statement, so a
         // concurrent change between the read above and this update cannot slip through.
@@ -177,6 +199,7 @@ internal sealed class RegistrationService(
             cancellationToken).ConfigureAwait(false);
         if (outcome == CancellationOutcome.NotCancelled)
         {
+            audit.Record(AuditEvent.RegistrationCancelRefused, session.Role);
             throw new BusinessRuleException(CancelFailed);
         }
 

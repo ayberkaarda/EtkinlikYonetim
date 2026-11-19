@@ -35,10 +35,11 @@ internal static class ErrorReporter
     }
 
     /// <summary>
-    /// Writes <paramref name="exception"/> to <paramref name="logger"/> without its message. Rule and
-    /// permission refusals are expected and logged as a warning with their type only; the audit log
-    /// already counts the security relevant ones. Every other exception is logged through
-    /// <see cref="FormatForLog"/>.
+    /// Writes <paramref name="exception"/> to <paramref name="logger"/> without its message. Rule,
+    /// permission and session refusals are expected answers, not failures, and are not written: a line for
+    /// a refusal and none for a success would tell the reader of the file which attempt found an existing
+    /// account, registration or ticket. The audit log records the security relevant ones with neutral
+    /// codes. Every other exception is logged through <see cref="FormatForLog"/>.
     /// </summary>
     internal static void Record(ILogger logger, Exception exception)
     {
@@ -47,7 +48,6 @@ internal static class ErrorReporter
 
         if (exception is BusinessRuleException or AccessDeniedException or SessionExpiredException)
         {
-            logger.Warning("Operation refused: {Type}", exception.GetType().Name);
             return;
         }
 

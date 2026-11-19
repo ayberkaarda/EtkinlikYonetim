@@ -92,6 +92,18 @@ public enum AuditEvent
 
     /// <summary>An admin exported the participant and check-in list of an event (national ids masked, no ticket codes).</summary>
     ParticipantListExported = 24,
+
+    /// <summary>A sign-up used a user name that is taken; no account was created.</summary>
+    AccountRegistrationRefused = 25,
+
+    /// <summary>
+    /// A registration was refused after its input was valid: unknown or someone else's participant, a
+    /// participant already registered or waiting, a past or cancelled event.
+    /// </summary>
+    RegistrationRefused = 26,
+
+    /// <summary>A cancellation was refused: a missing or someone else's registration, or one that can no longer be cancelled.</summary>
+    RegistrationCancelRefused = 27,
 }
 
 /// <summary>Receives <see cref="AuditEvent"/>s; the application writes them to its log file.</summary>
@@ -130,7 +142,41 @@ public static class AuditCodes
         AuditEvent.TicketAlreadyUsed => "ticket.already_used",
         AuditEvent.TicketRejected => "ticket.rejected",
         AuditEvent.ParticipantListExported => "participant.list_exported",
+        AuditEvent.AccountRegistrationRefused => "auth.account.registration_refused",
+        AuditEvent.RegistrationRefused => "registration.refused",
+        AuditEvent.RegistrationCancelRefused => "registration.cancel_refused",
         _ => throw new ArgumentOutOfRangeException(nameof(auditEvent), auditEvent, "Unknown audit event."),
+    };
+
+    /// <summary>The one code both outcomes of a sign-up share in the log file.</summary>
+    public const string AccountRegistrationSubmitted = "auth.account.registration_submitted";
+
+    /// <summary>The one code every outcome of a registration for an event shares in the log file.</summary>
+    public const string RegistrationSubmitted = "registration.submitted";
+
+    /// <summary>The one code every outcome of a cancellation of a registration shares in the log file.</summary>
+    public const string CancellationSubmitted = "registration.cancel_submitted";
+
+    /// <summary>The one code every outcome of a scan at the entrance shares in the log file.</summary>
+    public const string CheckInSubmitted = "ticket.check_in_submitted";
+
+    /// <summary>
+    /// The code written to the log file, which the local Windows user can read and compare with the time of
+    /// their own attempts. It is <see cref="Of(AuditEvent)"/>, except where the outcome would tell whether
+    /// an account, a participant, a registration or a ticket exists: the outcomes of a sign-up, of a
+    /// registration, of a cancellation and of a scan at the entrance each share one neutral code, and a
+    /// promotion from the waiting list (which tells that someone was waiting) is not written at all
+    /// (<see langword="null"/>). The screen still shows the precise answer to the person who acted.
+    /// </summary>
+    public static string? ForPublicLog(AuditEvent auditEvent) => auditEvent switch
+    {
+        AuditEvent.AccountRegistered or AuditEvent.AccountRegistrationRefused => AccountRegistrationSubmitted,
+        AuditEvent.RegistrationCreated or AuditEvent.RegistrationWaitlisted or AuditEvent.RegistrationEventFull or AuditEvent.RegistrationRefused
+            => RegistrationSubmitted,
+        AuditEvent.RegistrationCancelled or AuditEvent.RegistrationCancelRefused => CancellationSubmitted,
+        AuditEvent.RegistrationPromoted => null,
+        AuditEvent.TicketCheckedIn or AuditEvent.TicketAlreadyUsed or AuditEvent.TicketRejected => CheckInSubmitted,
+        _ => Of(auditEvent),
     };
 
     /// <summary>Lower case role name as it is written to the log; "none" when no account is known.</summary>

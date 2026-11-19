@@ -122,7 +122,7 @@ internal sealed class AuthService(
 
         if (await users.UserNameExistsAsync(name, cancellationToken).ConfigureAwait(false))
         {
-            throw new BusinessRuleException(UserNameTaken);
+            throw RegistrationRefused();
         }
 
         var user = new User
@@ -140,10 +140,17 @@ internal sealed class AuthService(
         catch (DuplicateUserNameException ex)
         {
             // Registered concurrently between the check and the insert.
-            throw new BusinessRuleException(UserNameTaken, ex);
+            throw RegistrationRefused(ex);
         }
 
         audit.Record(AuditEvent.AccountRegistered, UserRole.User);
+    }
+
+    /// <summary>A taken name; the log file writes it with the code of a new account.</summary>
+    private BusinessRuleException RegistrationRefused(Exception? inner = null)
+    {
+        audit.Record(AuditEvent.AccountRegistrationRefused, UserRole.User);
+        return inner is null ? new BusinessRuleException(UserNameTaken) : new BusinessRuleException(UserNameTaken, inner);
     }
 
     private BusinessRuleException SignInRefused(string? message = null)
