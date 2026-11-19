@@ -47,13 +47,16 @@ Bu proje, etkinlik organizasyonlarının dijital ortamda kolayca yönetilmesini 
    git clone https://github.com/kullaniciadi/EtkinlikYonetim.git
    ```
 
-2. Visual Studio'da açın.
+2. .NET 10 SDK ve SQL Server (Express yeterli) kurulu olmalıdır. `EtkinlikYonetim.sln` dosyasını Visual Studio'da açın ya da `dotnet build` çalıştırın.
 
-3. `databaseHelper.cs` ya da proje içindeki SQL bağlantı string'ini kendi veritabanı bilgilerinizle güncelleyin.
+3. Bağlantı bilgisini verin (birini seçin):
+   - `src/EtkinlikYonetim.UI/appsettings.example.json` dosyasını aynı klasöre `appsettings.json` adıyla kopyalayıp düzenleyin (bu dosya git'e eklenmez),
+   - `dotnet user-secrets set "ConnectionStrings:EtkinlikYonetim" "<bağlantı>" --project src/EtkinlikYonetim.UI`,
+   - ya da `ETKINLIK_CONNECTION` ortam değişkenini tanımlayın.
 
-4. MSSQL'de gerekli tabloları oluşturun (Admin, Kullanıcı, Etkinlik, Katılımcı vs.)
+4. Tabloları elle oluşturmanız gerekmez: uygulama ilk açılışta EF Core migration'larını uygular ve örnek (kurgusal) verileri ekler (`admin` / `Demo.Admin1`, `ornek` / `Demo.Kullanici1`). Eski sürümün oluşturduğu bir veritabanı verileri korunarak yerinde yükseltilir.
 
-5. Uygulamayı çalıştırın ve test edin.
+5. Uygulamayı çalıştırın (`dotnet run --project src/EtkinlikYonetim.UI`) ve testleri `dotnet test` ile çalıştırın; SQL Server gerektiren testleri atlamak için `ETKINLIK_SKIP_SQL_TESTS=1` tanımlayın.
 
 ## 📌 Notlar
 - TC Kimlik numarası doğrulaması yalnızca sistem içi kontrolle yapılmaktadır.
