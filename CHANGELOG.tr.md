@@ -22,10 +22,27 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
 - Mimari diyagramlı İngilizce ve Türkçe README, tehdit modeli (`docs/THREAT_MODEL.md`) ve bu değişiklik günlüğü.
 - CI'da sürüm işi: `v*` etiketlerinde etiket adı denetlenir, win-x64 derlemesi yayımlanır ve zip çıktısı olarak
   yüklenir.
+- Bekleme listesi: dolu bir etkinlik katılımcıyı sıra numarasıyla bekleme listesine alır; iptal edilen yer hemen
+  sıradaki kişiye biletiyle birlikte geçer (`AddWaitingList` migration'ı).
+- Yöneticiler için etkinlik yönetimi: günü geçmemiş bir etkinliğin tarihi, kapasitesi (mevcut kayıtların altına
+  inmeden) ve açıklaması değiştirilir ya da etkinlik iptal edilir; iptal edilen etkinlik listede kalır ve kayıtları
+  hesaplarına iptal edildi olarak gösterilir (`AddEventManagement` migration'ı).
+- Katılımcının hesabının yeniden gösterebildiği QR kodlu biletler (QRCoder 1.6.0, MIT) ve yöneticiler için ikinci
+  okutmada "zaten kullanıldı" diyen, sayaçlı giriş kontrolü penceresi (`AddTicketCheckIn` migration'ı).
+- Bir etkinliğin katılımcı ve giriş listesinin bilet kodu içermeyen CSV ve yazdırılabilir HTML dışa aktarımı.
+- Yöneticiler için hesap yönetimi: etkinleştirme, devre dışı bırakma, yönetici veya kullanıcı yapma; yöneticinin
+  kendi hesabı ve son etkin yönetici korunur (`AddAccountDisabledFlag` migration'ı).
+- Bekleme listesi, kapasite değişikliği, etkinlik iptali, eşzamanlı giriş kontrolü ve birbirinin rolünü düşüren
+  yöneticiler için SQL Server yarış testleri.
 
 ### Değişti
 
 - Hatalar izleme çıktısı yerine log dosyasına yazılır; hata pencereleri değişmedi.
+- Bilet kodları artık `ETK-` ve 26 karakterdir (130 rastgele bit); migration mevcut her bilete 128 rastgele bitlik
+  yeni bir kod verir, bu yüzden yükseltmeden önce gösterilen kodlar artık çalışmaz.
+- Yöneticinin katılımcı listesi bilet kodu yerine kaydın durumunu (giriş yaptı, bekliyor, iptal) gösterir; yönetici
+  bilet kodlarını yalnızca kendi eklediği katılımcıların görür.
+- Reddedilen işlemler log dosyasına artık "Operation refused" satırı yazmaz.
 
 ### Güvenlik
 
@@ -34,6 +51,11 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
   kullanılabilir anahtarların seçimi de artık bilgisayarın saatine bağlı değildir. Bir kurulum beklerken süresi
   dolan ya da yalnızca geri kalmış bir saatin kabul edeceği anahtar reddedilir ve kullanılmamış kalır.
 - Adlar, e-posta adresleri, kimlik numaraları, şifreler, kurulum anahtarları ve istisna mesajları loga asla yazılmaz.
+- Açık oturumlar her işlemde veritabanına göre denetlenir: rolü düşürülen, devre dışı bırakılan veya silinen bir
+  hesap hâlâ açık bir pencereden işlem yapamaz; devre dışı hesaplar giriş yapamaz.
+- Bilet kodları SHA-256 özetleriyle bulunur ve sabit zamanda karşılaştırılır; loga ve dışa aktarımlara asla yazılmaz.
+- Log dosyası kayıt olma, etkinlik kaydı, iptal ve girişte okutmanın her sonucu için tek bir nötr kod yazar; artık
+  hangi hesapların, kayıtların veya biletlerin var olduğunu belli etmez.
 
 ## Temel
 

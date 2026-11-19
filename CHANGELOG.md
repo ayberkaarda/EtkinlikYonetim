@@ -22,10 +22,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   changelog.
 - Release job in CI: on `v*` tags the tag name is checked, a win-x64 build is published and uploaded as a zip
   artifact.
+- Waiting list: a full event puts the participant on its waiting list with a queue number; a cancelled seat goes at
+  once to the first one waiting, with a ticket (migration `AddWaitingList`).
+- Event management for admins: change the date, capacity (not below the seats held) and description of an event
+  that has not passed, or cancel it; a cancelled event stays listed and its registrations are shown to their
+  accounts as cancelled (migration `AddEventManagement`).
+- Tickets with QR codes (QRCoder 1.6.0, MIT) that the participant's account can show again, and an entrance check-in
+  window for admins with "already used" on a second scan and a counter (migration `AddTicketCheckIn`).
+- CSV and printable HTML export of an event's participant and check-in list, without ticket codes.
+- Account management for admins: enable, disable, make admin, make user; the own account and the last enabled
+  admin are protected (migration `AddAccountDisabledFlag`).
+- SQL Server race tests for the waiting list, capacity changes, event cancellation, simultaneous check-ins and
+  admins demoting each other.
 
 ### Changed
 
 - Errors are written to the log file instead of the trace output; the error dialogs are unchanged.
+- Ticket codes are now `ETK-` and 26 characters (130 random bits); the migration gives every existing ticket a new
+  code of 128 random bits, so codes shown before the upgrade stop working.
+- The admin participant list shows the state of each registration (checked in, waiting, cancelled) instead of its
+  ticket code, and an admin sees ticket codes only of participants it added.
+- Refused operations no longer write an "Operation refused" line to the log file.
 
 ### Security
 
@@ -34,6 +51,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   of usable keys no longer depends on the computer's clock. A key that expires while a setup waits, or that only a
   clock running behind would accept, is refused and stays unused.
 - Names, e-mail addresses, national ids, passwords, setup keys and exception messages are never written to the log.
+- Open sessions are checked against the database on every operation: a demoted, disabled or deleted account can no
+  longer act from a window that is still open, and disabled accounts cannot sign in.
+- Ticket codes are found by their SHA-256 and compared in constant time; they are never logged or exported.
+- The log file writes one neutral code for every outcome of a sign-up, a registration, a cancellation and a scan at
+  the entrance, so it no longer tells which accounts, registrations or tickets exist.
 
 ## Foundation
 
