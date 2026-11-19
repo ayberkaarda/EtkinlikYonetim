@@ -83,6 +83,12 @@ internal sealed class ControlledEventService : IEventService
 
     public int CreateCalls { get; private set; }
 
+    /// <summary>Today by the database's clock, as the service answers it; the computer's clock plays no part.</summary>
+    public DateOnly DatabaseToday { get; set; } = new(2027, 4, 1);
+
+    public Task<DateOnly> GetTodayAsync(UserSession session, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DatabaseToday);
+
     public Task<IReadOnlyList<EventSummary>> GetEventsAsync(UserSession session, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<EventSummary>>(Events);
 

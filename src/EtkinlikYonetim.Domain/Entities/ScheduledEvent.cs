@@ -32,4 +32,12 @@ public sealed class ScheduledEvent
 
     /// <summary>UTC time of the cancellation, or <see langword="null"/>.</summary>
     public DateTime? CancelledAt { get; set; }
+
+    /// <summary>
+    /// Raised by one on every change and cancellation by an admin. A change is stored only while the event
+    /// still has the version its form was loaded with, so an older form never writes over another admin's
+    /// change, also not over one that only changed the case of the description (the database compares
+    /// text without regard to case).
+    /// </summary>
+    public int EditVersion { get; set; }
 }

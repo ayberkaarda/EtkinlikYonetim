@@ -85,6 +85,10 @@ internal sealed class SyntheticFestival :
     public Task<IReadOnlyList<EventSummary>> GetEventsAsync(UserSession session, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<EventSummary>>(_events);
 
+    /// <summary>The database's day of the screenshots: before the season, so every event can still be changed.</summary>
+    public Task<DateOnly> GetTodayAsync(UserSession session, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new DateOnly(2027, 3, 1));
+
     public Task<IReadOnlyList<EventSummary>> GetOpenEventsAsync(UserSession session, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<EventSummary>>([.. _events.Where(e => !e.Cancelled && e.Date >= new DateOnly(2027, 4, 1))]);
 

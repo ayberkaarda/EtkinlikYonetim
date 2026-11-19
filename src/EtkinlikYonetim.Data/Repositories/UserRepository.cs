@@ -227,17 +227,17 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
             .ConfigureAwait(false);
     }
 
-    public Task<AccountChangeStatus> SetDisabledAsync(int actorId, int targetId, bool disabled, CancellationToken cancellationToken = default) =>
+    public Task<AccountChangeStatus> SetDisabledAsync(Actor actor, int targetId, bool disabled, CancellationToken cancellationToken = default) =>
         ChangeAccountAsync(
-            actorId,
+            actor,
             targetId,
             target => !disabled || !IsEnabledAdmin(target),
             accounts => accounts.SetProperty(u => u.Disabled, disabled),
             cancellationToken);
 
-    public Task<AccountChangeStatus> SetRoleAsync(int actorId, int targetId, UserRole role, CancellationToken cancellationToken = default) =>
+    public Task<AccountChangeStatus> SetRoleAsync(Actor actor, int targetId, UserRole role, CancellationToken cancellationToken = default) =>
         ChangeAccountAsync(
-            actorId,
+            actor,
             targetId,
             target => role == UserRole.Admin || !IsEnabledAdmin(target),
             accounts => accounts.SetProperty(u => u.Role, role),
@@ -246,14 +246,15 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
     private static bool IsEnabledAdmin(SessionState account) => account.Role == UserRole.Admin && !account.Disabled;
 
     /// <summary>
-    /// Runs one account change under the account lock: the actor is checked, the target read and, when
-    /// <paramref name="keepsEveryAdmin"/> says the change may remove an enabled admin, the other enabled
-    /// admins counted, all in the transaction that writes. Two admins who demote or disable each other at
-    /// the same time are therefore decided one after the other, and the second finds itself no longer
-    /// allowed or the last one.
+    /// Runs one account change under the account lock: the actor is checked (enabled admin with the
+    /// session version of its session, so an admin disabled and enabled again since sign-in is refused),
+    /// the target read and, when <paramref name="keepsEveryAdmin"/> says the change may remove an enabled
+    /// admin, the other enabled admins counted, all in the transaction that writes. Two admins who demote
+    /// or disable each other at the same time are therefore decided one after the other, and the second
+    /// finds itself no longer allowed or the last one.
     /// </summary>
     private async Task<AccountChangeStatus> ChangeAccountAsync(
-        int actorId,
+        Actor actor,
         int targetId,
         Func<SessionState, bool> keepsEveryAdmin,
         Action<Microsoft.EntityFrameworkCore.Query.UpdateSettersBuilder<User>> change,
@@ -263,19 +264,19 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await AppLocks.AcquireAsync(db, AppLocks.Accounts, cancellationToken).ConfigureAwait(false);
 
-        var states = await db.Users
-            .AsNoTracking()
-            .Where(u => u.Id == actorId || u.Id == targetId)
-            .Select(u => new { u.Id, State = new SessionState(u.Role, u.Disabled) })
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var actor = states.FirstOrDefault(s => s.Id == actorId)?.State;
-        if (actor is null || !IsEnabledAdmin(actor))
+        // The account lock first, then the actor, as every other write does.
+        if (!await Actors.IsCurrentAsync(db, actor, admin: true, cancellationToken).ConfigureAwait(false))
         {
             return AccountChangeStatus.ActorNotAuthorized;
         }
 
-        if (states.FirstOrDefault(s => s.Id == targetId)?.State is not { } target)
+        var target = await db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == targetId)
+            .Select(u => new SessionState(u.Role, u.Disabled, u.SessionVersion))
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (target is null)
         {
             return AccountChangeStatus.NotFound;
         }

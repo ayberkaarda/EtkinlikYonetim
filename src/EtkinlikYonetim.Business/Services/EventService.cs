@@ -16,6 +16,13 @@ public interface IEventService
     /// <summary>Events that still accept registrations (today or later, not cancelled), earliest first.</summary>
     Task<IReadOnlyList<EventSummary>> GetOpenEventsAsync(UserSession session, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Today by the database's clock, in this computer's time zone: the day the services decide with. Screens
+    /// use it to show which events can still be changed, so a computer whose clock is wrong neither locks a
+    /// current event nor offers to change a past one.
+    /// </summary>
+    Task<DateOnly> GetTodayAsync(UserSession session, CancellationToken cancellationToken = default);
+
     /// <summary>Creates an event without a description; admins only. Returns the new event id.</summary>
     Task<int> CreateAsync(UserSession session, string? name, DateTime eventDate, int capacity, CancellationToken cancellationToken = default);
 
@@ -76,6 +83,12 @@ internal sealed class EventService(
         return await events.GetFromAsync(now.Today, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<DateOnly> GetTodayAsync(UserSession session, CancellationToken cancellationToken = default)
+    {
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
+        return (await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false)).Today;
+    }
+
     public async Task<int> CreateAsync(
         UserSession session,
         string? name,
@@ -89,9 +102,10 @@ internal sealed class EventService(
         var input = EventInput.Create(name, eventDate, capacity, now.Today);
         validator.ValidateOrThrow(input);
 
-        var id = await events.AddAsync(
+        var id = await audit.WriteAsAsync(session, actor => events.AddAsync(
+            actor,
             new ScheduledEvent { Name = input.Name, Date = input.Day, Capacity = input.Capacity, RegisteredCount = 0 },
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken)).ConfigureAwait(false);
         audit.Record(AuditEvent.EventCreated, session.Role);
         return id;
     }
@@ -113,14 +127,13 @@ internal sealed class EventService(
 
         // The repository decides whether the event is still open, still as the caller loaded it and whether
         // the capacity still holds its seats, in the transaction that writes.
-        var status = await events.UpdateAsync(
+        var status = await audit.WriteAsAsync(session, actor => events.UpdateAsync(
+            actor,
             original.Id,
-            new EventValues(original.Date, original.Capacity, original.Description),
+            original.EditVersion,
             new EventValues(input.Day, input.Capacity, input.Description),
-            now.Today,
-            now.Utc,
             TicketCode.New,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken)).ConfigureAwait(false);
         Complete(status);
         audit.Record(AuditEvent.EventUpdated, session.Role);
     }
@@ -129,8 +142,8 @@ internal sealed class EventService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
-        var status = await events.CancelAsync(eventId, now.Today, now.Utc, cancellationToken).ConfigureAwait(false);
+        // The repository reads the database's day itself, after the event's lock.
+        var status = await audit.WriteAsAsync(session, actor => events.CancelAsync(actor, eventId, cancellationToken)).ConfigureAwait(false);
         Complete(status);
         audit.Record(AuditEvent.EventCancelled, session.Role);
     }
@@ -143,6 +156,8 @@ internal sealed class EventService(
                 return;
             case EventChangeStatus.Closed:
                 throw new BusinessRuleException(EventClosed);
+            case EventChangeStatus.DateInPast:
+                throw new BusinessRuleException(NewDateInPast);
             case EventChangeStatus.CapacityBelowRegistrations:
                 throw new BusinessRuleException(CapacityBelowRegistrations);
             case EventChangeStatus.ChangedElsewhere:

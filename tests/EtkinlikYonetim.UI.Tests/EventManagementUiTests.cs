@@ -1,8 +1,8 @@
+using System.Globalization;
 using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.UI.Tests.Support;
 using EtkinlikYonetim.UI.Theming;
-using Microsoft.Extensions.Time.Testing;
 using static EtkinlikYonetim.UI.Tests.Support.StaThread;
 
 namespace EtkinlikYonetim.UI.Tests;
@@ -10,13 +10,11 @@ namespace EtkinlikYonetim.UI.Tests;
 /// <summary>The event management window: binding, editable states and exclusive changes. No window is shown.</summary>
 public sealed class EventManagementUiTests
 {
-    private static readonly FakeTimeProvider Clock = new(new DateTimeOffset(2027, 4, 1, 9, 0, 0, TimeSpan.Zero));
-
     [Fact]
     public void Selection_ShowsTheFieldsOfTheEvent() => Run(() =>
     {
         var events = EventsWithStates();
-        using var form = new EtkinlikYonetForm(events, Sessions.Admin, Clock) { Prompts = new RecordingPrompts() };
+        using var form = new EtkinlikYonetForm(events, Sessions.Admin) { Prompts = new RecordingPrompts() };
         Assert.True(form.LoadAsync().IsCompletedSuccessfully);
         var list = Find<ListBox>(form, "lstEtkinlikler");
 
@@ -40,7 +38,7 @@ public sealed class EventManagementUiTests
     [InlineData(2)]
     public void PastOrCancelledEvent_CannotBeEdited(int index) => Run(() =>
     {
-        using var form = new EtkinlikYonetForm(EventsWithStates(), Sessions.Admin, Clock) { Prompts = new RecordingPrompts() };
+        using var form = new EtkinlikYonetForm(EventsWithStates(), Sessions.Admin) { Prompts = new RecordingPrompts() };
         Assert.True(form.LoadAsync().IsCompletedSuccessfully);
 
         Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = index;
@@ -51,11 +49,38 @@ public sealed class EventManagementUiTests
         Assert.True(Find<TextBox>(form, "txtAciklama").ReadOnly);
     });
 
+    /// <summary>
+    /// Whether an event can still be changed is decided by the database's day, not by this computer's clock
+    /// (which stands somewhere between the two cases): an event years in the computer's past is still
+    /// current when the database's day is before it, so a clock far ahead does not lock it; an event years in
+    /// the computer's future has passed when the database's day is after it, so a clock far behind does not
+    /// open it.
+    /// </summary>
+    [Theory]
+    [InlineData("2020-06-01", "2020-05-01", true)]
+    [InlineData("2090-06-01", "2090-06-02", false)]
+    public void Editability_FollowsTheDatabaseDayNotTheComputerClock(string eventDay, string databaseDay, bool editable) => Run(() =>
+    {
+        var events = new ControlledEventService();
+        events.Events.Clear();
+        events.Events.Add(new EventSummary(1, "Saat Testi", DateOnly.Parse(eventDay, CultureInfo.InvariantCulture), 50, 0));
+        events.DatabaseToday = DateOnly.Parse(databaseDay, CultureInfo.InvariantCulture);
+        using var form = new EtkinlikYonetForm(events, Sessions.Admin) { Prompts = new RecordingPrompts() };
+        Assert.True(form.LoadAsync().IsCompletedSuccessfully);
+
+        Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = 0;
+
+        Assert.Equal(editable, Find<Button>(form, "btnKaydet").Enabled);
+        Assert.Equal(editable, Find<Button>(form, "btnIptalEt").Enabled);
+        Assert.Equal(editable, Find<DateTimePicker>(form, "dtpTarih").Enabled);
+        Assert.Equal(!editable, Find<TextBox>(form, "txtAciklama").ReadOnly);
+    });
+
     [Fact]
     public void Save_WhilePending_IsNotSentTwiceAndLocksBothButtons() => Run(() =>
     {
         var events = EventsWithStates();
-        using var form = new EtkinlikYonetForm(events, Sessions.Admin, Clock) { Prompts = new RecordingPrompts() };
+        using var form = new EtkinlikYonetForm(events, Sessions.Admin) { Prompts = new RecordingPrompts() };
         Assert.True(form.LoadAsync().IsCompletedSuccessfully);
         Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = 0;
         Find<NumericUpDown>(form, "numKapasite").Value = 120;
@@ -77,7 +102,7 @@ public sealed class EventManagementUiTests
     {
         var events = EventsWithStates();
         var prompts = new RecordingPrompts();
-        using var form = new EtkinlikYonetForm(events, Sessions.Admin, Clock) { Prompts = prompts };
+        using var form = new EtkinlikYonetForm(events, Sessions.Admin) { Prompts = prompts };
         Assert.True(form.LoadAsync().IsCompletedSuccessfully);
         Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = 0;
 
@@ -92,7 +117,7 @@ public sealed class EventManagementUiTests
     {
         var events = EventsWithStates();
         var prompts = new RecordingPrompts();
-        using var form = new EtkinlikYonetForm(events, Sessions.Admin, Clock) { Prompts = prompts };
+        using var form = new EtkinlikYonetForm(events, Sessions.Admin) { Prompts = prompts };
 
         Assert.True(form.SaveAsync().IsCompletedSuccessfully);
 
@@ -108,7 +133,7 @@ public sealed class EventManagementUiTests
     public void Save_EventChangedElsewhere_ReloadsTheEventAndSaysSo() => Run(() =>
     {
         var events = EventsWithStates();
-        using var form = new EtkinlikYonetForm(events, Sessions.Admin, Clock) { Prompts = new RecordingPrompts() };
+        using var form = new EtkinlikYonetForm(events, Sessions.Admin) { Prompts = new RecordingPrompts() };
         Assert.True(form.LoadAsync().IsCompletedSuccessfully);
         Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = 0;
         var loaded = events.Events[0];

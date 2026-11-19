@@ -89,7 +89,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   iptal edilemez."), and the check-in takes the event's lock: a participant who is inside keeps the seat instead of
   it going to the next one waiting, so the room never holds more people than seats.
 - Saving an event that another admin changed after the form was loaded is refused instead of writing the old date,
-  capacity or description back; the event management shows the current values and asks for the change again.
+  capacity or description back; the event management shows the current values and asks for the change again. The
+  decision compares an edit version raised by every change (migration `AddEventEditVersion`), not the values, so
+  also a change of only the case of the description ("Salon" to "SALON"), which the case-insensitive collation
+  finds equal, is no longer overwritten.
+- Every write checks its account again inside its own transaction, after its lock: an account disabled, demoted or
+  changed and changed back while a registration, cancellation, event change or check-in waited for the event's
+  lock writes nothing, and its window returns to the sign-in. Account changes now also compare the acting admin's
+  session version. A deadlock victim is reported with the busy message; nothing was written.
+- Registrations, cancellations, event changes and check-ins read the database's time inside the writing
+  transaction after the lock, so a write that waited across midnight no longer acts for a day that has passed and
+  stores the time it wrote at. A check-in reads the event's date again under the lock: an event moved to another
+  day while the scan waited no longer uses the ticket up.
+- The event management decides which events can still be changed by the database's day instead of the computer's
+  clock, so a clock running ahead no longer locks current events.
 
 ## Foundation
 

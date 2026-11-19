@@ -51,7 +51,9 @@ otomatik olarak oluşturulup güncellenir.
 - ✅ **Etkinlik yönetimi** ("Etkinlik yönetimi", Event management): günü geçmemiş bir etkinliğin tarihi, kapasitesi
   ve açıklaması değiştirilir; kapasite mevcut kayıt sayısının altına inemez, eklenen yerler bekleme listesine
   verilir. Form açıldıktan sonra başka bir yöneticinin yaptığı bir değişikliğin üzerine kaydetmek reddedilir ve güncel
-  değerler gösterilir. Etkinliği iptal etmek ("Etkinliği iptal et", Cancel event) onu iptal edildi olarak listede tutar, kayıtlarını
+  değerler gösterilir (kararı bir düzenleme sürümü verir; açıklamanın yalnızca harf büyüklüğünü değiştiren bir
+  düzenleme de fark edilir). Hangi etkinliklerin hâlâ değiştirilebileceğini bilgisayarın saati değil veritabanının
+  günü belirler. Etkinliği iptal etmek ("Etkinliği iptal et", Cancel event) onu iptal edildi olarak listede tutar, kayıtlarını
   ve bekleme sıralarını kapatır (soft delete).
 - ✅ **Katılımcı ekleme** ("Katılımcı ekle") ve tüm hesapların katılımcıları için **bilet oluşturma** ("Kayıt ve
   bilet", Registration and ticket); yönetici tüm kayıtları görür ve iptal edebilir, bilet kodlarını ise yalnızca kendi
@@ -60,7 +62,8 @@ otomatik olarak oluşturulup güncellenir.
   ve kullanılmamış bilet için "GİRİŞ YAPILDI", ikinci okutmada aynı ekranda "ZATEN KULLANILDI" gösterilir; bilinmeyen,
   iptal edilmiş ya da başka etkinliğe ait biletler tek bir retle ("GEÇERSİZ BİLET") karşılanır; sayaç girişleri yer
   sayısıyla birlikte gösterir. Girişte katılımcının adı kimlik belgesiyle karşılaştırılmak üzere gösterilir; biletler
-  yalnızca etkinlik günü kullanılır (aksi hâlde "ETKİNLİK GÜNÜ DEĞİL" gösterilir ve bilet geçerli kalır); kod alanı
+  yalnızca etkinlik günü kullanılır ve bu, bilet yazılırken etkinliğin kilidi altında yeniden denetlenir (aksi hâlde
+  "ETKİNLİK GÜNÜ DEĞİL" gösterilir ve bilet geçerli kalır); kod alanı
   açık kalır, böylece bir bilet denetlenirken okuyucu sonrakini okuyabilir.
 - ✅ **Katılımcı listesi** ("Katılımcı listesi", Participant list): seçilen etkinliğin ("Etkinlik",
   Event) katılımcıları; ad, maskelenmiş kimlik numarası, e-posta ve durumla (giriş yaptı, bekliyor, iptal). Liste CSV
@@ -78,8 +81,8 @@ otomatik olarak oluşturulup güncellenir.
 - ✅ **Çift kayıt yok**: bir katılımcının bir etkinlikte en fazla bir yeri veya bekleme sırası olur (benzersiz
   indeks); iptal edilen kayıt geçmiş olarak kalır.
 - ✅ **Geçmiş etkinlik yok**: günü geçmiş bir etkinlik oluşturulamaz, ona kayıt yapılamaz ve kaydı iptal edilemez.
-  Bugünün hangi gün olduğunu bilgisayarın değil veritabanının saati belirler; kayıt, iptal ve giriş zamanları da
-  onunla yazılır.
+  Bugünün hangi gün olduğunu bilgisayarın değil veritabanının saati belirler ve bu saat yazan işlemin içinde, kilitten
+  sonra okunur; kayıt, iptal ve giriş zamanları da onunla yazılır.
 - ✅ **KVKK**: kimlik numaraları yönetim listelerinde maskelenmiş gösterilir (`123******01`) ve log dosyalarına asla
   yazılmaz; ad ve e-posta adresleri yöneticinin katılımcı listesinde açık gösterilir.
 
@@ -90,7 +93,9 @@ otomatik olarak oluşturulup güncellenir.
 - ✅ 5 hatalı giriş hesabı 15 dakika kilitler; bilinmeyen hesap, yanlış şifre ve kilitli hesap aynı yanıtı alır.
 - ✅ Her çağrı oturum açmış hesaba, oturum da veritabanına göre denetlenir: rolü düşürülen, devre dışı bırakılan
   veya silinen bir hesap hâlâ açık olan bir pencereyi kullanamaz; hesap yeniden etkinleştirilse veya yeniden yönetici
-  yapılsa da o pencere kapalı kalır (her erişim değişikliğinde oturum sürümü değişir). Kullanıcılar yalnızca kendi
+  yapılsa da o pencere kapalı kalır (her erişim değişikliğinde oturum sürümü değişir). Her yazma işlemi hesabını kendi
+  işleminin içinde, kilidi aldıktan sonra yeniden denetler; işlem beklerken devre dışı bırakılan bir hesap hiçbir şey
+  yazmaz. Kullanıcılar yalnızca kendi
   katılımcılarına ve kayıtlarına erişir; olmayan bir kayıt ile başkasının kaydı aynı yanıtı alır.
 - ✅ Bilet kodları SHA-256 özetleriyle bulunduktan sonra sabit zamanda karşılaştırılır; loga ve dışa aktarımlara asla
   yazılmaz.
@@ -372,8 +377,10 @@ Tehdit modeli için [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) dosyasına bak�
 - Kilitleme sayaçları atomik olarak güncellenir ve başarılı giriş yalnızca hesap hâlâ kilitli değilken yazılır;
   eşzamanlı denemeler yeni bir kilidi kaldıramaz.
 - Sahiplik servislerde denetlenir ve veritabanı komutlarında tekrarlanır.
-- Açık bir oturumun her işlemi önce hesabın rolünü ve etkinlik durumunu veritabanından okur; hesap değişiklikleri
-  işlemi yapan yöneticiyi kendi işlemlerinin içinde yeniden denetler.
+- Açık bir oturumun her işlemi önce hesabın rolünü, etkinlik durumunu ve oturum sürümünü veritabanından okur; her
+  yazma işlemi de işlemi yapan hesabı (kimlik, rol, oturum sürümü) kendi işleminin içinde, kilidini aldıktan sonra
+  yeniden denetler ve SQL Server'da hesabın satırını işlem bitene kadar kilitli tutar; hesap değişiklikleri önce
+  hesap kilidini alır, sonra işlemi yapan yöneticiyi aynı şekilde denetler.
 - Bilet kodları 130 rastgele bittir (yükseltmenin yeniden verdiği biletlerde 128). Katılımcının hesabı QR kodu yeniden gösterebilsin diye olduğu gibi, SHA-256
   özetiyle birlikte saklanır: giriş bileti özetle bulur ve kodu sabit zamanda karşılaştırır. Yönetim listeleri ve
   dışa aktarımlar kodu asla göstermez.
@@ -396,7 +403,7 @@ dotnet test -c Release
 | Proje | Tür | Kapsam |
 |---|---|---|
 | `tests/EtkinlikYonetim.Business.Tests` | Birim | Doğrulayıcı sınırları (kullanıcı adı 32, şifre 8/64 ve girişte 100, ad 64, etkinlik adı 80, kapasite 0/1/1000/1001, açıklama 500, geçmiş tarihler), kimlik no kontrol basamakları, PBKDF2 ve biçim yükseltmesi, kilitleme, kurulum anahtarı denetimleri, veritabanıyla denetlenen oturumlar, hesap kuralları, bilet kodları ve giriş sonuçları, CSV ve HTML dışa aktarımı, sıkı Moq nesneleriyle sahiplik ve denetim olayları |
-| `tests/EtkinlikYonetim.Data.Tests` | Entegrasyon | Bellek içi SQLite üzerinde servisler ve depolar (kapasite sınırları, bekleme listesi sırası, iptal ve yeniden kayıt, etkinlik değişikliği ve iptali, giriş kontrolü, dışa aktarım, rolü düşürülen ve devre dışı oturumlar, IDOR yanıtları, kilit süresi); SQL Server'da kapasite, bekleme listesi, çift kayıt, giriş, hesap, kilitleme ve ilk yönetici yarışları, kısıtlı oturumla kurulum anahtarları, migration'lar, eski şema yükseltmesi ve kilidi |
+| `tests/EtkinlikYonetim.Data.Tests` | Entegrasyon | Bellek içi SQLite üzerinde servisler ve depolar (kapasite sınırları, bekleme listesi sırası, iptal ve yeniden kayıt, etkinlik değişikliği ve iptali, giriş kontrolü, dışa aktarım, rolü düşürülen ve devre dışı oturumlar, IDOR yanıtları, kilit süresi); SQL Server'da kapasite, bekleme listesi, çift kayıt, giriş, hesap, kilitleme ve ilk yönetici yarışları, kısıtlı oturumla kurulum anahtarları, migration'lar, eski şema yükseltmesi ve kilidi, bir yazma işlemi kilidini beklerken devre dışı bırakılan hesaplar, giriş beklerken başka güne taşınan etkinlik ve yalnızca harf büyüklüğü değişen açıklama |
 | `tests/EtkinlikYonetim.UI.Tests` | Birim | Her ekran gösterilmeden kurulur: tema, 1024x600, 1366x768 ve 1920x1040 çalışma alanlarında 1-2 yazı ölçeğinde yerleşim, sekme sırası, pencere içi iletiler, paletler ve karşıtlık, çalışırken yüksek karşıtlığa geçiş; örnek yapılandırma, hata mesajları, log içeriği, kilit açıldıktan sonra odak, yazma korumaları, en son isteğin kazandığı yüklemeler, etkinlik yönetimi, giriş kontrolü ve hesap pencereleri, bilet QR görünümü, dışa aktarım dosyaları, oturum sonu, nötr marka |
 
 SQL Server testleri `ETKINLIK_TEST_SQLSERVER` içindeki sunucuda geçici veritabanları kullanır (varsayılan: Windows

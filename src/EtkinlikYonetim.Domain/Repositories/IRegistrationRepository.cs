@@ -9,15 +9,16 @@ public interface IRegistrationRepository
     /// the event's seats (an application lock per event on SQL Server). While a seat is free and nobody is
     /// waiting, the seat counter is raised by a conditional UPDATE that also checks the capacity and the
     /// date, and the ticket <paramref name="newTicketCode"/> returns is issued. Otherwise the registration
-    /// joins the end of the event's waiting list without a ticket.
+    /// joins the end of the event's waiting list without a ticket. The day and the stored time are the
+    /// database's, read in the transaction after the lock.
     /// </summary>
     /// <exception cref="AlreadyRegisteredException">The participant already holds a seat or waits for one at the event.</exception>
     /// <exception cref="EventClosedException">The event does not exist, is cancelled or is in the past.</exception>
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
     Task<RegistrationOutcome> AddAsync(
+        Actor actor,
         int participantId,
         int eventId,
-        DateOnly today,
-        DateTime createdAtUtc,
         Func<string> newTicketCode,
         CancellationToken cancellationToken = default);
 
@@ -32,16 +33,16 @@ public interface IRegistrationRepository
 
     /// <summary>
     /// Cancels the registration in one transaction under the event's lock, only if it still holds a seat
-    /// or waits for one, its event is not before <paramref name="today"/> and, when
+    /// or waits for one, its event is not past by the database's day (read after the lock) and, when
     /// <paramref name="ownerUserId"/> is given, its participant belongs to that account. A freed seat goes
     /// to the first waiting registration in the same transaction, with the ticket
     /// <paramref name="newTicketCode"/> returns; the seat counter stays equal to the seats held.
     /// </summary>
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
     Task<CancellationOutcome> CancelAsync(
+        Actor actor,
         int id,
         int? ownerUserId,
-        DateOnly today,
-        DateTime cancelledAtUtc,
         Func<string> newTicketCode,
         CancellationToken cancellationToken = default);
 }

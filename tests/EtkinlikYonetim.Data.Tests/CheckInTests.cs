@@ -1,8 +1,10 @@
 using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Business.Services;
+using EtkinlikYonetim.Data.Repositories;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using static EtkinlikYonetim.Data.Tests.TestServices;
 
 namespace EtkinlikYonetim.Data.Tests;
@@ -150,7 +152,7 @@ public sealed class CheckInTests : IAsyncLifetime
         var byUser = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.CancelAsync(User(SeedUserId), inside.RegistrationId, Ct));
         var byAdmin = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.CancelAsync(admin, inside.RegistrationId, Ct));
         var direct = await _db.Get<IRegistrationRepository>().CancelAsync(
-            inside.RegistrationId, null, DateOnly.FromDateTime(Start.UtcDateTime), Start.UtcDateTime, () => "ETK-" + new string('C', 26), Ct);
+            Access.ActorOf(admin), inside.RegistrationId, null, () => "ETK-" + new string('C', 26), Ct);
 
         Assert.Equal(RegistrationService.CheckedInCannotCancel, byUser.Message);
         Assert.Equal(RegistrationService.CheckedInCannotCancel, byAdmin.Message);
@@ -178,6 +180,34 @@ public sealed class CheckInTests : IAsyncLifetime
 
         Assert.Equal(CheckInOutcome.CheckedIn, (await CheckIns.CheckInAsync(admin, id, promoted.TicketCode, Ct)).Outcome);
         Assert.Equal(CheckInOutcome.Rejected, (await CheckIns.CheckInAsync(admin, id, first.TicketCode, Ct)).Outcome);
+    }
+
+    /// <summary>
+    /// The service found the ticket valid for today; before the check-in writes, another admin moves the
+    /// event to tomorrow. The write decides with the event's date and the database's day as they are under
+    /// the event's lock: the ticket is not used and stays valid for the new day.
+    /// </summary>
+    [Fact]
+    public async Task CheckIn_EventMovedToAnotherDayBeforeTheWrite_IsNotTheEventDay()
+    {
+        var admin = Admin(SeedAdminId);
+        var id = await _db.Get<IEventService>().CreateAsync(admin, "Bugün", Start.UtcDateTime.Date, 5, Ct);
+        var receipt = await Registrations.RegisterAsync(User(SeedUserId), id, DenizNationalId, Ct);
+        var tomorrow = DateOnly.FromDateTime(Start.UtcDateTime.Date.AddDays(1));
+        await using var app = _db.BuildServices(services => services.AddSingleton(provider => BeforeCall<ITicketRepository>.Wrap(
+            ActivatorUtilities.CreateInstance<TicketRepository>(provider),
+            method => method == nameof(ITicketRepository.CheckInAsync),
+            async () =>
+            {
+                await using var context = _db.CreateContext();
+                await context.Events.Where(e => e.Id == id).ExecuteUpdateAsync(s => s.SetProperty(e => e.Date, tomorrow), Ct);
+            })));
+
+        var result = await app.GetRequiredService<ICheckInService>().CheckInAsync(admin, id, receipt.TicketCode, Ct);
+
+        Assert.Equal(CheckInOutcome.NotEventDay, result.Outcome);
+        await using var check = _db.CreateContext();
+        Assert.Null((await check.Tickets.SingleAsync(t => t.Code == receipt.TicketCode, Ct)).CheckedInAt);
     }
 
     private async Task MoveToTheDayOfAsync(int eventId) =>

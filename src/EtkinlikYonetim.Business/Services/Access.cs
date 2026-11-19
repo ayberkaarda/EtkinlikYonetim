@@ -38,6 +38,29 @@ internal static class Access
     /// </summary>
     public static int? OwnerFilter(UserSession session) => session.IsAdmin ? null : session.UserId;
 
+    /// <summary>The account a write of <paramref name="session"/> acts for, checked again by the repository inside the write.</summary>
+    public static Actor ActorOf(UserSession session) => new(session.UserId, session.Role, session.SessionVersion);
+
+    /// <summary>
+    /// Runs a write as the account of <paramref name="session"/>. When the repository finds, after its locks
+    /// and inside its transaction, that the account was disabled, demoted or changed since the session check,
+    /// nothing was written: the refusal is audited and the session ends like one the guard rejects.
+    /// </summary>
+    public static async Task<T> WriteAsAsync<T>(this IAuditLog audit, UserSession session, Func<Actor, Task<T>> write)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(write);
+        try
+        {
+            return await write(ActorOf(session)).ConfigureAwait(false);
+        }
+        catch (ActorRevokedException ex)
+        {
+            audit.Record(AuditEvent.SessionRejected, session.Role);
+            throw new SessionExpiredException(SessionExpiredException.DefaultMessage, ex);
+        }
+    }
+
     /// <summary>
     /// The database's UTC time now and the calendar day it falls on in this computer's time zone (event
     /// dates are local calendar days). Computers whose clocks are wrong still agree on both, as long as

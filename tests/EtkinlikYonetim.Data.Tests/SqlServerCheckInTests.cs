@@ -104,4 +104,33 @@ public sealed class SqlServerCheckInTests
                 await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Biletler b JOIN dbo.Kayitlar r ON r.Id = b.KayitId WHERE r.EtkinlikId = @id AND b.GirisZamani IS NOT NULL", ct, ("@id", eventId)));
         }
     }
+
+    /// <summary>
+    /// A ticket of today is scanned while another admin holds the event's lock and moves the event to
+    /// tomorrow. The check-in passed its early checks before it waited; under the lock it reads the event's
+    /// date and the database's day again and does not use the ticket on the wrong day.
+    /// </summary>
+    [Fact]
+    public async Task CheckIn_EventMovedToTomorrowWhileWaitingForTheLock_DoesNotUseTheTicket()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+        await using var app = database.BuildServices(demo: true);
+        await app.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+        var eventId = await app.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Bugün", database.Today, 5, ct);
+        var receipt = await app.GetRequiredService<IRegistrationService>().RegisterAsync(User(SeedUserId), eventId, DenizNationalId, ct);
+
+        Task<CheckInResult> checkIn;
+        await using (var holder = await HeldAppLock.TakeAsync(database, AppLocks.Event(eventId), ct))
+        {
+            checkIn = app.GetRequiredService<ICheckInService>().CheckInAsync(Admin(SeedAdminId), eventId, receipt.TicketCode, ct);
+            await database.WaitForLockWaitAsync(ct);
+
+            await holder.ExecuteAsync("UPDATE dbo.Etkinlikler SET Tarih = DATEADD(DAY, 1, Tarih) WHERE Id = @id", ct, ("@id", eventId));
+            await holder.CommitAsync(ct);
+        }
+
+        Assert.Equal(CheckInOutcome.NotEventDay, (await checkIn).Outcome);
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Biletler b JOIN dbo.Kayitlar r ON r.Id = b.KayitId WHERE r.EtkinlikId = @id AND b.GirisZamani IS NOT NULL", ct, ("@id", eventId)));
+    }
 }

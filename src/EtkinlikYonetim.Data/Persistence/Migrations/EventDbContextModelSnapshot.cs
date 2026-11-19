@@ -144,6 +144,10 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .HasColumnType("nvarchar(500)")
                         .HasColumnName("Aciklama");
 
+                    b.Property<int>("EditVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("DuzenlemeSurumu");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)

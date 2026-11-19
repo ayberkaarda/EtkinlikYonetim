@@ -91,7 +91,20 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
   yer sayısından fazla kişi olmaz.
 - Form açıldıktan sonra başka bir yöneticinin değiştirdiği bir etkinliği kaydetmek, eski tarihi, kapasiteyi veya
   açıklamayı geri yazmak yerine reddedilir; etkinlik yönetimi güncel değerleri gösterir ve değişikliğin yeniden
-  yapılmasını ister.
+  yapılmasını ister. Karar değerlerle değil, her değişiklikte artan bir düzenleme sürümüyle verilir (migration
+  `AddEventEditVersion`); böylece büyük/küçük harfe duyarsız harmanlamanın eşit saydığı, açıklamanın yalnızca harf
+  büyüklüğünü değiştiren bir düzenleme ("Salon" yerine "SALON") de artık ezilmez.
+- Her yazma işlemi hesabını kendi işleminin içinde, kilidi aldıktan sonra yeniden denetler: bir kayıt, iptal,
+  etkinlik değişikliği veya giriş etkinliğin kilidini beklerken devre dışı bırakılan, rolü düşürülen ya da değiştirilip
+  geri alınan bir hesap hiçbir şey yazmaz ve penceresi giriş ekranına döner. Hesap değişiklikleri artık işlemi yapan
+  yöneticinin oturum sürümünü de karşılaştırır. Kilitlenme (deadlock) kurbanı olan bir işlem meşgul mesajıyla
+  bildirilir; hiçbir şey yazılmamıştır.
+- Kayıtlar, iptaller, etkinlik değişiklikleri ve girişler veritabanının saatini yazan işlemin içinde, kilitten sonra
+  okur; gece yarısını kilit bekleyerek geçen bir işlem artık geçmiş bir gün için işlem yapmaz ve yazdığı anın
+  zamanını kaydeder. Giriş, etkinliğin tarihini kilit altında yeniden okur: okutma beklerken başka bir güne taşınan
+  bir etkinliğin bileti artık kullanılmış sayılmaz.
+- Etkinlik yönetimi, hangi etkinliklerin hâlâ değiştirilebileceğine bilgisayarın saatiyle değil veritabanının
+  günüyle karar verir; ileri giden bir saat artık güncel etkinlikleri kilitlemez.
 
 ## Temel
 

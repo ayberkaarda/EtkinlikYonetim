@@ -82,7 +82,7 @@ internal sealed class ParticipantService(
         int added;
         try
         {
-            added = await participants.AddAsync(participant, cancellationToken).ConfigureAwait(false);
+            added = await audit.WriteAsAsync(session, actor => participants.AddAsync(actor, participant, cancellationToken)).ConfigureAwait(false);
         }
         catch (DuplicateNationalIdException ex)
         {

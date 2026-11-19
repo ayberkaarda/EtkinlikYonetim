@@ -62,7 +62,7 @@ internal sealed class CheckInService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var (outcome, name) = await DecideAsync(eventId, code, cancellationToken).ConfigureAwait(false);
+        var (outcome, name) = await DecideAsync(session, eventId, code, cancellationToken).ConfigureAwait(false);
         audit.Record(
             outcome switch
             {
@@ -81,7 +81,7 @@ internal sealed class CheckInService(
         return await tickets.GetCheckInCountAsync(eventId, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<(CheckInOutcome Outcome, string? ParticipantName)> DecideAsync(int eventId, string? typed, CancellationToken cancellationToken)
+    private async Task<(CheckInOutcome Outcome, string? ParticipantName)> DecideAsync(UserSession session, int eventId, string? typed, CancellationToken cancellationToken)
     {
         var wellFormed = TicketCode.TryNormalize(typed, out var code);
         var given = Encoding.ASCII.GetBytes(wellFormed ? code : string.Empty);
@@ -115,10 +115,18 @@ internal sealed class CheckInService(
             return (CheckInOutcome.AlreadyUsed, null);
         }
 
-        // The check-in time is the database's, so the clock of the scanning computer cannot change it.
-        if (await tickets.CheckInAsync(ticket.TicketId, eventId, now.Utc, cancellationToken).ConfigureAwait(false))
+        // The repository decides the day again under the event's lock, with the event's date and the
+        // database's time as they are then, and stamps the check-in with that time: neither a move of the
+        // event while the scan waited nor the scanning computer's clock can make it count on another day.
+        var written = await audit.WriteAsAsync(session, actor => tickets.CheckInAsync(actor, ticket.TicketId, eventId, cancellationToken)).ConfigureAwait(false);
+        if (written == CheckInWriteStatus.CheckedIn)
         {
             return (CheckInOutcome.CheckedIn, ticket.ParticipantName);
+        }
+
+        if (written == CheckInWriteStatus.NotEventDay)
+        {
+            return (CheckInOutcome.NotEventDay, null);
         }
 
         // Lost to a concurrent scan of the same ticket, or the registration or event was cancelled since

@@ -130,12 +130,44 @@ public sealed class SqlServerClockTests
         Assert.Equal("kilit", (await behind.GetRequiredService<IAuthService>().SignInAsync("kilit", Password, Ct)).UserName);
     }
 
+    /// <summary>
+    /// A registration waits for the event's lock. Its date decision and its stored time are taken from the
+    /// database's clock after the lock was granted, not from a reading made before it waited.
+    /// </summary>
+    [Fact]
+    public async Task Register_AfterWaitingForTheEventLock_UsesTheTimeOfTheWrite()
+    {
+        await using var database = await SqlServerTestDatabase.ReserveAsync(Ct);
+        await using var app = database.BuildServices(demo: true);
+        await app.GetRequiredService<IDatabaseInitializer>().InitializeAsync(Ct);
+        var eventId = await AddEventAsync(database, daysFromToday: 3);
+
+        Task<RegistrationReceipt> registration;
+        DateTimeOffset released;
+        await using (var holder = await HeldAppLock.TakeAsync(database, AppLocks.Event(eventId), Ct))
+        {
+            registration = app.GetRequiredService<IRegistrationService>().RegisterAsync(User(SeedUserId), eventId, DenizNationalId, Ct);
+            await database.WaitForLockWaitAsync(Ct);
+            await Task.Delay(TimeSpan.FromSeconds(2), Ct);
+            released = await database.ServerUtcNowAsync(Ct);
+        }
+
+        var receipt = await registration;
+
+        // A time read before the wait would be two seconds older than the release.
+        Assert.Equal(1, await database.ScalarAsync(
+            "SELECT COUNT(*) FROM dbo.Kayitlar WHERE Id = @id AND KayitZamani >= DATEADD(MILLISECOND, -500, @released)",
+            Ct,
+            ("@id", receipt.RegistrationId),
+            ("@released", released.UtcDateTime)));
+    }
+
     /// <summary>Stores an event <paramref name="daysFromToday"/> days from today by the database's clock and returns its id.</summary>
     private static Task<int> AddEventAsync(SqlServerTestDatabase database, int daysFromToday) =>
         database.ScalarAsync(
             """
-            INSERT dbo.Etkinlikler (EtkinlikAdi, Tarih, Kapasite, KayitSayisi, IptalEdildi)
-            VALUES (N'Saat Testi', DATEADD(DAY, @days, CAST(SYSUTCDATETIME() AS date)), 10, 0, 0);
+            INSERT dbo.Etkinlikler (EtkinlikAdi, Tarih, Kapasite, KayitSayisi, IptalEdildi, DuzenlemeSurumu)
+            VALUES (N'Saat Testi', DATEADD(DAY, @days, CAST(SYSUTCDATETIME() AS date)), 10, 0, 0, 0);
             SELECT CAST(SCOPE_IDENTITY() AS int);
             """,
             Ct,

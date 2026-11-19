@@ -23,6 +23,7 @@ internal sealed class EventConfiguration : IEntityTypeConfiguration<ScheduledEve
         builder.Property(e => e.Description).HasColumnName("Aciklama").HasMaxLength(SchemaLimits.EventDescriptionLength);
         builder.Property(e => e.Cancelled).HasColumnName("IptalEdildi");
         builder.Property(e => e.CancelledAt).HasColumnName("IptalZamani");
+        builder.Property(e => e.EditVersion).HasColumnName("DuzenlemeSurumu");
 
         builder.HasIndex(e => e.Date, "IX_Etkinlikler_Tarih");
     }

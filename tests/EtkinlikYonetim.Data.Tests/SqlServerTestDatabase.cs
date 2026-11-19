@@ -143,6 +143,26 @@ internal sealed class SqlServerTestDatabase : IAsyncDisposable
         return await command.ExecuteScalarAsync(ct) as byte[];
     }
 
+    /// <summary>
+    /// Waits until a session of this database waits for an application lock, that is until an operation
+    /// started by the test has reached its lock and is blocked by a <see cref="HeldAppLock"/>.
+    /// </summary>
+    public async Task WaitForLockWaitAsync(CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+        while (await ScalarAsync(
+            "SELECT COUNT(*) FROM sys.dm_tran_locks WHERE resource_type = N'APPLICATION' AND request_status = N'WAIT' AND resource_database_id = DB_ID()",
+            ct) == 0)
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException("No operation reached the held lock.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(20), ct);
+        }
+    }
+
     public static async Task ExecuteAsync(
         string connectionString,
         string sql,

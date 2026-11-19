@@ -12,15 +12,6 @@ internal sealed class DatabaseClock(IDbContextFactory<EventDbContext> contextFac
     public async Task<DateTime> GetUtcNowAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        if (!db.Database.IsSqlServer())
-        {
-            return timeProvider.GetUtcNow().UtcDateTime;
-        }
-
-        var now = await db.Database
-            .SqlQueryRaw<DateTime>("SELECT SYSUTCDATETIME() AS [Value]")
-            .SingleAsync(cancellationToken)
-            .ConfigureAwait(false);
-        return DateTime.SpecifyKind(now, DateTimeKind.Utc);
+        return (await DatabaseTime.NowAsync(db, timeProvider, cancellationToken).ConfigureAwait(false)).Utc;
     }
 }

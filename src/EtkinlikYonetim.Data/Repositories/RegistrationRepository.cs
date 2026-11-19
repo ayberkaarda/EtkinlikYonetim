@@ -5,13 +5,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EtkinlikYonetim.Data.Repositories;
 
-internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> contextFactory) : IRegistrationRepository
+internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> contextFactory, TimeProvider timeProvider) : IRegistrationRepository
 {
     public async Task<RegistrationOutcome> AddAsync(
+        Actor actor,
         int participantId,
         int eventId,
-        DateOnly today,
-        DateTime createdAtUtc,
         Func<string> newTicketCode,
         CancellationToken cancellationToken = default)
     {
@@ -23,6 +22,10 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
         // Every change of this event's seats and waiting list waits here for the one before it, so the
         // decision between a seat and the waiting list below sees all of them.
         await AppLocks.AcquireAsync(db, AppLocks.Event(eventId), cancellationToken).ConfigureAwait(false);
+        await Actors.RequireAsync(db, actor, admin: false, cancellationToken).ConfigureAwait(false);
+
+        // The day and the stored time are the database's as of now, after the wait for the lock.
+        var (createdAtUtc, today) = await DatabaseTime.NowAsync(db, timeProvider, cancellationToken).ConfigureAwait(false);
 
         if (await HoldsPlaceAsync(db, participantId, eventId, cancellationToken).ConfigureAwait(false))
         {
@@ -148,10 +151,9 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
     }
 
     public async Task<CancellationOutcome> CancelAsync(
+        Actor actor,
         int id,
         int? ownerUserId,
-        DateOnly today,
-        DateTime cancelledAtUtc,
         Func<string> newTicketCode,
         CancellationToken cancellationToken = default)
     {
@@ -172,6 +174,8 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
         }
 
         await AppLocks.AcquireAsync(db, AppLocks.Event(lockedEvent), cancellationToken).ConfigureAwait(false);
+        await Actors.RequireAsync(db, actor, admin: false, cancellationToken).ConfigureAwait(false);
+        var (cancelledAtUtc, today) = await DatabaseTime.NowAsync(db, timeProvider, cancellationToken).ConfigureAwait(false);
         var heldSeat = await db.Registrations
             .AnyAsync(r => r.Id == id && r.Status == RegistrationStatus.Active, cancellationToken)
             .ConfigureAwait(false);

@@ -134,7 +134,8 @@ internal static class ErrorReporter
                 + "ve veritabanı oluşturma yetkiniz bulunduğundan emin olun.";
         }
 
-        if (Find<DatabaseBusyException>(exception) is not null)
+        // A deadlock victim was rolled back like a write that found its lock busy: nothing was written.
+        if (Find<DatabaseBusyException>(exception) is not null || DatabaseErrors.IsDeadlock(exception))
         {
             return BusyMessage;
         }

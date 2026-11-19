@@ -98,8 +98,9 @@ internal static class TestForms
 
     public static EtkinlikYonetForm EventManagement()
     {
-        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2027, 3, 1, 9, 0, 0, TimeSpan.Zero));
-        var form = new EtkinlikYonetForm(Events(), Sessions.Admin, clock) { Prompts = new RecordingPrompts() };
+        var events = Events();
+        events.DatabaseToday = new DateOnly(2027, 3, 1);
+        var form = new EtkinlikYonetForm(events, Sessions.Admin) { Prompts = new RecordingPrompts() };
         Assert.True(form.LoadAsync().IsCompletedSuccessfully);
         Find<ListBox>(form, "lstEtkinlikler").SelectedIndex = 2;
         return form;
