@@ -90,12 +90,13 @@ internal class CardPanel : Panel, IThemeAware
 }
 
 /// <summary>
-/// A card shaped like a printed ticket: a semicircle notch at the top and at the bottom edge where
-/// <see cref="Perforation"/> separates the stub. Under high contrast it stays a plain card.
+/// A card shaped like a printed ticket: a dashed perforation from edge to edge in line with
+/// <see cref="Perforation"/> (an empty column of the card's layout, which must have a transparent
+/// background), with a semicircle notch at each end. Under high contrast only the dashed line remains.
 /// </summary>
 internal sealed class TicketPanel : CardPanel
 {
-    /// <summary>The dashed line between the ticket and its stub; the notches are drawn in line with it.</summary>
+    /// <summary>The empty column between the ticket and its stub; the perforation runs down its middle.</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Control? Perforation { get; set; }
 
@@ -103,7 +104,7 @@ internal sealed class TicketPanel : CardPanel
     {
         ArgumentNullException.ThrowIfNull(e);
         base.OnPaintBackground(e);
-        if (Perforation is null || Theme.Current.IsHighContrast)
+        if (Perforation is null)
         {
             return;
         }
@@ -114,48 +115,29 @@ internal sealed class TicketPanel : CardPanel
             x += current.Left;
         }
 
+        var p = Theme.Current;
         var g = e.Graphics;
         var radius = Theme.PxF(this, 10);
         var previous = g.SmoothingMode;
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        using var hole = new SolidBrush(Painting.ParentBackground(this));
-        using var edge = new Pen(Theme.Current.Border, Math.Max(1F, Theme.PxF(this, 1)));
-        foreach (var y in new[] { 0F, Height })
+        using (var line = new Pen(p.IsHighContrast ? p.Text : p.BorderStrong, Math.Max(1F, Theme.PxF(this, 1.5F))) { DashPattern = [3F, 3F] })
         {
-            var circle = new RectangleF(x - radius, y - radius, 2 * radius, 2 * radius);
-            g.FillEllipse(hole, circle);
-            g.DrawEllipse(edge, circle);
+            g.DrawLine(line, x, radius + Theme.PxF(this, Spacing.XS), x, Height - radius - Theme.PxF(this, Spacing.XS));
+        }
+
+        if (!p.IsHighContrast)
+        {
+            using var hole = new SolidBrush(Painting.ParentBackground(this));
+            using var edge = new Pen(p.Border, Math.Max(1F, Theme.PxF(this, 1)));
+            foreach (var y in new[] { 0F, Height })
+            {
+                var circle = new RectangleF(x - radius, y - radius, 2 * radius, 2 * radius);
+                g.FillEllipse(hole, circle);
+                g.DrawEllipse(edge, circle);
+            }
         }
 
         g.SmoothingMode = previous;
-    }
-}
-
-/// <summary>A dashed vertical line, the perforation between a ticket and its stub.</summary>
-internal sealed class PerforationLine : Control
-{
-    public PerforationLine()
-    {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        SetStyle(ControlStyles.Selectable, false);
-        TabStop = false;
-        Size = new Size(2 * Spacing.XL, 1);
-        Margin = Padding.Empty;
-        AccessibleRole = AccessibleRole.Separator;
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        ArgumentNullException.ThrowIfNull(e);
-
-        var p = Theme.Current;
-        e.Graphics.Clear(Painting.ParentBackground(this));
-        using var pen = new Pen(p.IsHighContrast ? p.Text : p.BorderStrong, Math.Max(1F, Theme.PxF(this, 1.5F)))
-        {
-            DashPattern = [3F, 3F],
-        };
-        var x = Width / 2F;
-        e.Graphics.DrawLine(pen, x, 0, x, Height);
     }
 }
 

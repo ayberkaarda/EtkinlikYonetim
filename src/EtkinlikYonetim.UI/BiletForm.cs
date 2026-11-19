@@ -53,7 +53,8 @@ namespace EtkinlikYonetim.UI
             code.Margin = Padding.Empty;
             var info = FormLayout.Stack("ticketInfo", eventName, date, participantCaption, participant, code);
 
-            var perforation = new PerforationLine { Name = "perforation", Dock = DockStyle.Fill };
+            // An empty column for the perforation, which the ticket card draws through the transparent layout.
+            var perforation = new Panel { Name = "perforation", Size = new Size(2 * Spacing.XL, 1), Margin = Padding.Empty, TabStop = false, BackColor = Color.Transparent, Anchor = AnchorStyles.Top };
             picQr.Anchor = AnchorStyles.Top;
             var ticket = new TableLayoutPanel
             {
@@ -64,6 +65,7 @@ namespace EtkinlikYonetim.UI
                 RowCount = 1,
                 Dock = DockStyle.Top,
                 Margin = Padding.Empty,
+                BackColor = Color.Transparent,
             };
             ticket.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             ticket.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));

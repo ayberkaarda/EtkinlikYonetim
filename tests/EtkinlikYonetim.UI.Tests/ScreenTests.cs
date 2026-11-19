@@ -343,5 +343,5 @@ public sealed class ScreenTests
         && control.Enabled
         && !FormLayout.IsHidden(control)
         && control.Parent is not NumericUpDown
-        && control is not (Label or Panel or TableLayoutPanel or FlowLayoutPanel or TextField or NumberField or DateField or GlyphBadge or InfoBar or BrandRule or PerforationLine or PictureBox);
+        && control is not (Label or Panel or TableLayoutPanel or FlowLayoutPanel or TextField or NumberField or DateField or GlyphBadge or InfoBar or BrandRule or PictureBox);
 }
