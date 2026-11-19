@@ -48,7 +48,8 @@ otomatik olarak oluşturulup güncellenir.
   veya sonrası) ve kapasite ("Kişi Kapasitesi", 1-1000 kişi).
 - ✅ **Etkinlik yönetimi** ("Etkinlik Yönetimi", Event Management): günü geçmemiş bir etkinliğin tarihi, kapasitesi
   ve açıklaması değiştirilir; kapasite mevcut kayıt sayısının altına inemez, eklenen yerler bekleme listesine
-  verilir. Etkinliği iptal etmek ("Etkinliği İptal Et", Cancel Event) onu iptal edildi olarak listede tutar, kayıtlarını
+  verilir. Form açıldıktan sonra başka bir yöneticinin yaptığı bir değişikliğin üzerine kaydetmek reddedilir ve güncel
+  değerler gösterilir. Etkinliği iptal etmek ("Etkinliği İptal Et", Cancel Event) onu iptal edildi olarak listede tutar, kayıtlarını
   ve bekleme sıralarını kapatır (soft delete).
 - ✅ **Katılımcı ekleme** ("Katılımcı Ekleme") ve tüm hesapların katılımcıları için **bilet oluşturma** ("Bilet
   Oluştur", Create Ticket); yönetici tüm kayıtları görür ve iptal edebilir, bilet kodlarını ise yalnızca kendi

@@ -49,6 +49,7 @@ startup.
   later) and capacity ("Kişi Kapasitesi", 1-1000 seats).
 - ✅ **Event management** ("Etkinlik Yönetimi", Event Management): change the date, capacity and description of an
   event that has not passed; the capacity cannot go below the seats held, and added seats go to the waiting list.
+  A save over another admin's change made after the form was loaded is refused and the current values are shown.
   Cancelling an event ("Etkinliği İptal Et", Cancel Event) keeps it listed as cancelled and closes its
   registrations and waiting places (soft delete).
 - ✅ **Add participants** ("Katılımcı Ekleme") and **issue tickets** ("Bilet Oluştur", Create Ticket) for the

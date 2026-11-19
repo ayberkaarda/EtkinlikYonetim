@@ -70,6 +70,9 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
 - Bileti girişte okutulmuş bir kayıt artık iptal edilemez ("Giriş yapılmış bir kayıt iptal edilemez.") ve giriş
   işlemi etkinliğin kilidini alır: içerideki katılımcı yerini korur, yer sıradaki bekleyene geçmez; böylece salonda
   yer sayısından fazla kişi olmaz.
+- Form açıldıktan sonra başka bir yöneticinin değiştirdiği bir etkinliği kaydetmek, eski tarihi, kapasiteyi veya
+  açıklamayı geri yazmak yerine reddedilir; etkinlik yönetimi güncel değerleri gösterir ve değişikliğin yeniden
+  yapılmasını ister.
 
 ## Temel
 

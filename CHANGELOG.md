@@ -69,6 +69,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A registration whose ticket was scanned at the entrance can no longer be cancelled ("Giriş yapılmış bir kayıt
   iptal edilemez."), and the check-in takes the event's lock: a participant who is inside keeps the seat instead of
   it going to the next one waiting, so the room never holds more people than seats.
+- Saving an event that another admin changed after the form was loaded is refused instead of writing the old date,
+  capacity or description back; the event management shows the current values and asks for the change again.
 
 ## Foundation
 
