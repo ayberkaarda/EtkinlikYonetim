@@ -8,7 +8,8 @@ internal interface ISessionGuard
 {
     /// <summary>
     /// Throws <see cref="SessionExpiredException"/> when the account of <paramref name="session"/> no
-    /// longer exists, is disabled or has another role than the session was issued with.
+    /// longer exists, is disabled, has another role than the session was issued with, or had its access
+    /// changed (disabled, enabled, role changed) since then.
     /// </summary>
     Task EnsureCurrentAsync(UserSession session, CancellationToken cancellationToken);
 }
@@ -20,7 +21,9 @@ internal sealed class SessionGuard(IUserRepository users, IAuditLog audit) : ISe
         ArgumentNullException.ThrowIfNull(session);
 
         var state = await users.GetSessionStateAsync(session.UserId, cancellationToken).ConfigureAwait(false);
-        if (state is null || state.Disabled || state.Role != session.Role)
+        // The version catches what the role and state alone would miss: an account disabled and enabled
+        // again, or demoted and promoted again, since the session was issued.
+        if (state is null || state.Disabled || state.Role != session.Role || state.SessionVersion != session.SessionVersion)
         {
             audit.Record(AuditEvent.SessionRejected, session.Role);
             throw new SessionExpiredException();

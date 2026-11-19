@@ -51,8 +51,40 @@ public sealed class AccountManagementTests : IAsyncLifetime
         var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => _db.Get<IAuthService>().SignInAsync("ornek", "Demo.Kullanici1", Ct));
         Assert.Equal(AuthService.CredentialsInvalid, refused.Message);
 
+        // Enabled again, the account signs in anew; the session opened before it was disabled stays dead.
         await Accounts.SetEnabledAsync(Admin(SeedAdminId), user.UserId, true, Ct);
-        await _db.Get<IRegistrationService>().CancelAsync(user, receipt.RegistrationId, Ct);
+        await Assert.ThrowsAsync<SessionExpiredException>(() => _db.Get<IRegistrationService>().CancelAsync(user, receipt.RegistrationId, Ct));
+        var renewed = await _db.Get<IAuthService>().SignInAsync("ornek", "Demo.Kullanici1", Ct);
+        await _db.Get<IRegistrationService>().CancelAsync(renewed, receipt.RegistrationId, Ct);
+    }
+
+    /// <summary>
+    /// A window left open on a compromised admin's computer: the account is disabled, then enabled again (or
+    /// demoted, then promoted again). The account has its old role and state again, but the sessions opened
+    /// before the change never work again; only a new sign-in does.
+    /// </summary>
+    [Fact]
+    public async Task SessionsOpenedBeforeAnAccessChange_StayRefusedAfterTheChangeIsUndone()
+    {
+        var other = await PromoteAndSignInAsync("ornek", "Demo.Kullanici1");
+        var admin = await _db.Get<IAuthService>().SignInAsync("admin", "Demo.Admin1", Ct);
+
+        await Accounts.SetEnabledAsync(admin, other.UserId, false, Ct);
+        await Accounts.SetEnabledAsync(admin, other.UserId, true, Ct);
+        await Assert.ThrowsAsync<SessionExpiredException>(() => Accounts.GetAccountsAsync(other, Ct));
+
+        var renewed = await _db.Get<IAuthService>().SignInAsync("ornek", "Demo.Kullanici1", Ct);
+        Assert.NotEmpty(await Accounts.GetAccountsAsync(renewed, Ct));
+        await Accounts.ChangeRoleAsync(admin, other.UserId, UserRole.User, Ct);
+        await Accounts.ChangeRoleAsync(admin, other.UserId, UserRole.Admin, Ct);
+        await Assert.ThrowsAsync<SessionExpiredException>(() => Accounts.GetAccountsAsync(renewed, Ct));
+        await Assert.ThrowsAsync<SessionExpiredException>(() => _db.Get<IEventService>().CreateAsync(renewed, "Geri Gelen", Start.Date.AddDays(5), 10, Ct));
+
+        // The admin who made the changes keeps working; only the changed account's sessions end.
+        Assert.NotEmpty(await Accounts.GetAccountsAsync(admin, Ct));
+        var fresh = await _db.Get<IAuthService>().SignInAsync("ornek", "Demo.Kullanici1", Ct);
+        Assert.True(fresh.IsAdmin);
+        Assert.NotEmpty(await Accounts.GetAccountsAsync(fresh, Ct));
     }
 
     [Fact]

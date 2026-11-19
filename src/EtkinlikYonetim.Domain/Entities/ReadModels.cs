@@ -9,10 +9,14 @@ public sealed record AccountCredentials(
     PasswordFormat PasswordFormat,
     int FailedLoginCount,
     DateTime? LockoutEnd,
-    bool Disabled = false);
+    bool Disabled = false,
+    int SessionVersion = 0);
 
-/// <summary>What an operation of an open session checks about its account, read at the time of the operation.</summary>
-public sealed record SessionState(UserRole Role, bool Disabled);
+/// <summary>
+/// What an operation of an open session checks about its account, read at the time of the operation;
+/// <paramref name="SessionVersion"/> changes with every change of the account's access.
+/// </summary>
+public sealed record SessionState(UserRole Role, bool Disabled, int SessionVersion = 0);
 
 /// <summary>An account as admins see it in the account management; no password data.</summary>
 public sealed record AccountSummary(int Id, string UserName, UserRole Role, bool Disabled);

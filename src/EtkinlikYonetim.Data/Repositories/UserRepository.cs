@@ -17,7 +17,7 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return await db.Users
             .AsNoTracking()
             .Where(u => u.UserName == userName)
-            .Select(u => new AccountCredentials(u.Id, u.UserName, u.Role, u.PasswordHash, u.PasswordFormat, u.FailedLoginCount, u.LockoutEnd, u.Disabled))
+            .Select(u => new AccountCredentials(u.Id, u.UserName, u.Role, u.PasswordHash, u.PasswordFormat, u.FailedLoginCount, u.LockoutEnd, u.Disabled, u.SessionVersion))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -175,11 +175,13 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-        // The WHERE clause is the final decision: a lock set by a concurrent failure, an account disabled
-        // or a password changed since it was verified makes the statement match no row and the sign-in fails.
+        // The WHERE clause is the final decision: a lock set by a concurrent failure, an account disabled,
+        // a password changed or any change of the account's access since it was verified (also one undone
+        // again) makes the statement match no row and the sign-in fails.
         var id = verified.Id;
         var verifiedHash = verified.PasswordHash;
         var verifiedFormat = verified.PasswordFormat;
+        var verifiedVersion = verified.SessionVersion;
         var hash = newPasswordHash ?? verifiedHash;
         var format = newPasswordHash is null ? verifiedFormat : PasswordFormat.Pbkdf2;
 
@@ -188,7 +190,8 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
                 && !u.Disabled
                 && (u.LockoutEnd == null || u.LockoutEnd <= now)
                 && u.PasswordHash == verifiedHash
-                && u.PasswordFormat == verifiedFormat)
+                && u.PasswordFormat == verifiedFormat
+                && u.SessionVersion == verifiedVersion)
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(u => u.FailedLoginCount, 0)
@@ -207,7 +210,7 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return await db.Users
             .AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => new SessionState(u.Role, u.Disabled))
+            .Select(u => new SessionState(u.Role, u.Disabled, u.SessionVersion))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -283,7 +286,18 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
             return AccountChangeStatus.LastActiveAdmin;
         }
 
-        await db.Users.Where(u => u.Id == targetId).ExecuteUpdateAsync(change, cancellationToken).ConfigureAwait(false);
+        // Every change of access also raises the session version, which ends the account's open sessions
+        // for good: undoing the change later does not bring them back.
+        await db.Users
+            .Where(u => u.Id == targetId)
+            .ExecuteUpdateAsync(
+                accounts =>
+                {
+                    change(accounts);
+                    accounts.SetProperty(u => u.SessionVersion, u => u.SessionVersion + 1);
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return AccountChangeStatus.Changed;
     }

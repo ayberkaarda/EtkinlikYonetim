@@ -87,6 +87,22 @@ public sealed class SessionGuardTests
         await Assert.ThrowsAsync<SessionExpiredException>(() => Events().GetEventsAsync(Sessions.User, Ct));
     }
 
+    /// <summary>
+    /// The account has the session's role and is enabled again, but its access changed since the session
+    /// was issued (disabled and enabled, or demoted and promoted): the session version differs, so the
+    /// session stays refused.
+    /// </summary>
+    [Fact]
+    public async Task SessionOfAnAccountChangedAndRestoredSince_IsRefused()
+    {
+        State(Sessions.Admin.UserId, new SessionState(UserRole.Admin, false, SessionVersion: 2));
+
+        await Assert.ThrowsAsync<SessionExpiredException>(() => Events().GetEventsAsync(Sessions.Admin, Ct));
+
+        _events.VerifyNoOtherCalls();
+        Assert.Equal([(AuditEvent.SessionRejected, UserRole.Admin)], _audit.Events);
+    }
+
     [Fact]
     public async Task CurrentAdminSession_IsAccepted()
     {

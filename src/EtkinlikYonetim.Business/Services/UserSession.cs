@@ -9,11 +9,12 @@ namespace EtkinlikYonetim.Business.Services;
 /// </summary>
 public sealed class UserSession
 {
-    internal UserSession(int userId, string userName, UserRole role)
+    internal UserSession(int userId, string userName, UserRole role, int sessionVersion = 0)
     {
         UserId = userId;
         UserName = userName;
         Role = role;
+        SessionVersion = sessionVersion;
     }
 
     public int UserId { get; }
@@ -23,4 +24,7 @@ public sealed class UserSession
     public UserRole Role { get; }
 
     public bool IsAdmin => Role == UserRole.Admin;
+
+    /// <summary>The account's session version at sign-in; any later change of the account's access ends the session.</summary>
+    internal int SessionVersion { get; }
 }
