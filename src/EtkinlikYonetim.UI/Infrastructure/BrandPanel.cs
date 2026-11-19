@@ -14,11 +14,13 @@ internal sealed class BrandPanel : Panel
         ArgumentNullException.ThrowIfNull(points);
 
         var p = Theme.Current;
-        var onBrand = p.IsHighContrast ? p.Text : p.OnAccent;
-        var onBrandMuted = p.IsHighContrast ? p.Text : p.OnAccentMuted;
+        // The dark palette keeps the panel deep (a tinted ink) instead of a light accent block beside dark content.
+        var deep = p.IsHighContrast || p.IsDark;
+        var onBrand = deep ? p.Text : p.OnAccent;
+        var onBrandMuted = p.IsHighContrast ? p.Text : p.IsDark ? p.TextSecondary : p.OnAccentMuted;
         Name = "brandPanel";
         AutoScroll = true;
-        BackColor = p.IsHighContrast ? p.Surface : p.Accent;
+        BackColor = p.IsHighContrast ? p.Surface : p.IsDark ? p.AccentSubtle : p.Accent;
         Padding = new Padding(Spacing.XL + Spacing.XS, Spacing.XXL, Spacing.XL, Spacing.XL);
         SetStyle(ControlStyles.ResizeRedraw, true);
 
@@ -63,8 +65,8 @@ internal sealed class BrandPanel : Panel
             var badge = new GlyphBadge(glyph, 32, 12F)
             {
                 Name = "brandPointBadge" + i.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                Fill = p.IsHighContrast ? null : p.AccentPressed,
-                GlyphColor = p.IsHighContrast ? null : p.OnAccent,
+                Fill = p.IsHighContrast ? null : p.IsDark ? p.Surface : p.AccentPressed,
+                GlyphColor = p.IsHighContrast ? null : p.IsDark ? p.AccentText : p.OnAccent,
                 Margin = new Padding(0, 0, Spacing.M, Spacing.M),
                 Anchor = AnchorStyles.Left | AnchorStyles.Top,
             };
