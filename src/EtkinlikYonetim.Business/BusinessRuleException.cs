@@ -22,6 +22,32 @@ public sealed class BusinessRuleException : Exception
 }
 
 /// <summary>
+/// Raised when an open session may no longer be used: its account was deleted, disabled or given
+/// another role since the sign-in. The check reads the database at the time of the operation, so a
+/// demoted or disabled admin cannot keep working in a window that is still open. The user has to sign
+/// in again.
+/// </summary>
+public sealed class SessionExpiredException : Exception
+{
+    internal const string DefaultMessage = "Oturumunuz artık geçerli değil. Lütfen yeniden giriş yapın.";
+
+    public SessionExpiredException()
+        : base(DefaultMessage)
+    {
+    }
+
+    public SessionExpiredException(string message)
+        : base(message)
+    {
+    }
+
+    public SessionExpiredException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// Raised when the signed-in account tries to see or change data that does not belong to it. The
 /// message is fixed and does not reveal whether the requested record exists.
 /// </summary>

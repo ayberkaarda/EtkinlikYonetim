@@ -31,11 +31,13 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IValidator<RegistrationTargetInput>, RegistrationTargetInputValidator>();
         services.AddSingleton<IValidator<CancellationInput>, CancellationInputValidator>();
         services.AddSingleton<SetupKeyGate>();
+        services.AddSingleton<ISessionGuard, SessionGuard>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<ISetupService, SetupService>();
         services.AddSingleton<IEventService, EventService>();
         services.AddSingleton<IParticipantService, ParticipantService>();
         services.AddSingleton<IRegistrationService, RegistrationService>();
+        services.AddSingleton<IAccountService, AccountService>();
         return services;
     }
 }

@@ -49,6 +49,21 @@ public enum AuditEvent
 
     /// <summary>An account asked for data or an operation it is not allowed to use.</summary>
     AccessDenied = 12,
+
+    /// <summary>
+    /// An open session was refused because its account was deleted, disabled or given another role
+    /// since the sign-in; the role is the one the session was issued with.
+    /// </summary>
+    SessionRejected = 13,
+
+    /// <summary>An admin disabled an account (the role is the acting admin's).</summary>
+    AccountDisabled = 14,
+
+    /// <summary>An admin enabled an account again (the role is the acting admin's).</summary>
+    AccountEnabled = 15,
+
+    /// <summary>An admin changed the role of another account (the role is the acting admin's).</summary>
+    RoleChanged = 16,
 }
 
 /// <summary>Receives <see cref="AuditEvent"/>s; the application writes them to its log file.</summary>
@@ -75,6 +90,10 @@ public static class AuditCodes
         AuditEvent.RegistrationEventFull => "registration.event_full",
         AuditEvent.RegistrationCancelled => "registration.cancelled",
         AuditEvent.AccessDenied => "access.denied",
+        AuditEvent.SessionRejected => "auth.session.rejected",
+        AuditEvent.AccountDisabled => "admin.account.disabled",
+        AuditEvent.AccountEnabled => "admin.account.enabled",
+        AuditEvent.RoleChanged => "admin.account.role_changed",
         _ => throw new ArgumentOutOfRangeException(nameof(auditEvent), auditEvent, "Unknown audit event."),
     };
 

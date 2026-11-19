@@ -195,6 +195,7 @@ public sealed partial class LoggingTests : IDisposable
             .ReturnsAsync(true);
         users.Setup(u => u.AddFirstAdminAsync(It.IsAny<User>(), It.IsAny<SetupKeyAttempt?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FirstAdminResult(FirstAdminStatus.NotAuthorized, 0));
+        users.Setup(u => u.GetSessionStateAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(new SessionState(UserRole.User, false));
         var day = DateOnly.FromDateTime(Now.UtcDateTime).AddDays(10);
         var events = new Mock<IEventRepository>();
         events.Setup(e => e.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(1, EventName, day, 10, 0));

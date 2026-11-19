@@ -33,6 +33,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Role).HasColumnName("Rol").HasMaxLength(SchemaLimits.RoleLength).HasConversion(RoleConverter).IsRequired();
         builder.Property(u => u.FailedLoginCount).HasColumnName("BasarisizGiris");
         builder.Property(u => u.LockoutEnd).HasColumnName("KilitBitis");
+        builder.Property(u => u.Disabled).HasColumnName("DevreDisi");
 
         builder.HasIndex(u => u.UserName, "IX_Kullanicilar_KullaniciAdi").IsUnique();
     }

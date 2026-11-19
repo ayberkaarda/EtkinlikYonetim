@@ -20,6 +20,13 @@ internal sealed record RegistrationItem(RegistrationDetails Registration)
         + $"{Registration.ParticipantName ?? "Ad Bilinmiyor"} - Bilet: {Registration.TicketCode ?? "-"}";
 }
 
+/// <summary>An account in the account management: name, role and state.</summary>
+internal sealed record AccountItem(AccountSummary Account)
+{
+    public override string ToString() =>
+        $"{Account.UserName} - {(Account.Role == UserRole.Admin ? "Yönetici" : "Kullanıcı")} - {(Account.Disabled ? "Devre dışı" : "Etkin")}";
+}
+
 /// <summary>A participant of an event, as the original list showed it, with the national id masked.</summary>
 internal sealed record ParticipantItem(ParticipantView Participant)
 {

@@ -70,5 +70,17 @@ internal static class SuccessWriteGateExtensions
             await gate.PassAsync(cancellationToken);
             return await inner.RecordSuccessfulLoginAsync(verified, now, newPasswordHash, cancellationToken);
         }
+
+        public Task<SessionState?> GetSessionStateAsync(int userId, CancellationToken cancellationToken = default) =>
+            inner.GetSessionStateAsync(userId, cancellationToken);
+
+        public Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(CancellationToken cancellationToken = default) =>
+            inner.GetAccountsAsync(cancellationToken);
+
+        public Task<AccountChangeStatus> SetDisabledAsync(int actorId, int targetId, bool disabled, CancellationToken cancellationToken = default) =>
+            inner.SetDisabledAsync(actorId, targetId, disabled, cancellationToken);
+
+        public Task<AccountChangeStatus> SetRoleAsync(int actorId, int targetId, UserRole role, CancellationToken cancellationToken = default) =>
+            inner.SetRoleAsync(actorId, targetId, role, cancellationToken);
     }
 }

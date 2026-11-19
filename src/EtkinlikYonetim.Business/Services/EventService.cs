@@ -24,6 +24,7 @@ internal sealed class EventService(
     IEventRepository events,
     TimeProvider timeProvider,
     IValidator<EventInput> validator,
+    ISessionGuard sessions,
     IAuditLog audit) : IEventService
 {
     internal const string NameRequired = "Etkinlik adı boş bırakılamaz.";
@@ -37,16 +38,16 @@ internal sealed class EventService(
         CultureInfo.InvariantCulture,
         $"Kapasite {InputRules.MinCapacity} ile {InputRules.MaxCapacity} arasında olmalıdır.");
 
-    public Task<IReadOnlyList<EventSummary>> GetEventsAsync(UserSession session, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<EventSummary>> GetEventsAsync(UserSession session, CancellationToken cancellationToken = default)
     {
-        Access.RequireSignedIn(session);
-        return events.GetAllAsync(cancellationToken);
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
+        return await events.GetAllAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public Task<IReadOnlyList<EventSummary>> GetOpenEventsAsync(UserSession session, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<EventSummary>> GetOpenEventsAsync(UserSession session, CancellationToken cancellationToken = default)
     {
-        Access.RequireSignedIn(session);
-        return events.GetFromAsync(timeProvider.Today(), cancellationToken);
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
+        return await events.GetFromAsync(timeProvider.Today(), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<int> CreateAsync(
@@ -56,7 +57,7 @@ internal sealed class EventService(
         int capacity,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireAdmin(session, audit);
+        await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
         var input = EventInput.Create(name, eventDate, capacity, timeProvider.Today());
         validator.ValidateOrThrow(input);

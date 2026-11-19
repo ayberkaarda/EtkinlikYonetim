@@ -38,6 +38,7 @@ internal sealed class RegistrationService(
     IValidator<RegistrationRequestInput> requestValidator,
     IValidator<RegistrationTargetInput> targetValidator,
     IValidator<CancellationInput> cancellationValidator,
+    ISessionGuard sessions,
     IAuditLog audit) : IRegistrationService
 {
     internal const string EventRequired = "Lütfen bir etkinlik seçin.";
@@ -57,7 +58,7 @@ internal sealed class RegistrationService(
         string? nationalId,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireSignedIn(session);
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
 
         var request = RegistrationRequestInput.Create(eventId, nationalId);
         requestValidator.ValidateOrThrow(request);
@@ -121,17 +122,17 @@ internal sealed class RegistrationService(
         }
     }
 
-    public Task<IReadOnlyList<RegistrationDetails>> GetMyRegistrationsAsync(
+    public async Task<IReadOnlyList<RegistrationDetails>> GetMyRegistrationsAsync(
         UserSession session,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireSignedIn(session);
-        return registrations.GetActiveAsync(Access.OwnerFilter(session), cancellationToken);
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
+        return await registrations.GetActiveAsync(Access.OwnerFilter(session), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task CancelAsync(UserSession session, int registrationId, CancellationToken cancellationToken = default)
     {
-        Access.RequireSignedIn(session);
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
 
         var registration = await registrations.GetOwnershipAsync(registrationId, cancellationToken).ConfigureAwait(false);
 

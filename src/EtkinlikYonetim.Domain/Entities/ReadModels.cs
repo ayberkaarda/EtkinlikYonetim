@@ -8,7 +8,14 @@ public sealed record AccountCredentials(
     string PasswordHash,
     PasswordFormat PasswordFormat,
     int FailedLoginCount,
-    DateTime? LockoutEnd);
+    DateTime? LockoutEnd,
+    bool Disabled = false);
+
+/// <summary>What an operation of an open session checks about its account, read at the time of the operation.</summary>
+public sealed record SessionState(UserRole Role, bool Disabled);
+
+/// <summary>An account as admins see it in the account management; no password data.</summary>
+public sealed record AccountSummary(int Id, string UserName, UserRole Role, bool Disabled);
 
 /// <summary>A usable setup key, as a given key is compared with it.</summary>
 public sealed record StoredSetupKey(int Id, byte[] KeyHash);

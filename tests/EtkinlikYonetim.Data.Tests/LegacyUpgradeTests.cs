@@ -127,7 +127,7 @@ public sealed class LegacyUpgradeTests
             ct));
         Assert.Contains("IX_Kayitlar_KatilimciId_EtkinlikId", duplicate.Message, StringComparison.Ordinal);
         var role = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync(
-            "INSERT dbo.Kullanicilar (KullaniciAdi, Sifre, SifreBicimi, Rol, BasarisizGiris) VALUES (N'x', N'-', 0, N'Sahip', 0)",
+            "INSERT dbo.Kullanicilar (KullaniciAdi, Sifre, SifreBicimi, Rol, BasarisizGiris, DevreDisi) VALUES (N'x', N'-', 0, N'Sahip', 0, 0)",
             ct));
         Assert.Contains("CK_Kullanicilar_Rol", role.Message, StringComparison.Ordinal);
         var nationalId = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync(

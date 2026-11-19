@@ -57,6 +57,41 @@ public interface IUserRepository
         DateTime now,
         string? newPasswordHash,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The current role and state of the account, read when an operation of an open session starts, or
+    /// <see langword="null"/> when the account no longer exists.
+    /// </summary>
+    Task<SessionState?> GetSessionStateAsync(int userId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every account, by user name.</summary>
+    Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Disables or enables <paramref name="targetId"/> on behalf of <paramref name="actorId"/>. One
+    /// transaction, serialized with every other account change, decides it all: the actor must still be
+    /// an enabled admin, the target must exist, and at least one enabled admin must remain.
+    /// </summary>
+    Task<AccountChangeStatus> SetDisabledAsync(int actorId, int targetId, bool disabled, CancellationToken cancellationToken = default);
+
+    /// <summary>Gives <paramref name="targetId"/> the <paramref name="role"/>, under the rules of <see cref="SetDisabledAsync"/>.</summary>
+    Task<AccountChangeStatus> SetRoleAsync(int actorId, int targetId, UserRole role, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Outcome of an account change by an admin.</summary>
+public enum AccountChangeStatus
+{
+    /// <summary>The change was stored (or the account was already in that state).</summary>
+    Changed = 0,
+
+    /// <summary>The account does not exist; nothing was written.</summary>
+    NotFound = 1,
+
+    /// <summary>The acting account is no longer an enabled admin; nothing was written.</summary>
+    ActorNotAuthorized = 2,
+
+    /// <summary>The change would leave no enabled admin; nothing was written.</summary>
+    LastActiveAdmin = 3,
 }
 
 /// <summary>Outcome of <see cref="IUserRepository.AddFirstAdminAsync"/>.</summary>

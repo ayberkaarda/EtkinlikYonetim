@@ -30,6 +30,7 @@ public interface IParticipantService
 internal sealed class ParticipantService(
     IParticipantRepository participants,
     IValidator<ParticipantInput> validator,
+    ISessionGuard sessions,
     IAuditLog audit) : IParticipantService
 {
     internal const string FieldsRequired = "Lütfen tüm alanları doldurun.";
@@ -49,7 +50,7 @@ internal sealed class ParticipantService(
         string? email,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireSignedIn(session);
+        await sessions.RequireCurrentAsync(session, cancellationToken).ConfigureAwait(false);
 
         var input = ParticipantInput.Create(nationalId, fullName, email);
         validator.ValidateOrThrow(input);
@@ -90,7 +91,7 @@ internal sealed class ParticipantService(
         int eventId,
         CancellationToken cancellationToken = default)
     {
-        Access.RequireAdmin(session, audit);
+        await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
         var rows = await participants.GetByEventAsync(eventId, cancellationToken).ConfigureAwait(false);
         return rows

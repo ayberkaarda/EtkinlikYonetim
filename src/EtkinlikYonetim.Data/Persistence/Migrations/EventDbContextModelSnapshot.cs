@@ -228,6 +228,10 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Disabled")
+                        .HasColumnType("bit")
+                        .HasColumnName("DevreDisi");
+
                     b.Property<int>("FailedLoginCount")
                         .HasColumnType("int")
                         .HasColumnName("BasarisizGiris");

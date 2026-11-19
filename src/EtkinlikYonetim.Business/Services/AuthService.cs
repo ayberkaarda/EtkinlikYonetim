@@ -66,10 +66,10 @@ internal sealed class AuthService(
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        if (account.LockoutEnd > now)
+        if (account.Disabled || account.LockoutEnd > now)
         {
             // Same answer and about the same cost as a wrong password; nothing is written, so the
-            // lock neither grows nor ends early.
+            // lock neither grows nor ends early, and a disabled account is not told apart.
             passwordHasher.SimulateVerification(password);
             throw SignInRefused();
         }

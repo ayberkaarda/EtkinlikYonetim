@@ -17,7 +17,7 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return await db.Users
             .AsNoTracking()
             .Where(u => u.UserName == userName)
-            .Select(u => new AccountCredentials(u.Id, u.UserName, u.Role, u.PasswordHash, u.PasswordFormat, u.FailedLoginCount, u.LockoutEnd))
+            .Select(u => new AccountCredentials(u.Id, u.UserName, u.Role, u.PasswordHash, u.PasswordFormat, u.FailedLoginCount, u.LockoutEnd, u.Disabled))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -175,8 +175,8 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-        // The WHERE clause is the final decision: a lock set by a concurrent failure, or a password
-        // changed since it was verified, makes the statement match no row and the sign-in fails.
+        // The WHERE clause is the final decision: a lock set by a concurrent failure, an account disabled
+        // or a password changed since it was verified makes the statement match no row and the sign-in fails.
         var id = verified.Id;
         var verifiedHash = verified.PasswordHash;
         var verifiedFormat = verified.PasswordFormat;
@@ -185,6 +185,7 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
 
         var updated = await db.Users
             .Where(u => u.Id == id
+                && !u.Disabled
                 && (u.LockoutEnd == null || u.LockoutEnd <= now)
                 && u.PasswordHash == verifiedHash
                 && u.PasswordFormat == verifiedFormat)
@@ -198,6 +199,93 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
             .ConfigureAwait(false);
 
         return updated == 1;
+    }
+
+    public async Task<SessionState?> GetSessionStateAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new SessionState(u.Role, u.Disabled))
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await db.Users
+            .AsNoTracking()
+            .OrderBy(u => u.UserName)
+            .ThenBy(u => u.Id)
+            .Select(u => new AccountSummary(u.Id, u.UserName, u.Role, u.Disabled))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public Task<AccountChangeStatus> SetDisabledAsync(int actorId, int targetId, bool disabled, CancellationToken cancellationToken = default) =>
+        ChangeAccountAsync(
+            actorId,
+            targetId,
+            target => !disabled || !IsEnabledAdmin(target),
+            accounts => accounts.SetProperty(u => u.Disabled, disabled),
+            cancellationToken);
+
+    public Task<AccountChangeStatus> SetRoleAsync(int actorId, int targetId, UserRole role, CancellationToken cancellationToken = default) =>
+        ChangeAccountAsync(
+            actorId,
+            targetId,
+            target => role == UserRole.Admin || !IsEnabledAdmin(target),
+            accounts => accounts.SetProperty(u => u.Role, role),
+            cancellationToken);
+
+    private static bool IsEnabledAdmin(SessionState account) => account.Role == UserRole.Admin && !account.Disabled;
+
+    /// <summary>
+    /// Runs one account change under the account lock: the actor is checked, the target read and, when
+    /// <paramref name="keepsEveryAdmin"/> says the change may remove an enabled admin, the other enabled
+    /// admins counted, all in the transaction that writes. Two admins who demote or disable each other at
+    /// the same time are therefore decided one after the other, and the second finds itself no longer
+    /// allowed or the last one.
+    /// </summary>
+    private async Task<AccountChangeStatus> ChangeAccountAsync(
+        int actorId,
+        int targetId,
+        Func<SessionState, bool> keepsEveryAdmin,
+        Action<Microsoft.EntityFrameworkCore.Query.UpdateSettersBuilder<User>> change,
+        CancellationToken cancellationToken)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await AppLocks.AcquireAsync(db, AppLocks.Accounts, cancellationToken).ConfigureAwait(false);
+
+        var states = await db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == actorId || u.Id == targetId)
+            .Select(u => new { u.Id, State = new SessionState(u.Role, u.Disabled) })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var actor = states.FirstOrDefault(s => s.Id == actorId)?.State;
+        if (actor is null || !IsEnabledAdmin(actor))
+        {
+            return AccountChangeStatus.ActorNotAuthorized;
+        }
+
+        if (states.FirstOrDefault(s => s.Id == targetId)?.State is not { } target)
+        {
+            return AccountChangeStatus.NotFound;
+        }
+
+        if (!keepsEveryAdmin(target)
+            && !await db.Users.AnyAsync(u => u.Id != targetId && u.Role == UserRole.Admin && !u.Disabled, cancellationToken).ConfigureAwait(false))
+        {
+            return AccountChangeStatus.LastActiveAdmin;
+        }
+
+        await db.Users.Where(u => u.Id == targetId).ExecuteUpdateAsync(change, cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return AccountChangeStatus.Changed;
     }
 
     /// <summary>
