@@ -40,9 +40,9 @@ public sealed class BrandingTests
             }
         }
 
-        Assert.Same(AppAssets.Background, signIn.BackgroundImage);
-        Assert.Same(AppAssets.Background, signUp.BackgroundImage);
-        Assert.Same(AppAssets.Background, panel.BackgroundImage);
+        Assert.Null(signIn.BackgroundImage);
+        Assert.Null(signUp.BackgroundImage);
+        Assert.Null(panel.BackgroundImage);
     });
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class BrandingTests
             .Order(StringComparer.Ordinal);
 
         Assert.Equal(
-            ["EtkinlikYonetim.UI.Assets.app.ico", "EtkinlikYonetim.UI.Assets.background.png", "EtkinlikYonetim.UI.Assets.logo.png"],
+            ["EtkinlikYonetim.UI.Assets.app.ico", "EtkinlikYonetim.UI.Assets.logo-256.png"],
             images);
         Assert.DoesNotContain(typeof(AppAssets).Assembly.GetManifestResourceNames(), n => n.EndsWith(".resources", StringComparison.Ordinal));
         Assert.Equal(new Size(256, 256), AppAssets.Logo.Size);

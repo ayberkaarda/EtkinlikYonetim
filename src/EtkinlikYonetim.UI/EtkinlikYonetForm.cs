@@ -4,6 +4,7 @@ using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.UI.Infrastructure;
+using EtkinlikYonetim.UI.Theming;
 
 namespace EtkinlikYonetim.UI
 {
@@ -11,8 +12,10 @@ namespace EtkinlikYonetim.UI
     /// Event management for admins: changes the date, capacity and description of an event and cancels
     /// it. Past and cancelled events are shown but cannot be changed; the services decide every rule again.
     /// </summary>
-    public partial class EtkinlikYonetForm : Form
+    public sealed class EtkinlikYonetForm : AppDialog
     {
+        internal const string NothingSelected = "Düzenlemek için soldan bir etkinlik seçin.";
+
         private readonly IEventService _events;
         private readonly UserSession _session;
         private readonly ExclusiveOperation _change = new();
@@ -20,7 +23,17 @@ namespace EtkinlikYonetim.UI
         private readonly TimeProvider _time;
         private bool _binding;
 
+        private readonly ThemedListBox lstEtkinlikler = new() { Name = nameof(lstEtkinlikler) };
+        private readonly Label lblSecili = FormLayout.Text(nameof(lblSecili));
+        private readonly Label lblDoluluk = FormLayout.Text(nameof(lblDoluluk));
+        private readonly DatePicker dtpTarih = new() { Name = nameof(dtpTarih), Format = DateTimePickerFormat.Short, Width = 130 };
+        private readonly NumericUpDown numKapasite = new() { Name = nameof(numKapasite), Minimum = InputRules.MinCapacity, Maximum = InputRules.MaxCapacity };
+        private readonly TextBox txtAciklama = new() { Name = nameof(txtAciklama), Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = InputRules.EventDescriptionMaxLength };
+        private readonly ThemedButton btnKaydet = FormLayout.Button(nameof(btnKaydet), "Değişiklikleri kaydet", ButtonKind.Primary, Glyphs.Save);
+        private readonly ThemedButton btnIptalEt = FormLayout.Button(nameof(btnIptalEt), "Etkinliği iptal et", ButtonKind.Danger, Glyphs.Cancel);
+
         public EtkinlikYonetForm(IEventService events, UserSession session, TimeProvider time)
+            : base("Etkinlik yönetimi", "Tarihi, kapasiteyi ve açıklamayı değiştirin ya da etkinliği iptal edin.", Glyphs.Calendar, new Size(980, 600), new Size(820, 520), modal: true)
         {
             ArgumentNullException.ThrowIfNull(events);
             ArgumentNullException.ThrowIfNull(session);
@@ -29,20 +42,20 @@ namespace EtkinlikYonetim.UI
             _events = events;
             _session = session;
             _time = time;
-            Prompts = new MessageBoxPrompts(this);
-
-            InitializeComponent();
-            Icon = AppAssets.Icon;
-            Text = AppText.Title + " - " + Text;
-            numKapasite.Minimum = InputRules.MinCapacity;
-            numKapasite.Maximum = InputRules.MaxCapacity;
-            txtAciklama.MaxLength = InputRules.EventDescriptionMaxLength;
+            BuildLayout();
             ShowSelection(null);
-        }
 
-        /// <summary>Confirmation and information dialogs; replaced in tests so no window opens.</summary>
-        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
-        internal IUserPrompts Prompts { get; set; }
+            lstEtkinlikler.SelectedIndexChanged += (_, _) =>
+            {
+                if (!_binding)
+                {
+                    ShowSelection(Selected);
+                }
+            };
+            btnKaydet.Click += async (_, _) => await SaveAsync();
+            btnIptalEt.Click += async (_, _) => await CancelEventAsync();
+            Load += async (_, _) => await LoadAsync();
+        }
 
         /// <summary>The event whose fields are shown, or <see langword="null"/>.</summary>
         internal EventSummary? Selected => lstEtkinlikler.SelectedItem as EventSummary;
@@ -116,11 +129,26 @@ namespace EtkinlikYonetim.UI
             return ran;
         }
 
+        private DateOnly Today => DateOnly.FromDateTime(_time.GetLocalNow().DateTime);
+
         private async Task RefreshAsync()
         {
             var request = _listRequests.Next();
             var selectedId = Selected?.Id;
-            var events = await _events.GetEventsAsync(_session);
+            lstEtkinlikler.IsLoading = true;
+            IReadOnlyList<EventSummary> events;
+            try
+            {
+                events = await _events.GetEventsAsync(_session);
+            }
+            finally
+            {
+                if (_listRequests.IsLatest(request) && !IsDisposed)
+                {
+                    lstEtkinlikler.IsLoading = false;
+                }
+            }
+
             if (!_listRequests.IsLatest(request) || IsDisposed)
             {
                 return;
@@ -144,7 +172,7 @@ namespace EtkinlikYonetim.UI
         /// <summary>Shows the event's fields; only an event that is neither past nor cancelled can be changed.</summary>
         private void ShowSelection(EventSummary? selected)
         {
-            var today = DateOnly.FromDateTime(_time.GetLocalNow().DateTime);
+            var today = Today;
             var editable = selected is { Cancelled: false } && selected.Date >= today;
 
             _binding = true;
@@ -152,7 +180,7 @@ namespace EtkinlikYonetim.UI
             {
                 if (selected is null)
                 {
-                    lblSecili.Text = "Düzenlemek için soldan bir etkinlik seçin.";
+                    lblSecili.Text = NothingSelected;
                     lblDoluluk.Text = string.Empty;
                     txtAciklama.Clear();
                 }
@@ -181,18 +209,36 @@ namespace EtkinlikYonetim.UI
             btnIptalEt.Enabled = editable;
         }
 
-        private async void EtkinlikYonetForm_Load(object? sender, EventArgs e) => await LoadAsync();
-
-        private void lstEtkinlikler_SelectedIndexChanged(object? sender, EventArgs e)
+        private void BuildLayout()
         {
-            if (!_binding)
-            {
-                ShowSelection(Selected);
-            }
+            Name = nameof(EtkinlikYonetForm);
+
+            // Every event, with its seats and its state.
+            lstEtkinlikler.Describe = item => item is EventSummary summary ? EventRows.Describe(summary, Today) : new ListRow(item.ToString() ?? string.Empty);
+            lstEtkinlikler.EmptyText = "Henüz etkinlik yok. Yönetim panelindeki Yeni etkinlik kartıyla ekleyin.";
+            var listCard = FormLayout.Card("eventsCard", "Etkinlikler", lstEtkinlikler);
+
+            // The selected event: what it is, how full it is, and the fields that can change.
+            lblSecili.Font = Theme.Fonts.Subtitle;
+            lblSecili.ForeColor = Theme.Current.Text;
+            lblSecili.Margin = Padding.Empty;
+            lblDoluluk.ForeColor = Theme.Current.TextSecondary;
+            lblDoluluk.Margin = new Padding(0, Spacing.XS, 0, Spacing.L);
+            var when = FormLayout.FieldRow(
+                "eventRow",
+                (FormLayout.Field("&Tarih", FormLayout.Date(dtpTarih)), 50),
+                (FormLayout.Field("&Kapasite", FormLayout.Number(numKapasite), "Kayıtlı kişi sayısının altına inemez."), 50));
+            var description = FormLayout.Field("&Açıklama", FormLayout.Input(txtAciklama, Sizes.NoteHeight + Spacing.XL));
+            description.Margin = new Padding(0, 0, 0, Spacing.M);
+            btnKaydet.Margin = btnIptalEt.Margin = Padding.Empty;
+            var actions = FormLayout.Bar("eventActions", (btnKaydet, false), (FormLayout.Spacer(), true), (btnIptalEt, false));
+            var editor = FormLayout.Stack("eventEditor", lblSecili, lblDoluluk, when, description, actions);
+            var editCard = FormLayout.Card("editCard", "Seçili etkinlik", FormLayout.Page("editPage", (editor, false)));
+            Content.Controls.Add(FormLayout.Columns("layout", listCard, 46, editCard));
+
+            SetFooterNote("Geçmiş ve iptal edilmiş etkinlikler değiştirilemez; iptal geri alınamaz.");
+            SetFooterButtons(CreateCloseButton("btnKapat"));
+            FinishLayout();
         }
-
-        private async void btnKaydet_Click(object? sender, EventArgs e) => await SaveAsync();
-
-        private async void btnIptalEt_Click(object? sender, EventArgs e) => await CancelEventAsync();
     }
 }

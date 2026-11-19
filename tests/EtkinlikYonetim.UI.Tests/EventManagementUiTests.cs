@@ -1,6 +1,7 @@
 using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.UI.Tests.Support;
+using EtkinlikYonetim.UI.Theming;
 using Microsoft.Extensions.Time.Testing;
 using static EtkinlikYonetim.UI.Tests.Support.StaThread;
 
@@ -123,7 +124,8 @@ public sealed class EventManagementUiTests
         Assert.Same(loaded, Assert.Single(events.UpdatedOriginals));
         Assert.Equal(new DateTime(2027, 4, 24), Find<DateTimePicker>(form, "dtpTarih").Value);
         Assert.Equal(150, Find<NumericUpDown>(form, "numKapasite").Value);
-        Assert.Equal(["Uyarı: Etkinlik başka biri tarafından değiştirildi."], NoDialogs.Requested.Skip(dialogs));
+        Assert.Empty(NoDialogs.Requested.Skip(dialogs));
+        Assert.Equal((StatusKind.Warning, "Etkinlik başka biri tarafından değiştirildi."), (form.StatusBar.Kind, form.StatusBar.Text));
         Assert.True(Find<Button>(form, "btnKaydet").Enabled);
     });
 

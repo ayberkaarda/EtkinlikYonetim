@@ -8,7 +8,7 @@
     <AssemblyName>EtkinlikYonetim</AssemblyName>
     <Product>Etkinlik Yönetim</Product>
     <NeutralLanguage>tr-TR</NeutralLanguage>
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
     <UserSecretsId>etkinlik-yonetim-ui</UserSecretsId>
   </PropertyGroup>
@@ -19,14 +19,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Original artwork, rendered from the SVG sources in assets/. -->
-    <EmbeddedResource Include="..\..\assets\logo.png" Link="Assets\logo.png" LogicalName="EtkinlikYonetim.UI.Assets.logo.png" />
-    <EmbeddedResource Include="..\..\assets\background.png" Link="Assets\background.png" LogicalName="EtkinlikYonetim.UI.Assets.background.png" />
+    <!-- Original artwork: the logo and icon are rasterized from assets/logo.svg by tools/Screenshots (icons command). -->
+    <EmbeddedResource Include="..\..\assets\logo-256.png" Link="Assets\logo-256.png" LogicalName="EtkinlikYonetim.UI.Assets.logo-256.png" />
     <EmbeddedResource Include="..\..\assets\app.ico" Link="Assets\app.ico" LogicalName="EtkinlikYonetim.UI.Assets.app.ico" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="EtkinlikYonetim.UI.Tests" />
+    <InternalsVisibleTo Include="EtkinlikYonetim.Screenshots" />
   </ItemGroup>
 
   <ItemGroup>
@@ -41,7 +41,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
     <!-- QR code of the ticket: MIT licensed, managed encoder; its PNG renderer needs no GDI+. Pinned to exactly one version. -->
     <PackageReference Include="QRCoder" Version="[1.6.0]" />
-    <PackageReference Include="ReaLTaiizor" Version="3.8.1.2" />
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>

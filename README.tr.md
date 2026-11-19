@@ -10,7 +10,7 @@ Business, Data ve UI katmanlarına ayrılmıştır; veritabanı erişimi EF Core
 otomatik olarak oluşturulup güncellenir.
 
 > Uygulamanın arayüzü Türkçedir. Aşağıda ekran ve düğme adları, Türkçe etiketin ardından İngilizce karşılığıyla
-> verilir; örneğin "Etkinlik Ekle" (Add Event).
+> verilir; örneğin "Etkinliği ekle" (Add event).
 
 ---
 
@@ -18,53 +18,55 @@ otomatik olarak oluşturulup güncellenir.
 
 ### Hesaplar
 
-- ✅ **Kayıt** ("Kayıt Ol", Sign Up): yalnızca harflerden oluşan bir kullanıcı adı (en fazla 32 karakter) ve iki kez
-  yazılan ("Şifre (Tekrar)", Password (Again)) 8-64 karakterlik bir şifre. Yeni hesaplar kullanıcı rolü alır.
-- ✅ **Giriş** ("Giriş", Sign In): kullanıcı adı ve şifreyle ("Kullanıcı Adı", "Şifre"). Yöneticiler yönetim
+- ✅ **Kayıt** ("Kayıt ol", Sign up): yalnızca harflerden oluşan bir kullanıcı adı (en fazla 32 karakter) ve iki kez
+  yazılan ("Şifre tekrar", Password again) 8-64 karakterlik bir şifre. Yeni hesaplar kullanıcı rolü alır.
+- ✅ **Giriş** ("Giriş yap", Sign in): kullanıcı adı ve şifreyle ("Kullanıcı adı", "Şifre"). Yöneticiler yönetim
   panelini, kullanıcılar katılımcı ekranını açar.
-- ✅ **İlk kurulum** ("İlk Kurulum", First-Run Setup): boş bir veritabanında ilk yönetici, kurulumu yapan kişinin
+- ✅ **Oturumu kapatma** ("Oturumu kapat", Sign out): yönetim panelinde ve kullanıcının ana ekranında giriş ekranına
+  döner; giriş ekranı oturumun neden kapandığını söyler. Pencereyi kapatmak uygulamayı kapatır.
+- ✅ **İlk kurulum** ("İlk kurulum", First-run setup): boş bir veritabanında ilk yönetici, kurulumu yapan kişinin
   kendi belirlediği şifreyle oluşturulur; varsayılan hesap ve yayımlanmış şifre yoktur.
 
 ### Kullanıcı paneli
 
-- ✅ **Katılımcı ekleme** ("Katılımcı Ekle", Add Participant): T.C. Kimlik No ("TC Kimlik No"), ad soyad ("Ad Soyad")
+- ✅ **Katılımcı ekleme** ("Katılımcı ekle", Add participant): T.C. Kimlik No ("T.C. kimlik no"), ad soyad ("Ad soyad")
   ve e-posta ("E-posta"). Kimlik numarası 11 hane ve kontrol basamaklarıyla doğrulanır; ad yalnızca harf ve tek
   boşluk içerebilir (en fazla 64 karakter). Katılımcı, onu ekleyen hesaba aittir ve bir kimlik numarası her hesapta
   yalnızca bir kez eklenebilir.
-- ✅ **Etkinliğe kayıt** ("Kayıt Ekle", Add Registration): tarihi geçmemiş bir etkinlik seçilir ("Etkinlik Seçimi",
-  Event Selection) ve katılımcının kimlik numarası girilir ("Katılımcı TC Kimlik Numarası"). Her yerle 130 rastgele
+- ✅ **Etkinliğe kayıt** ("Kayıtlar ve biletler", Registrations and tickets): tarihi geçmemiş bir etkinlik seçilir
+  ("Etkinlik", Event) ve katılımcının kimlik numarası girilir ("Katılımcının T.C. kimlik no"). Her yerle 130 rastgele
   bitlik bir bilet kodu (`ETK-` ve 26 karakter) üretilir. Bir katılımcı birden fazla etkinliğe kaydedilebilir.
 - ✅ **Bekleme listesi**: etkinlik doluysa katılımcı reddedilmez, sıra numarasıyla bekleme listesine alınır. Bir
   yer iptal edildiğinde sıradaki katılımcı hemen o yere geçer ve bileti oluşturulur.
-- ✅ **Kayıtlarım ve biletlerim** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): hesabın kendi
+- ✅ **Kayıtlarım ve biletlerim** ("Kayıtlarım", My registrations): hesabın kendi
   katılımcılarının yerleri ve bekleme sıraları ile etkinliği iptal edildiği için kapanan kayıtlar ("Etkinlik iptal
-  edildi"). Yerler ve bekleme sıraları etkinlik günü dahil iptal edilebilir ("Kaydı İptal Et", Cancel Registration);
+  edildi"). Yerler ve bekleme sıraları etkinlik günü dahil iptal edilebilir ("Kaydı iptal et", Cancel registration);
   girişte bileti okutulmuş bir kayıt artık iptal edilemez.
-- ✅ **Bileti göster** ("Bileti Göster", Show Ticket): bir yerin QR kodu ve bilet kodu, istendiği kadar.
+- ✅ **Bileti göster** ("Bileti göster", Show ticket): bir yerin QR kodu ve bilet kodu, istendiği kadar.
 
 ### Yönetim paneli
 
-- ✅ **Etkinlik oluşturma** ("Etkinlik Ekle", Add Event): ad ("Etkinlik Adı", en fazla 80 karakter), tarih (bugün
-  veya sonrası) ve kapasite ("Kişi Kapasitesi", 1-1000 kişi).
-- ✅ **Etkinlik yönetimi** ("Etkinlik Yönetimi", Event Management): günü geçmemiş bir etkinliğin tarihi, kapasitesi
+- ✅ **Etkinlik oluşturma** ("Etkinliği ekle", Add event): ad ("Etkinlik adı", en fazla 80 karakter), tarih (bugün
+  veya sonrası) ve kapasite ("Kapasite", 1-1000 kişi).
+- ✅ **Etkinlik yönetimi** ("Etkinlik yönetimi", Event management): günü geçmemiş bir etkinliğin tarihi, kapasitesi
   ve açıklaması değiştirilir; kapasite mevcut kayıt sayısının altına inemez, eklenen yerler bekleme listesine
   verilir. Form açıldıktan sonra başka bir yöneticinin yaptığı bir değişikliğin üzerine kaydetmek reddedilir ve güncel
-  değerler gösterilir. Etkinliği iptal etmek ("Etkinliği İptal Et", Cancel Event) onu iptal edildi olarak listede tutar, kayıtlarını
+  değerler gösterilir. Etkinliği iptal etmek ("Etkinliği iptal et", Cancel event) onu iptal edildi olarak listede tutar, kayıtlarını
   ve bekleme sıralarını kapatır (soft delete).
-- ✅ **Katılımcı ekleme** ("Katılımcı Ekleme") ve tüm hesapların katılımcıları için **bilet oluşturma** ("Bilet
-  Oluştur", Create Ticket); yönetici tüm kayıtları görür ve iptal edebilir, bilet kodlarını ise yalnızca kendi
+- ✅ **Katılımcı ekleme** ("Katılımcı ekle") ve tüm hesapların katılımcıları için **bilet oluşturma** ("Kayıt ve
+  bilet", Registration and ticket); yönetici tüm kayıtları görür ve iptal edebilir, bilet kodlarını ise yalnızca kendi
   eklediği katılımcıların görür.
-- ✅ **Giriş kontrolü** ("Bilet Kontrol", Ticket Check): etkinlik seçilir, bilet kodu yazılır veya okutulur. Geçerli
+- ✅ **Giriş kontrolü** ("Giriş kontrolü", Entrance check): etkinlik seçilir, bilet kodu yazılır veya okutulur. Geçerli
   ve kullanılmamış bilet için "GİRİŞ YAPILDI", ikinci okutmada aynı ekranda "ZATEN KULLANILDI" gösterilir; bilinmeyen,
   iptal edilmiş ya da başka etkinliğe ait biletler tek bir retle ("GEÇERSİZ BİLET") karşılanır; sayaç girişleri yer
   sayısıyla birlikte gösterir. Girişte katılımcının adı kimlik belgesiyle karşılaştırılmak üzere gösterilir; biletler
   yalnızca etkinlik günü kullanılır (aksi hâlde "ETKİNLİK GÜNÜ DEĞİL" gösterilir ve bilet geçerli kalır); kod alanı
   açık kalır, böylece bir bilet denetlenirken okuyucu sonrakini okuyabilir.
-- ✅ **Katılımcı listesi** ("Katılımcı Görüntüle", View Participants): seçilen etkinliğin ("Etkinlik Seçin", Select
+- ✅ **Katılımcı listesi** ("Katılımcı listesi", Participant list): seçilen etkinliğin ("Etkinlik",
   Event) katılımcıları; ad, maskelenmiş kimlik numarası, e-posta ve durumla (giriş yaptı, bekliyor, iptal). Liste CSV
-  ("CSV Olarak Kaydet") veya yazdırılabilir HTML ("Yazdırılabilir Liste") olarak kaydedilir; dışa aktarımlarda bilet
+  ("CSV olarak kaydet") veya yazdırılabilir HTML ("Yazdırılabilir liste") olarak kaydedilir; dışa aktarımlarda bilet
   kodu yoktur.
-- ✅ **Hesaplar** ("Kullanıcılar", Users): hesaplar etkinleştirilir, devre dışı bırakılır, yönetici veya kullanıcı
+- ✅ **Hesaplar** ("Hesaplar", Accounts): hesaplar etkinleştirilir, devre dışı bırakılır, yönetici veya kullanıcı
   yapılır. Yönetici kendi hesabını değiştiremez; son etkin yönetici korunur.
 
 ### Kurallar ve koruma
@@ -101,25 +103,33 @@ otomatik olarak oluşturulup güncellenir.
 
 ## 🖼️ Ekran Görüntüleri
 
-Bu görüntüler özgün uygulamanın ekranlarını gösterir; tasarım güncellemesiyle değiştirilecektir.
+Ekranlar, uydurma bir etkinlik sezonuyla (kurgusal kişiler ve hesaplar, example.com adresleri, maskelenmiş kimlik
+numaraları ve açıkça örnek bir bilet kodu) pencere açılmadan çizilir; gerçek veri içermez. Her görüntü 2x sürümüne
+bağlantı verir. Yeniden çizmek için: `dotnet run --project tools/Screenshots -c Release -- screenshots`.
 
-### Giriş ("Giriş Yap")
-![Giriş](screenshots/login.png)
+| | |
+|---|---|
+| [![Giriş](screenshots/giris.png)](screenshots/giris-2x.png)<br>**Giriş** ("Giriş yap"), marka paneliyle | [![Kayıt](screenshots/kayit-ol.png)](screenshots/kayit-ol-2x.png)<br>**Kayıt** ("Kayıt ol") |
+| [![İlk kurulum](screenshots/ilk-kurulum.png)](screenshots/ilk-kurulum-2x.png)<br>**İlk kurulum** ("İlk kurulum"), boş veritabanında | [![Yönetim paneli](screenshots/yonetim-paneli.png)](screenshots/yonetim-paneli-2x.png)<br>**Yönetim paneli** ("Yönetim paneli"): yeni etkinlik, yer sayılarıyla sezon, kısayollar |
+| [![Katılımcı ekleme](screenshots/katilimci-ekle.png)](screenshots/katilimci-ekle-2x.png)<br>**Katılımcı ekleme** ("Katılımcı ekle"), kullanıcının ana ekranı | [![Kayıtlar ve biletler](screenshots/kayitlar-ve-biletler.png)](screenshots/kayitlar-ve-biletler-2x.png)<br>**Kayıtlar ve biletler** ("Kayıtlar ve biletler"), bekleme listesine alınan bir kaydın ardından |
+| [![Bilet](screenshots/bilet.png)](screenshots/bilet-2x.png)<br>**Bilet** ("Bilet"), QR koduyla | [![Giriş kontrolü](screenshots/giris-kontrolu.png)](screenshots/giris-kontrolu-2x.png)<br>**Giriş kontrolü** ("Giriş kontrolü"), bir okutmanın hemen ardından |
+| [![Katılımcı listesi](screenshots/katilimci-listesi.png)](screenshots/katilimci-listesi-2x.png)<br>**Katılımcı listesi** ("Katılımcı listesi"), CSV ve HTML dışa aktarımıyla | [![Etkinlik yönetimi](screenshots/etkinlik-yonetimi.png)](screenshots/etkinlik-yonetimi-2x.png)<br>**Etkinlik yönetimi** ("Etkinlik yönetimi") |
+| [![Hesaplar](screenshots/hesaplar.png)](screenshots/hesaplar-2x.png)<br>**Hesaplar** ("Hesaplar") | [![Onay](screenshots/onay-penceresi.png)](screenshots/onay-penceresi-2x.png)<br>**Onay** ("Onay"), bir etkinlik iptal edilmeden önce |
 
-### Kayıt ("Kayıt Ol")
-![Kayıt](screenshots/user_register.png)
+### Tasarım
 
-### Etkinliğe kayıt ("Kayıt Ekle")
-![Etkinliğe kayıt](screenshots/event_register.png)
-
-### Yönetim paneli ("Yönetim Paneli")
-![Yönetim paneli](screenshots/admin_panel.png)
-
-### Katılımcı listesi ("Katılımcı Görüntüle")
-![Katılımcı listesi](screenshots/shows_members.png)
+- **Kimlik:** özgün bir logo (kobalt bir zemin üzerinde macenta koçanlı ve onay işaretli bir giriş bileti,
+  `assets/logo.svg`), serin mürekkep grisi nötrler üzerinde kobalt vurgu ve macenta bir sahne ışığı işareti,
+  Bahnschrift SemiBold başlıklar (bulunmadığında Segoe UI Semibold) ve Segoe UI gövde metni. Hiçbir üçüncü taraf
+  markası kullanılmaz.
+- **Temalar:** açık (varsayılan), koyu ve Windows yüksek karşıtlık. `appsettings.json` içindeki `Appearance:Theme`
+  `Light`, `Dark` veya `System` (Windows uygulama modunu izler) alır; yüksek karşıtlık her zaman önceliklidir ve
+  sistem renklerini kullanır. Uygulama çalışırken karşıtlık veya uygulama modu değişirse açık pencereler de değişir.
+- **Yerleşim:** her ekran aynı çerçeveyi paylaşır (başlık, pencere içi ileti şeridi, kayan gövde, eylemlerin
+  bulunduğu alt şerit), monitör başına DPI uyumludur ve ekranının çalışma alanından büyük açılmaz. Sonuçlar ve kural
+  retleri pencerenin içinde gösterilir; yalnızca sorular temalı bir ileti penceresi açar.
 
 ---
-
 ## 🔑 Yetki Matrisi
 
 | İşlem | Kullanıcı | Yönetici |
@@ -147,7 +157,7 @@ Bu görüntüler özgün uygulamanın ekranlarını gösterir; tasarım güncell
 | Alan | Kullanılan |
 |---|---|
 | Platform | .NET 10 (`net10.0-windows` arayüz, `net10.0` kütüphaneler) |
-| Arayüz | Windows Forms |
+| Arayüz | Windows Forms, kendi tema katmanı (açık, koyu, yüksek karşıtlık), monitör başına DPI |
 | Veri erişimi | Entity Framework Core 10 (SQL Server sağlayıcısı) |
 | Veritabanı | Microsoft SQL Server (Express yeterli) |
 | Şifre özeti | PBKDF2-HMAC-SHA256 (`Rfc2898DeriveBytes.Pbkdf2`) |
@@ -168,12 +178,13 @@ EtkinlikYonetim/
 │   ├── EtkinlikYonetim.Domain/     # Varlıklar (User, Event, Participant, Registration, SetupKey) ve depo sözleşmeleri
 │   ├── EtkinlikYonetim.Business/   # Giriş, kurulum, hesap, etkinlik, katılımcı, kayıt ve giriş kontrolü servisleri, Exports/ (CSV, HTML), Security/ (PBKDF2, kilitleme, kurulum anahtarı), Validation/ (FluentValidation), Auditing/
 │   ├── EtkinlikYonetim.Data/       # EF Core DbContext, yapılandırmalar, Migrations/, eski şema yükseltmesi, demo verisi, depolar
-│   └── EtkinlikYonetim.UI/         # WinForms ekranları, Infrastructure/ (hatalar, loglama, iletişim kutuları, yazma koruması, oturum sonu, QR kodu, dışa aktarım dosyaları), Program.cs (kompozisyon kökü)
+│   └── EtkinlikYonetim.UI/         # WinForms ekranları, Theming/ (paletler, yazı ölçeği, boyanan denetimler, tema izleyici), Infrastructure/ (ekran çerçevesi, yerleşim, ileti penceresi, hatalar, loglama, yazma koruması, oturum sonu, QR kodu, dışa aktarım dosyaları), Program.cs (kompozisyon kökü)
 ├── tests/
 │   ├── EtkinlikYonetim.Business.Tests/  # Doğrulayıcılar, kimlik no, şifre özeti, kilitleme, kapasite, tarihler ve sahiplik (Moq)
 │   ├── EtkinlikYonetim.Data.Tests/      # SQLite üzerinde servisler; SQL Server'da yarışlar, kurulum anahtarları ve eski şema yükseltmesi
-│   └── EtkinlikYonetim.UI.Tests/        # Yapılandırma, hatalar, loglar, odak ve yazma korumaları (pencere gösterilmez)
-├── assets/                         # Özgün logo, arka plan ve simge ile SVG kaynakları
+│   └── EtkinlikYonetim.UI.Tests/        # Ekranlar, küçük ekranda ve büyük yazıyla yerleşim, temalar, yapılandırma, hatalar, loglar, odak ve yazma korumaları (pencere gösterilmez)
+├── assets/                         # Özgün logo (logo.svg) ve ondan üretilen simge ile PNG
+├── tools/Screenshots/              # Pencere açmadan ekran görüntüleri ve simge aracı
 ├── docs/
 │   ├── issue-setup-key.sql         # Kurulum anahtarı, veritabanı sahibi çalıştırır
 │   ├── grant-app-login.sql         # Uygulamanın kendi oturumunun yetkileri
@@ -228,9 +239,15 @@ dotnet build -c Release
      },
      "Seed": {
        "Demo": false
+     },
+     "Appearance": {
+       "Theme": "Light"
      }
    }
    ```
+
+   `Appearance:Theme` değeri `Light` (varsayılan), `Dark` veya `System` olabilir; Windows yüksek karşıtlık her zaman
+   önceliklidir.
 
 2. **User secrets**:
 
@@ -380,7 +397,7 @@ dotnet test -c Release
 |---|---|---|
 | `tests/EtkinlikYonetim.Business.Tests` | Birim | Doğrulayıcı sınırları (kullanıcı adı 32, şifre 8/64 ve girişte 100, ad 64, etkinlik adı 80, kapasite 0/1/1000/1001, açıklama 500, geçmiş tarihler), kimlik no kontrol basamakları, PBKDF2 ve biçim yükseltmesi, kilitleme, kurulum anahtarı denetimleri, veritabanıyla denetlenen oturumlar, hesap kuralları, bilet kodları ve giriş sonuçları, CSV ve HTML dışa aktarımı, sıkı Moq nesneleriyle sahiplik ve denetim olayları |
 | `tests/EtkinlikYonetim.Data.Tests` | Entegrasyon | Bellek içi SQLite üzerinde servisler ve depolar (kapasite sınırları, bekleme listesi sırası, iptal ve yeniden kayıt, etkinlik değişikliği ve iptali, giriş kontrolü, dışa aktarım, rolü düşürülen ve devre dışı oturumlar, IDOR yanıtları, kilit süresi); SQL Server'da kapasite, bekleme listesi, çift kayıt, giriş, hesap, kilitleme ve ilk yönetici yarışları, kısıtlı oturumla kurulum anahtarları, migration'lar, eski şema yükseltmesi ve kilidi |
-| `tests/EtkinlikYonetim.UI.Tests` | Birim | Örnek yapılandırma, hata mesajları, log içeriği, nötr kodlar ve saklama süresi, kilit açıldıktan sonra odak, yazma korumaları, en son isteğin kazandığı yüklemeler, etkinlik yönetimi, giriş kontrolü ve hesap pencereleri, bilet QR görünümü, dışa aktarım dosyaları, oturum sonu, nötr marka |
+| `tests/EtkinlikYonetim.UI.Tests` | Birim | Her ekran gösterilmeden kurulur: tema, 1024x600, 1366x768 ve 1920x1040 çalışma alanlarında 1-2 yazı ölçeğinde yerleşim, sekme sırası, pencere içi iletiler, paletler ve karşıtlık, çalışırken yüksek karşıtlığa geçiş; örnek yapılandırma, hata mesajları, log içeriği, kilit açıldıktan sonra odak, yazma korumaları, en son isteğin kazandığı yüklemeler, etkinlik yönetimi, giriş kontrolü ve hesap pencereleri, bilet QR görünümü, dışa aktarım dosyaları, oturum sonu, nötr marka |
 
 SQL Server testleri `ETKINLIK_TEST_SQLSERVER` içindeki sunucuda geçici veritabanları kullanır (varsayılan: Windows
 kimlik doğrulamasıyla yerel SQL Express). `ETKINLIK_SKIP_SQL_TESTS=1` tanımlıysa veya sunucuya ulaşılamıyorsa
@@ -393,7 +410,7 @@ $env:ETKINLIK_SKIP_SQL_TESTS = "1"; dotnet test -c Release
 ```
 
 SQLite üzerinde şema migration'lar yerine modelden oluşturulur. Arayüz testleri formları göstermeden oluşturur, tüm
-mesaj kutularını değiştirir ve sırayla çalışır; hiçbir pencere açılmaz.
+ileti pencerelerini değiştirir ve sırayla çalışır; hiçbir pencere açılmaz.
 
 ---
 
@@ -429,8 +446,12 @@ da `ETKINLIK_CONNECTION` tanımlayın.
 - Doğrulayıcılar `EtkinlikYonetim.Business/Validation` altındadır ve ilk hatada durur; kullanıcı her seferinde tek
   bir mesaj görür.
 - Yeni yazma düğmeleri `ExclusiveOperation` üzerinden çalışmalı ve odağı `FocusAfterUnlock` ile taşımalıdır; bir
-  seçimle tetiklenen yüklemeler yalnızca en son yanıtın gösterilmesi için `RequestSequence` kullanmalıdır. Mesaj
-  kutuları `Dialogs` veya `IUserPrompts` üzerinden açılır, asla doğrudan `MessageBox` ile değil.
+  seçimle tetiklenen yüklemeler yalnızca en son yanıtın gösterilmesi için `RequestSequence` kullanmalıdır. Sonuçlar
+  ve kural retleri `IUserPrompts` üzerinden ekranın ileti şeridine gider; sorular `Dialogs` (temalı `MessageDialog`)
+  üzerinden açılır, asla doğrudan `MessageBox` ile değil.
+- Yeni ekranlar `AppDialog`'dan türer, yerleşimlerini `FormLayout` ve temalı denetimlerle kurar ve `FinishLayout()`
+  ile bitirir; renkler yalnızca palet rollerinden gelir. `LayoutTests` ve `ScreenTests` onları küçük ekranlarda ve
+  büyük yazıyla denetler.
 - Denetim olayları yalnızca olay türünü ve rolü taşır; onlara kimlik belirleyen veri eklemeyin.
 
 ---

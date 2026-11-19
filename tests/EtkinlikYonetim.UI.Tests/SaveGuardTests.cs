@@ -22,8 +22,8 @@ public sealed class SaveGuardTests
         Assert.False(first.IsCompleted);
         Assert.True(second.IsCompletedSuccessfully);
         Assert.Null(second.Result);
-        Assert.False(Find<Control>(form, "btnGiris2").Enabled);
-        Assert.False(Find<Button>(form, "btnkayitol").Enabled);
+        Assert.False(Find<Control>(form, "btnGiris").Enabled);
+        Assert.False(Find<Button>(form, "btnKayitOl").Enabled);
         Assert.True(form.OfferAdminSetup);
         Assert.False(Find<Button>(form, "btnKurulum").Enabled);
     });
@@ -72,7 +72,7 @@ public sealed class SaveGuardTests
     {
         var setup = new PendingSetupService();
         using var form = new IlkKurulumForm(setup) { Prompts = new RecordingPrompts() };
-        var emptyHeight = form.ClientSize.Height;
+        Assert.True(FormLayout.IsHidden(Find<TextBox>(form, "txtAnahtar")));
         Find<TextBox>(form, "txtAnahtar").Text = "ABCDE-FGHJK";
         Find<TextBox>(form, "txtKullaniciAdi").Text = "kurucu";
         _ = form.CreateAsync();
@@ -87,7 +87,7 @@ public sealed class SaveGuardTests
         Assert.Contains("issue-setup-key.sql", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
         Assert.DoesNotContain("--create-setup-key", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
         Assert.DoesNotContain("ABCDE", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
-        Assert.Equal(emptyHeight + 64, keyed.ClientSize.Height);
+        Assert.False(FormLayout.IsHidden(Find<TextBox>(keyed, "txtAnahtar")));
         Assert.True(Find<TextBox>(keyed, "txtAnahtar").UseSystemPasswordChar);
     });
 

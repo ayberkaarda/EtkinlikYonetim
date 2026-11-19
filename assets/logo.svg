@@ -1,21 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <!-- Etkinlik Yonetim application mark: a white admission ticket with a perforated stub and an amber star on an indigo tile. -->
-  <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#5b4fe0"/>
-      <stop offset="1" stop-color="#352a9c"/>
-    </linearGradient>
-    <mask id="notches">
-      <rect width="256" height="256" fill="#ffffff"/>
-      <circle cx="40" cy="128" r="17" fill="#000000"/>
-      <circle cx="216" cy="128" r="17" fill="#000000"/>
-      <circle cx="166" cy="72" r="13" fill="#000000"/>
-      <circle cx="166" cy="184" r="13" fill="#000000"/>
-    </mask>
-  </defs>
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
-  <rect x="40" y="72" width="176" height="112" rx="16" fill="#ffffff" mask="url(#notches)"/>
-  <line x1="166" y1="96" x2="166" y2="160" stroke="#c9c4f5" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 14"/>
-  <path d="M102 93 L110.8 116.9 L136.2 117.9 L116.3 133.6 L123.2 158.1 L102 144 L80.8 158.1 L87.7 133.6 L67.8 117.9 L93.2 116.9 Z"
-        fill="#f5a524" stroke="#f5a524" stroke-width="6" stroke-linejoin="round"/>
+  <title>Etkinlik Yönetim</title>
+  <desc>An admission ticket with a magenta stub and a check mark, on a cobalt rounded square: a seat confirmed at the door.</desc>
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="#1F56D6"/>
+  <rect x="30" y="70" width="196" height="116" rx="16" fill="#FFFFFF"/>
+  <rect x="166" y="70" width="60" height="116" rx="16" fill="#D6338A"/>
+  <rect x="166" y="70" width="24" height="116" fill="#D6338A"/>
+  <circle cx="30" cy="128" r="17" fill="#1F56D6"/>
+  <circle cx="226" cy="128" r="17" fill="#1F56D6"/>
+  <circle cx="166" cy="70" r="11" fill="#1F56D6"/>
+  <circle cx="166" cy="186" r="11" fill="#1F56D6"/>
+  <rect x="163" y="94" width="6" height="12" rx="3" fill="#1F56D6"/>
+  <rect x="163" y="122" width="6" height="12" rx="3" fill="#1F56D6"/>
+  <rect x="163" y="150" width="6" height="12" rx="3" fill="#1F56D6"/>
+  <path d="M 68 130 L 92 154 L 134 106" fill="none" stroke="#1F56D6" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
