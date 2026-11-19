@@ -45,6 +45,10 @@ public sealed class AuditTests
         { AuditEvent.RegistrationEventFull, 10, "registration.event_full" },
         { AuditEvent.RegistrationCancelled, 11, "registration.cancelled" },
         { AuditEvent.AccessDenied, 12, "access.denied" },
+        { AuditEvent.SessionRejected, 13, "auth.session.rejected" },
+        { AuditEvent.AccountDisabled, 14, "admin.account.disabled" },
+        { AuditEvent.AccountEnabled, 15, "admin.account.enabled" },
+        { AuditEvent.RoleChanged, 16, "admin.account.role_changed" },
     };
 
     [Theory]

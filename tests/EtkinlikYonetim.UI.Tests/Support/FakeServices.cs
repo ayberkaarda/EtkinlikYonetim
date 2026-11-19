@@ -158,6 +158,41 @@ internal sealed class ControlledRegistrationService : IRegistrationService
         _register.SetResult(new RegistrationReceipt(9, "ETK-ABCDEFGHJK", "Bahar Konseri", new DateOnly(2027, 4, 17)));
 }
 
+/// <summary>Account changes stay pending; the account list is answered at once, or refused when <see cref="Expired"/> is set.</summary>
+internal sealed class ControlledAccountService : IAccountService
+{
+    public List<AccountSummary> Accounts { get; } =
+    [
+        new(1, "admin", UserRole.Admin, false),
+        new(2, "ornek", UserRole.User, false),
+    ];
+
+    public bool Expired { get; set; }
+
+    public int ChangeCalls { get; private set; }
+
+    public List<(int UserId, string Change)> Changes { get; } = [];
+
+    public Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(UserSession session, CancellationToken cancellationToken = default) =>
+        Expired
+            ? Task.FromException<IReadOnlyList<AccountSummary>>(new SessionExpiredException())
+            : Task.FromResult<IReadOnlyList<AccountSummary>>(Accounts);
+
+    public Task SetEnabledAsync(UserSession session, int userId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        ChangeCalls++;
+        Changes.Add((userId, enabled ? "enable" : "disable"));
+        return new TaskCompletionSource().Task;
+    }
+
+    public Task ChangeRoleAsync(UserSession session, int userId, UserRole role, CancellationToken cancellationToken = default)
+    {
+        ChangeCalls++;
+        Changes.Add((userId, role.ToString()));
+        return new TaskCompletionSource().Task;
+    }
+}
+
 /// <summary>Answers confirmations with yes and records every message instead of showing a dialog.</summary>
 internal sealed class RecordingPrompts : IUserPrompts
 {
