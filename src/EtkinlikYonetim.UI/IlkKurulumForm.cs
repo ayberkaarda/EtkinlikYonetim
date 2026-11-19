@@ -88,7 +88,7 @@ namespace EtkinlikYonetim.UI
         /// <summary>How the founder gets a setup key for this database; no key is issued or shown here.</summary>
         internal static readonly string SetupKeyHint =
             "Bu veritabanında hesaplar var ama yönetici yok. İlk yönetici hesabı yalnızca bu veritabanı için üretilmiş bir kurulum anahtarıyla oluşturulabilir. "
-            + "Anahtarı veritabanının kurucusu \"EtkinlikYonetim.exe --create-setup-key\" komutuyla üretir; "
+            + "Anahtarı uygulama değil, veritabanı sahibi docs\\issue-setup-key.sql betiğiyle üretir; "
             + "anahtar 24 saat geçerlidir ve bir kez kullanılır.";
 
         /// <summary>Creates the first admin; ignored while a previous attempt is still running.</summary>

@@ -84,7 +84,8 @@ public sealed class SaveGuardTests
         _ = keyed.CreateAsync();
 
         Assert.Equal("ABCDE-FGHJK", setup.LastSetupKey);
-        Assert.Contains("--create-setup-key", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
+        Assert.Contains("issue-setup-key.sql", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("--create-setup-key", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
         Assert.DoesNotContain("ABCDE", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
         Assert.Equal(emptyHeight + 64, keyed.ClientSize.Height);
         Assert.True(Find<TextBox>(keyed, "txtAnahtar").UseSystemPasswordChar);
