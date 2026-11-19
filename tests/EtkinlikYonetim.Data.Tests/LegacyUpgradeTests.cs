@@ -296,7 +296,7 @@ public sealed class LegacyUpgradeTests
 
         Assert.False(await setup.IsSetupRequiredAsync(ct));
         Assert.True(await setup.IsAdminMissingAsync(ct));
-        var key = await TestServices.AddSetupKeyAsync(provider, database.Clock.GetUtcNow());
+        var key = await database.IssueSetupKeyAsync(ct);
         var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(null, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));
         Assert.Equal(SetupService.SetupKeyRequired, refused.Message);
         Assert.Equal(0, await database.ScalarAsync(Admins, ct));

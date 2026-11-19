@@ -1,6 +1,7 @@
 using System.Globalization;
 using EtkinlikYonetim.Data.Persistence;
 using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
@@ -56,10 +57,26 @@ internal sealed class SqlServerTestDatabase : IAsyncDisposable
     /// two providers behave like two application instances. <paramref name="demo"/> turns the
     /// demonstration data on, as ETKINLIK_DEMO=1 does for the application.
     /// </summary>
-    public ServiceProvider BuildServices(Action<IServiceCollection>? configure = null, bool demo = false)
+    /// <paramref name="configureContext"/> adds to the context options (for example interceptors) and
+    /// <paramref name="pooling"/> off keeps its connections out of the shared pool (needed when they
+    /// impersonate another database user).
+    public ServiceProvider BuildServices(
+        Action<IServiceCollection>? configure = null,
+        bool demo = false,
+        Action<DbContextOptionsBuilder>? configureContext = null,
+        bool pooling = true)
     {
+        var connectionString = pooling
+            ? ConnectionString
+            : new SqlConnectionStringBuilder(ConnectionString) { Pooling = false }.ConnectionString;
         var services = new ServiceCollection();
-        services.AddSqlServerDataAccess(ConnectionString, new DataAccessOptions { SeedDemoData = demo });
+        services.AddDataAccess(
+            builder =>
+            {
+                builder.UseSqlServer(connectionString);
+                configureContext?.Invoke(builder);
+            },
+            new DataAccessOptions { SeedDemoData = demo });
         services.AddTestBusinessServices(Clock);
         configure?.Invoke(services);
         return services.BuildServiceProvider();
@@ -116,6 +133,50 @@ internal sealed class SqlServerTestDatabase : IAsyncDisposable
         }
 
         return Convert.ToInt32(await command.ExecuteScalarAsync(ct), CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Runs docs/issue-setup-key.sql as the database owner (or with <paramref name="asUser"/>
+    /// impersonated) and returns the key it shows once.
+    /// </summary>
+    public async Task<string> IssueSetupKeyAsync(CancellationToken ct, bool revokeUnused = false, string? asUser = null)
+    {
+        var script = await File.ReadAllTextAsync(RepositoryFile("docs", "issue-setup-key.sql"), ct);
+        if (revokeUnused)
+        {
+            Assert.Contains("DECLARE @RevokeUnusedKeys bit = 0;", script, StringComparison.Ordinal);
+            script = script.Replace("DECLARE @RevokeUnusedKeys bit = 0;", "DECLARE @RevokeUnusedKeys bit = 1;", StringComparison.Ordinal);
+        }
+
+        if (asUser is not null)
+        {
+            script = "EXECUTE AS USER = N'" + asUser + "';\n" + script;
+        }
+
+        // Impersonation stays on a connection, so such a connection never goes back to the pool.
+        await using var connection = new SqlConnection(asUser is null
+            ? ConnectionString
+            : new SqlConnectionStringBuilder(ConnectionString) { Pooling = false }.ConnectionString);
+        await connection.OpenAsync(ct);
+        await using var command = new SqlCommand(script, connection) { CommandTimeout = 120 };
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        Assert.True(await reader.ReadAsync(ct));
+        return reader.GetString(0);
+    }
+
+    /// <summary>A file of the repository, found by walking up from the test output folder.</summary>
+    public static string RepositoryFile(params string[] parts)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var path = Path.Combine([directory.FullName, .. parts]);
+            if (File.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        throw new FileNotFoundException("Repository file not found.", Path.Combine(parts));
     }
 
     public async ValueTask DisposeAsync()

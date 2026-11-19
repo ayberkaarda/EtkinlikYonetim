@@ -210,8 +210,8 @@ public sealed class SqlServerConcurrencyTests
             await database.ExecuteAsync("DELETE dbo.Kullanicilar; DELETE dbo.KurulumAnahtarlari", ct);
             await first.GetRequiredService<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", ct);
 
-            // The key is issued for the database; the two instances stand for two profiles or computers.
-            var key = await AddSetupKeyAsync(first, database.Clock.GetUtcNow());
+            // The owner issues the key with the script; the two instances stand for two profiles or computers.
+            var key = await database.IssueSetupKeyAsync(ct);
             await using var a = database.BuildServices();
             await using var b = database.BuildServices();
             var providers = new[] { a, b };
@@ -225,9 +225,20 @@ public sealed class SqlServerConcurrencyTests
                 ct);
 
             Assert.Single(results, r => r is null);
-            Assert.All(
-                results.Where(r => r is not null),
-                r => Assert.Contains(Assert.IsType<BusinessRuleException>(r).Message, new[] { SetupService.AlreadyDone, SetupService.SetupKeyInvalid }));
+            static bool WrongKey(string name) => name[^1] % 3 == 1;
+            var winner = names[Array.FindIndex(results, r => r is null)];
+            Assert.False(WrongKey(winner), $"{winner} won with a wrong key.");
+            Assert.Equal(winner, await database.TextAsync("SELECT KullaniciAdi FROM dbo.Kullanicilar WHERE Rol = N'Admin'", ct));
+            for (var i = 0; i < names.Count; i++)
+            {
+                if (results[i] is { } error)
+                {
+                    // A right key after the winner finds the admin; a wrong key is refused or finds the admin.
+                    var message = Assert.IsType<BusinessRuleException>(error).Message;
+                    Assert.Contains(message, WrongKey(names[i]) ? new[] { SetupService.AlreadyDone, SetupService.SetupKeyInvalid } : new[] { SetupService.AlreadyDone });
+                }
+            }
+
             Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar", ct));
             Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar WHERE Rol = N'Admin' AND SifreBicimi = 0", ct));
             Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE Tuketildi = 1 AND TuketimTarihi IS NOT NULL", ct));
