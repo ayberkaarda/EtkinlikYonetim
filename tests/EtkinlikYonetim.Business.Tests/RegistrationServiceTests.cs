@@ -20,16 +20,19 @@ public sealed class RegistrationServiceTests
     private readonly Mock<IEventRepository> _events = new(MockBehavior.Strict);
     private readonly FakeTimeProvider _time = new(Now);
 
+    private readonly List<ParticipantRecord> _stored =
+    [
+        new(1, OwnNationalId, "Deniz Örnek", null, Sessions.User.UserId),
+        new(2, ForeignNationalId, "Ece Taslak", null, Sessions.OtherUser.UserId),
+        new(3, LegacyNationalId, "Eski Katılımcı", null, null),
+    ];
+
     public RegistrationServiceTests()
     {
-        _participants.Setup(p => p.FindByNationalIdAsync(OwnNationalId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ParticipantRecord(1, OwnNationalId, "Deniz Örnek", null, Sessions.User.UserId));
-        _participants.Setup(p => p.FindByNationalIdAsync(ForeignNationalId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ParticipantRecord(2, ForeignNationalId, "Ece Taslak", null, Sessions.OtherUser.UserId));
-        _participants.Setup(p => p.FindByNationalIdAsync(LegacyNationalId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ParticipantRecord(3, LegacyNationalId, "Eski Katılımcı", null, null));
-        _participants.Setup(p => p.FindByNationalIdAsync("10000000382", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ParticipantRecord?)null);
+        // Behaves like the repository: filtered by owner when one is given, every account's otherwise.
+        _participants.Setup(p => p.FindByNationalIdAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string id, int? owner, CancellationToken _) =>
+                _stored.Where(r => r.NationalId == id && (owner is null || r.OwnerUserId == owner)).ToList());
         _events.Setup(e => e.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(1, "Konser", Today, 2, 1));
         _events.Setup(e => e.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(2, "Dolu", Today.AddDays(3), 2, 2));
         _events.Setup(e => e.GetByIdAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(3, "Dün", Today.AddDays(-1), 2, 0));
@@ -62,6 +65,31 @@ public sealed class RegistrationServiceTests
         var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().RegisterAsync(Sessions.User, 1, nationalId, Ct));
 
         Assert.Equal(RegistrationService.ParticipantNotFound, error.Message);
+        _registrations.VerifyNoOtherCalls();
+    }
+
+    /// <summary>A number in the user's own list is found even when another account has it too.</summary>
+    [Fact]
+    public async Task Register_NationalIdOfSeveralAccounts_FindsTheUsersOwnParticipant()
+    {
+        _stored.Add(new ParticipantRecord(7, ForeignNationalId, "Kurgu Kişi", null, Sessions.User.UserId));
+        SetupAdd(7, 1, 41);
+
+        var receipt = await Service().RegisterAsync(Sessions.User, 1, ForeignNationalId, Ct);
+
+        Assert.Equal(41, receipt.RegistrationId);
+        _participants.Verify(p => p.FindByNationalIdAsync(ForeignNationalId, Sessions.User.UserId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Admins see every account's participants; a number that several accounts have is not guessed.</summary>
+    [Fact]
+    public async Task Register_AdminWithANationalIdOfSeveralAccounts_IsAskedToUseTheOwner()
+    {
+        _stored.Add(new ParticipantRecord(7, ForeignNationalId, "Kurgu Kişi", null, Sessions.User.UserId));
+
+        var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().RegisterAsync(Sessions.Admin, 1, ForeignNationalId, Ct));
+
+        Assert.Equal(RegistrationService.ParticipantAmbiguous, error.Message);
         _registrations.VerifyNoOtherCalls();
     }
 

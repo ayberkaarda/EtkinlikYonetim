@@ -7,16 +7,24 @@ namespace EtkinlikYonetim.Data.Repositories;
 
 internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> contextFactory) : IParticipantRepository
 {
-    public async Task<ParticipantRecord?> FindByNationalIdAsync(string nationalId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ParticipantRecord>> FindByNationalIdAsync(
+        string nationalId,
+        int? ownerUserId,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(nationalId);
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        return await db.Participants
-            .AsNoTracking()
-            .Where(p => p.NationalId == nationalId)
+        var query = db.Participants.AsNoTracking().Where(p => p.NationalId == nationalId);
+        if (ownerUserId is int owner)
+        {
+            query = query.Where(p => p.OwnerUserId == owner);
+        }
+
+        return await query
+            .OrderBy(p => p.Id)
             .Select(p => new ParticipantRecord(p.Id, p.NationalId, p.FullName, p.Email, p.OwnerUserId))
-            .SingleOrDefaultAsync(cancellationToken)
+            .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -40,9 +48,9 @@ internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> co
         }
         catch (DbUpdateException ex)
         {
-            // The unique index rejected a concurrent insert of the same national id. Checked with a
-            // new query so the provider specific error code does not matter.
-            if (await FindByNationalIdAsync(participant.NationalId, CancellationToken.None).ConfigureAwait(false) is not null)
+            // The unique index rejected a concurrent insert of the same national id for the same
+            // account. Checked with a new query so the provider specific error code does not matter.
+            if (await OwnerHasNationalIdAsync(participant.OwnerUserId, participant.NationalId).ConfigureAwait(false))
             {
                 throw new DuplicateNationalIdException("The national id is already registered.", ex);
             }
@@ -63,6 +71,14 @@ internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> co
                 orderby p.FullName, r.Id
                 select new EventParticipant(r.Id, p.FullName, p.NationalId, p.Email, r.Ticket != null ? r.Ticket.Code : null))
             .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<bool> OwnerHasNationalIdAsync(int? ownerUserId, string nationalId)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(CancellationToken.None).ConfigureAwait(false);
+        return await db.Participants
+            .AnyAsync(p => p.OwnerUserId == ownerUserId && p.NationalId == nationalId, CancellationToken.None)
             .ConfigureAwait(false);
     }
 }

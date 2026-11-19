@@ -18,7 +18,8 @@ namespace EtkinlikYonetim.Data.Persistence;
 /// Katilimcilar.EtkinlikAdi; each such assignment becomes an active registration with a ticket in
 /// Kayitlar and Biletler, the events' seat counters are filled in and the name column is removed. The
 /// remaining columns, constraints and indexes of <see cref="InitialCreate"/> are added and the
-/// migration is recorded as applied.
+/// migration is recorded as applied; the later migrations (such as the per-owner national id index of
+/// <see cref="ScopeNationalIdToOwner"/>) then run as on any other database.
 /// </summary>
 /// <remarks>
 /// Every step checks the current schema first, and the whole upgrade runs in one transaction under
@@ -207,11 +208,14 @@ internal static class LegacySchemaUpgrader
              WHERE TcKimlikNo IS NULL OR LEN(TcKimlikNo) > 11 OR LEN(AdSoyad) > 100 OR LEN(Email) > 100
              """,
                 "participants with a missing or too long national id, name or e-mail"),
+            // National ids are unique per owning account. The participants of the original application
+            // belong to no account yet, so they all share one list and a repeated id among them is a
+            // duplicate within the same owner.
             ("""
              SELECT COUNT(*) AS [Value] FROM (
                  SELECT TcKimlikNo FROM dbo.Katilimcilar GROUP BY TcKimlikNo HAVING COUNT(*) > 1) d
              """,
-                "national ids shared by more than one participant"),
+                "national ids shared by more than one participant of the same owner"),
             ("""
              SELECT COUNT(*) AS [Value] FROM dbo.Katilimcilar k
              WHERE k.EtkinlikAdi IS NOT NULL

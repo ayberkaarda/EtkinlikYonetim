@@ -56,7 +56,7 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     b.HasIndex(new[] { "OwnerUserId" }, "IX_Katilimcilar_KullaniciId");
 
-                    b.HasIndex(new[] { "NationalId" }, "IX_Katilimcilar_TcKimlikNo")
+                    b.HasIndex(new[] { "OwnerUserId", "NationalId" }, "IX_Katilimcilar_KullaniciId_TcKimlikNo")
                         .IsUnique();
 
                     b.ToTable("Katilimcilar", (string)null);

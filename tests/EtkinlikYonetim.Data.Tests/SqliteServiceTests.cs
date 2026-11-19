@@ -268,9 +268,60 @@ public sealed class SqliteServiceTests : IAsyncLifetime
             Assert.Equal(SeedUserId, (await context.Participants.SingleAsync(p => p.Id == id, Ct)).OwnerUserId);
         }
 
-        var duplicate = await Assert.ThrowsAsync<BusinessRuleException>(() => Participants.AddAsync(Admin(SeedAdminId), NewNationalId, "Başka Biri", "baska@example.com", Ct));
-        Assert.Equal("Bu T.C. Kimlik No ile kayıtlı bir katılımcı zaten var.", duplicate.Message);
+        var duplicate = await Assert.ThrowsAsync<BusinessRuleException>(() => Participants.AddAsync(user, NewNationalId, "Başka Biri", "baska@example.com", Ct));
+        Assert.Equal("Bu T.C. Kimlik No ile listenizde kayıtlı bir katılımcı zaten var.", duplicate.Message);
         await Registrations.RegisterAsync(user, ConcertId, NewNationalId, Ct);
+    }
+
+    /// <summary>
+    /// National ids are unique per owning account, so adding a participant answers the same whether or
+    /// not another account already has one with that number; nothing about the other account's
+    /// participant is revealed or changed.
+    /// </summary>
+    [Fact]
+    public async Task AddParticipant_ForeignNationalId_DoesNotDiscloseExistence()
+    {
+        var otherUser = await RegisterAndSignInAsync("baskauye");
+
+        var foreignId = await Participants.AddAsync(otherUser, DenizNationalId, "Kurgu Kişi", "kurgu@example.com", Ct);
+        var newId = await Participants.AddAsync(otherUser, NewNationalId, "Kurgu Kişi", "kurgu@example.com", Ct);
+
+        Assert.True(foreignId > 0 && newId > 0);
+        await using (var context = _db.CreateContext())
+        {
+            var deniz = await context.Participants.AsNoTracking().SingleAsync(p => p.NationalId == DenizNationalId && p.OwnerUserId == SeedUserId, Ct);
+            Assert.Equal("Deniz Örnek", deniz.FullName);
+            Assert.Equal(2, await context.Participants.CountAsync(p => p.NationalId == DenizNationalId, Ct));
+            Assert.Equal(otherUser.UserId, (await context.Participants.SingleAsync(p => p.Id == foreignId, Ct)).OwnerUserId);
+        }
+
+        // The repeated id in the account's own list is still refused, with the same answer for both numbers.
+        var ownForeign = await Assert.ThrowsAsync<BusinessRuleException>(() => Participants.AddAsync(otherUser, DenizNationalId, "Kurgu Kişi", "kurgu@example.com", Ct));
+        var ownNew = await Assert.ThrowsAsync<BusinessRuleException>(() => Participants.AddAsync(otherUser, NewNationalId, "Kurgu Kişi", "kurgu@example.com", Ct));
+        Assert.Equal(ownNew.Message, ownForeign.Message);
+
+        // Registration by national id finds each account's own participant.
+        var mine = await Registrations.RegisterAsync(otherUser, ConcertId, DenizNationalId, Ct);
+        var theirs = await Registrations.RegisterAsync(User(SeedUserId), ConcertId, DenizNationalId, Ct);
+        Assert.NotEqual(mine.RegistrationId, theirs.RegistrationId);
+        Assert.Equal(["Kurgu Kişi"], (await Registrations.GetMyRegistrationsAsync(otherUser, Ct)).Select(r => r.ParticipantName));
+        Assert.Equal(["Deniz Örnek"], (await Registrations.GetMyRegistrationsAsync(User(SeedUserId), Ct)).Select(r => r.ParticipantName));
+    }
+
+    /// <summary>
+    /// The unique index path (an insert that raced the check) reports a duplicate only for the
+    /// account's own list; the same number under another account is no conflict.
+    /// </summary>
+    [Fact]
+    public async Task Repository_DuplicateNationalId_IsReportedOnlyForTheSameOwner()
+    {
+        var repository = _db.Get<IParticipantRepository>();
+
+        var foreign = await repository.AddAsync(new Participant { NationalId = DenizNationalId, FullName = "Kurgu Kişi", OwnerUserId = SeedAdminId }, Ct);
+        await Assert.ThrowsAsync<DuplicateNationalIdException>(
+            () => repository.AddAsync(new Participant { NationalId = DenizNationalId, FullName = "Kurgu Kişi", OwnerUserId = SeedUserId }, Ct));
+
+        Assert.True(foreign > 0);
     }
 
     // IDOR: valid sessions must not reach other accounts' participants and registrations by passing their ids.

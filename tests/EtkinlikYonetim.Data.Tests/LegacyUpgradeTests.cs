@@ -79,6 +79,7 @@ public sealed class LegacyUpgradeTests
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar WHERE Id = 3 AND Rol COLLATE Latin1_General_BIN = N'Admin'", ct));
         Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar WHERE Id IN (5, 6) AND Rol COLLATE Latin1_General_BIN = N'Kullanici'", ct));
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId LIKE N'%_InitialCreate'", ct));
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId LIKE N'%_ScopeNationalIdToOwner'", ct));
 
         // Each event assignment became one active registration with a ticket; the counters follow.
         Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Katilimcilar') AND name = N'EtkinlikAdi'", ct));
@@ -132,7 +133,14 @@ public sealed class LegacyUpgradeTests
         var nationalId = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync(
             "INSERT dbo.Katilimcilar (TcKimlikNo) VALUES (N'20000000002')",
             ct));
-        Assert.Contains("IX_Katilimcilar_TcKimlikNo", nationalId.Message, StringComparison.Ordinal);
+        Assert.Contains("IX_Katilimcilar_KullaniciId_TcKimlikNo", nationalId.Message, StringComparison.Ordinal);
+
+        // The same number under an account is another account's own entry, not a duplicate.
+        await database.ExecuteAsync("INSERT dbo.Katilimcilar (TcKimlikNo, KullaniciId) VALUES (N'20000000002', 5)", ct);
+        var sameOwner = await Assert.ThrowsAsync<SqlException>(() => database.ExecuteAsync(
+            "INSERT dbo.Katilimcilar (TcKimlikNo, KullaniciId) VALUES (N'20000000002', 5)",
+            ct));
+        Assert.Contains("IX_Katilimcilar_KullaniciId_TcKimlikNo", sameOwner.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -180,7 +188,8 @@ public sealed class LegacyUpgradeTests
             INSERT dbo.Katilimcilar (EtkinlikAdi, TcKimlikNo, AdSoyad) VALUES
                 (N'Dolu Etkinlik', N'20000000001', N'Gizli Ad'),
                 (N'Dolu Etkinlik', N'20000000002', N'Gizli Ad'),
-                (N'Silinmiş Etkinlik', N'20000000003', N'Gizli Ad');
+                (N'Silinmiş Etkinlik', N'20000000003', N'Gizli Ad'),
+                (NULL, N'20000000003', N'Gizli Ad');
             """,
             ct);
 
@@ -191,6 +200,7 @@ public sealed class LegacyUpgradeTests
         var message = error.InnerException?.Message;
         Assert.Contains("1 participants whose event name matches no event", message, StringComparison.Ordinal);
         Assert.Contains("1 events with more participants than their capacity", message, StringComparison.Ordinal);
+        Assert.Contains("1 national ids shared by more than one participant of the same owner", message, StringComparison.Ordinal);
         Assert.DoesNotContain("Gizli", message, StringComparison.Ordinal);
         Assert.DoesNotContain("Dolu", message, StringComparison.Ordinal);
         Assert.DoesNotContain("2000000000", message, StringComparison.Ordinal);
@@ -403,7 +413,11 @@ public sealed class LegacyUpgradeTests
         Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.default_constraints", ct));
         Assert.Equal(15, await database.ScalarAsync("SELECT COUNT(*) FROM sys.objects WHERE type IN ('PK', 'F', 'C') AND parent_object_id <> OBJECT_ID(N'dbo.__EFMigrationsHistory')", ct));
         Assert.Equal(4, await database.ScalarAsync(
-            "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 1 AND has_filter = 0 AND name IN (N'IX_Kullanicilar_KullaniciAdi', N'IX_Katilimcilar_TcKimlikNo', N'IX_Biletler_KayitId', N'IX_Biletler_BiletKodu')",
+            "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 1 AND has_filter = 0 AND name IN (N'IX_Kullanicilar_KullaniciAdi', N'IX_Katilimcilar_KullaniciId_TcKimlikNo', N'IX_Biletler_KayitId', N'IX_Biletler_BiletKodu')",
+            ct));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Katilimcilar_TcKimlikNo'", ct));
+        Assert.Equal(2, await database.ScalarAsync(
+            "SELECT COUNT(*) FROM sys.index_columns ic JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id WHERE i.name = N'IX_Katilimcilar_KullaniciId_TcKimlikNo'",
             ct));
         Assert.Equal(1, await database.ScalarAsync(
             "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Kayitlar_KatilimciId_EtkinlikId' AND is_unique = 1 AND has_filter = 1 AND filter_definition = N'([Durum]=(0))'",

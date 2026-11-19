@@ -37,6 +37,7 @@ internal sealed class RegistrationService(
     internal const string EventRequired = "Lütfen bir etkinlik seçin.";
     internal const string NationalIdFormat = "Geçerli bir 11 haneli TC Kimlik No girin.";
     internal const string ParticipantNotFound = "Bu TC Kimlik numarasıyla sistemde kayıtlı bir katılımcı bulunamadı.";
+    internal const string ParticipantAmbiguous = "Bu TC Kimlik numarası birden fazla hesabın katılımcısıyla eşleşiyor. Kaydı katılımcıyı ekleyen hesapla yapın.";
     internal const string PastEvent = "Geçmiş tarihli bir etkinliğe kayıt yapılamaz.";
     internal const string EventFull = "Etkinliğin kontenjanı dolu.";
     internal const string AlreadyRegistered = "Bu katılımcı bu etkinliğe zaten kayıtlı.";
@@ -65,7 +66,14 @@ internal sealed class RegistrationService(
             throw new BusinessRuleException(NationalIdFormat);
         }
 
-        var participant = await participants.FindByNationalIdAsync(id!, cancellationToken).ConfigureAwait(false);
+        // Users look only in their own list; admins see every account's participants and prefer their own.
+        var candidates = await participants.FindByNationalIdAsync(id!, Access.OwnerFilter(session), cancellationToken).ConfigureAwait(false);
+        var participant = candidates.FirstOrDefault(p => p.OwnerUserId == session.UserId)
+            ?? (candidates.Count == 1 ? candidates[0] : null);
+        if (participant is null && session.IsAdmin && candidates.Count > 1)
+        {
+            throw new BusinessRuleException(ParticipantAmbiguous);
+        }
 
         // Somebody else's participant gets the same answer as an unknown one, so national ids cannot be probed.
         if (participant is null || !(session.IsAdmin || participant.OwnerUserId == session.UserId))

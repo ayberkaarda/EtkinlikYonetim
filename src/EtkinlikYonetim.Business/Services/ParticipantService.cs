@@ -31,7 +31,7 @@ internal sealed class ParticipantService(IParticipantRepository participants) : 
     internal const string NationalIdInvalid = "Lütfen geçerli bir T.C. Kimlik No girin.";
     internal const string FullNameInvalid = "Ad soyad yalnızca harf ve tek boşluk içerebilir ve en fazla 64 karakter olabilir.";
     internal const string EmailInvalid = "Geçersiz e-posta adresi!";
-    internal const string NationalIdTaken = "Bu T.C. Kimlik No ile kayıtlı bir katılımcı zaten var.";
+    internal const string NationalIdTaken = "Bu T.C. Kimlik No ile listenizde kayıtlı bir katılımcı zaten var.";
 
     internal const string UnknownName = "Ad Bilinmiyor";
     internal const string UnknownEmail = "E-posta Yok";
@@ -69,7 +69,9 @@ internal sealed class ParticipantService(IParticipantRepository participants) : 
             throw new BusinessRuleException(EmailInvalid);
         }
 
-        if (await participants.FindByNationalIdAsync(id, cancellationToken).ConfigureAwait(false) is not null)
+        // Only the account's own list is checked: national ids are unique per owner, so the answer for
+        // a number another account has is the same as for a number nobody has.
+        if ((await participants.FindByNationalIdAsync(id, session.UserId, cancellationToken).ConfigureAwait(false)).Count > 0)
         {
             throw new BusinessRuleException(NationalIdTaken);
         }
@@ -88,7 +90,7 @@ internal sealed class ParticipantService(IParticipantRepository participants) : 
         }
         catch (DuplicateNationalIdException ex)
         {
-            // Added concurrently between the check and the insert.
+            // Added to the same account concurrently between the check and the insert.
             throw new BusinessRuleException(NationalIdTaken, ex);
         }
     }

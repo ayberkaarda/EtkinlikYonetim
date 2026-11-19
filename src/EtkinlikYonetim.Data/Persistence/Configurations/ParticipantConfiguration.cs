@@ -24,7 +24,10 @@ internal sealed class ParticipantConfiguration : IEntityTypeConfiguration<Partic
             .HasConstraintName("FK_Katilimcilar_Kullanicilar")
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(p => p.NationalId, "IX_Katilimcilar_TcKimlikNo").IsUnique();
+        // A national id is unique within the participants of one account, not across accounts, so
+        // adding a participant reveals nothing about other accounts' participants. Without a filter
+        // the participants of the original application, which have no owner, stay unique as well.
+        builder.HasIndex(p => new { p.OwnerUserId, p.NationalId }, "IX_Katilimcilar_KullaniciId_TcKimlikNo").IsUnique().HasFilter(null);
         builder.HasIndex(p => p.OwnerUserId, "IX_Katilimcilar_KullaniciId");
     }
 }

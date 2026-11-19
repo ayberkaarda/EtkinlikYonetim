@@ -35,7 +35,7 @@ public sealed class ParticipantServiceTests
     public async Task Add_IsOwnedByTheSignedInAccount()
     {
         Participant? added = null;
-        _participants.Setup(p => p.FindByNationalIdAsync(NationalId, It.IsAny<CancellationToken>())).ReturnsAsync((ParticipantRecord?)null);
+        _participants.Setup(p => p.FindByNationalIdAsync(NationalId, Sessions.User.UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
         _participants.Setup(p => p.AddAsync(It.IsAny<Participant>(), It.IsAny<CancellationToken>()))
             .Callback<Participant, CancellationToken>((p, _) => added = p)
             .ReturnsAsync(11);
@@ -51,11 +51,11 @@ public sealed class ParticipantServiceTests
     }
 
     [Fact]
-    public async Task Add_ExistingOrConcurrentlyAddedNationalId_IsRejected()
+    public async Task Add_ExistingOrConcurrentlyAddedNationalIdOfTheOwnList_IsRejected()
     {
-        _participants.Setup(p => p.FindByNationalIdAsync(NationalId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ParticipantRecord(1, NationalId, "X", null, 9));
-        _participants.Setup(p => p.FindByNationalIdAsync("10000000214", It.IsAny<CancellationToken>())).ReturnsAsync((ParticipantRecord?)null);
+        _participants.Setup(p => p.FindByNationalIdAsync(NationalId, Sessions.User.UserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new ParticipantRecord(1, NationalId, "X", null, Sessions.User.UserId)]);
+        _participants.Setup(p => p.FindByNationalIdAsync("10000000214", Sessions.User.UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
         _participants.Setup(p => p.AddAsync(It.IsAny<Participant>(), It.IsAny<CancellationToken>())).ThrowsAsync(new DuplicateNationalIdException());
 
         var existing = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().AddAsync(Sessions.User, NationalId, "Deniz Örnek", "d@example.com", Ct));
@@ -63,6 +63,21 @@ public sealed class ParticipantServiceTests
 
         Assert.Equal(ParticipantService.NationalIdTaken, existing.Message);
         Assert.Equal(ParticipantService.NationalIdTaken, raced.Message);
+    }
+
+    /// <summary>
+    /// Only the account's own list is consulted, so whether another account has the number cannot
+    /// change the answer.
+    /// </summary>
+    [Fact]
+    public async Task Add_LooksOnlyInTheOwnList()
+    {
+        _participants.Setup(p => p.FindByNationalIdAsync(NationalId, Sessions.User.UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _participants.Setup(p => p.AddAsync(It.IsAny<Participant>(), It.IsAny<CancellationToken>())).ReturnsAsync(12);
+
+        Assert.Equal(12, await Service().AddAsync(Sessions.User, NationalId, "Deniz Örnek", "d@example.com", Ct));
+
+        _participants.Verify(p => p.FindByNationalIdAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

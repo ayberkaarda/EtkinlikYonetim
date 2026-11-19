@@ -192,6 +192,36 @@ public sealed class SqlServerConcurrencyTests
         Assert.False(await second.GetRequiredService<ISetupService>().IsSetupRequiredAsync(ct));
     }
 
+    /// <summary>
+    /// One account adds the same national id many times at once while another account adds it too:
+    /// the unique index keeps one per account, the losers of the same account are told it is already
+    /// in their list, and the other account is not affected.
+    /// </summary>
+    [Fact]
+    public async Task AddParticipant_SameNationalIdRacesWithinAndAcrossAccounts_OnePerAccount()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+        await using var provider = database.BuildServices(demo: true);
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+        var service = provider.GetRequiredService<IParticipantService>();
+
+        var attempts = Enumerable.Repeat(SeedAdminId, Contenders / 2).Concat(Enumerable.Repeat(SeedUserId, Contenders / 2))
+            .Select(id => id.ToString(CultureInfo.InvariantCulture))
+            .ToList();
+        var results = await RaceAsync(
+            attempts,
+            owner => service.AddAsync(owner == "1" ? Admin(SeedAdminId) : User(SeedUserId), NewNationalId, "Yarış Katılımcısı", "yaris@example.com", ct),
+            ct);
+
+        Assert.Equal(2, results.Count(r => r is null));
+        Assert.All(
+            results.Where(r => r is not null),
+            r => Assert.Equal(ParticipantService.NationalIdTaken, Assert.IsType<BusinessRuleException>(r).Message));
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Katilimcilar WHERE TcKimlikNo = @tc AND KullaniciId = 1", ct, ("@tc", NewNationalId)));
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Katilimcilar WHERE TcKimlikNo = @tc AND KullaniciId = 2", ct, ("@tc", NewNationalId)));
+    }
+
     /// <summary>Starts every attempt at once; each result is null on success or the exception.</summary>
     private static async Task<Exception?[]> RaceAsync<T>(IReadOnlyList<string> inputs, Func<string, Task<T>> attempt, CancellationToken ct)
     {
