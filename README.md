@@ -54,7 +54,11 @@ Bu proje, etkinlik organizasyonlarının dijital ortamda kolayca yönetilmesini 
    - `dotnet user-secrets set "ConnectionStrings:EtkinlikYonetim" "<bağlantı>" --project src/EtkinlikYonetim.UI`,
    - ya da `ETKINLIK_CONNECTION` ortam değişkenini tanımlayın.
 
-4. Tabloları elle oluşturmanız gerekmez: uygulama ilk açılışta EF Core migration'larını uygular. Varsayılan kurulum hiçbir hesap oluşturmaz ve hiçbir hazır şifre içermez; veritabanında yönetici yoksa açılan **İlk Kurulum** ekranında ilk yönetici hesabını kendi belirlediğiniz şifreyle oluşturursunuz. Eski sürümün oluşturduğu bir veritabanı verileri korunarak yerinde yükseltilir.
+4. Tabloları elle oluşturmanız gerekmez: uygulama ilk açılışta EF Core migration'larını uygular. Varsayılan kurulum hiçbir hesap oluşturmaz ve hiçbir hazır şifre içermez; veritabanı tamamen boşsa (hiç hesap yoksa) açılan **İlk Kurulum** ekranında ilk yönetici hesabını kendi belirlediğiniz şifreyle oluşturursunuz. Eski sürümün oluşturduğu bir veritabanı verileri korunarak yerinde yükseltilir.
+   - **Hesapları olan ama yöneticisi olmayan veritabanı** (örneğin yükseltilmiş eski bir veritabanı): uygulama normal giriş ekranıyla açılır; yönetici yokluğu tek başına kimseye yetki vermez. İlk yönetici yalnızca **kurulum anahtarı** ile oluşturulur: giriş ekranındaki **İlk yönetici hesabını oluştur** bağlantısı kurulum formunu açar ve anahtarı ister.
+   - Anahtar, form ilk açıldığında uygulamayı çalıştıran kullanıcının yerel veri klasörüne rastgele üretilerek yazılır: `%LOCALAPPDATA%\EtkinlikYonetim\setup-key.txt` (formda tam yol gösterilir, anahtarın kendisi gösterilmez ve hiçbir yere loglanmaz). Dosyadaki değeri forma yazın; tireler ve büyük/küçük harf önemli değildir.
+   - Bunun yerine en az 16 karakterlik bir değeri `ETKINLIK_SETUP_KEY` ortam değişkeniyle de verebilirsiniz; tanımlıysa dosya oluşturulmaz.
+   - Anahtar tek kullanımlıktır: yönetici oluşturulunca dosya silinir (ortam değişkenindeki değer bir daha kabul edilmez). Üst üste 5 hatalı anahtar girilirse anahtar 15 dakika boyunca kabul edilmez.
    - Demo modu isteğe bağlıdır ve varsayılan olarak kapalıdır: `ETKINLIK_DEMO=1` ortam değişkeni ya da `appsettings.json` içinde `"Seed": { "Demo": true }` yalnızca tamamen boş bir veritabanına kurgusal örnek veriler ekler. Yalnızca demo modu açıksa şu hesaplar oluşur: `admin` / `Demo.Admin1` ve `ornek` / `Demo.Kullanici1`. Demo modunu gerçek bir kurulumda açmayın.
 
 5. Uygulamayı çalıştırın (`dotnet run --project src/EtkinlikYonetim.UI`) ve testleri `dotnet test` ile çalıştırın; SQL Server gerektiren testleri atlamak için `ETKINLIK_SKIP_SQL_TESTS=1` tanımlayın.
@@ -63,7 +67,7 @@ Bu proje, etkinlik organizasyonlarının dijital ortamda kolayca yönetilmesini 
 - TC Kimlik numarası doğrulaması yalnızca sistem içi kontrolle yapılmaktadır.
 - Kullanıcıların sisteme birden fazla etkinlik kaydı yapması mümkündür.
 - Admin yetkisi giriş ekranında kontrol edilmektedir.
-- **Güvenlik notu:** Bu sürümden önceki ara sürümlerle kurulmuş veritabanlarında `admin` ve `ornek` örnek hesapları, yukarıda yayımlanmış şifreleriyle bulunabilir. Böyle bir veritabanında bu hesapları (sahip oldukları örnek katılımcı ve kayıtlarla birlikte) silin ya da şifrelerini değiştirin. Hiç yönetici hesabı kalmazsa uygulama bir sonraki açılışta İlk Kurulum ekranını gösterir.
+- **Güvenlik notu:** Bu sürümden önceki ara sürümlerle kurulmuş veritabanlarında `admin` ve `ornek` örnek hesapları, yukarıda yayımlanmış şifreleriyle bulunabilir. Böyle bir veritabanında bu hesapları (sahip oldukları örnek katılımcı ve kayıtlarla birlikte) silin ya da şifrelerini değiştirin. Hiç yönetici hesabı kalmazsa yeni yönetici, giriş ekranından yukarıdaki kurulum anahtarıyla oluşturulur.
 
 ## 📧 İletişim
 
