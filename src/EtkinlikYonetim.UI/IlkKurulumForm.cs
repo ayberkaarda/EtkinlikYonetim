@@ -48,8 +48,9 @@ namespace EtkinlikYonetim.UI
 
         /// <summary>
         /// Whether the setup key is asked for, because the database has accounts but no admin. The key
-        /// field starts with the value of the ETKINLIK_SETUP_KEY environment variable, if any; the database
-        /// decides whether it is a valid key.
+        /// field starts with the key of the ETKINLIK_SETUP_KEY environment variable, if it has the form of
+        /// one; the database decides whether it is a valid key. A malformed value fills in nothing and is
+        /// reported as a configuration error when the form opens.
         /// </summary>
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public bool RequireSetupKey
@@ -69,7 +70,9 @@ namespace EtkinlikYonetim.UI
                 lblAciklama.Text = value ? SetupKeyHint : _emptyDatabaseText;
                 lblAnahtar.Visible = value;
                 txtAnahtar.Visible = value;
-                txtAnahtar.Text = value ? Environment.GetEnvironmentVariable(SetupKeyPolicy.EnvironmentVariable) ?? string.Empty : string.Empty;
+                var prefill = value ? _setup.GetEnvironmentKey() : new SetupKeyPrefill(null, false);
+                txtAnahtar.Text = prefill.Key ?? string.Empty;
+                EnvironmentKeyWarning = prefill.Invalid ? EnvironmentKeyInvalid : null;
                 foreach (Control control in new Control[] { label1, txtKullaniciAdi, label2, txtSifre, label3, txtSifreTekrar, btnOlustur, btnIptal })
                 {
                     control.Top += shift;
@@ -80,6 +83,14 @@ namespace EtkinlikYonetim.UI
                 ResumeLayout();
             }
         }
+
+        /// <summary>The configuration warning shown when the form opens, or <see langword="null"/>.</summary>
+        internal string? EnvironmentKeyWarning { get; private set; }
+
+        /// <summary>Shown when ETKINLIK_SETUP_KEY is set to something that is not a setup key; the value itself is never shown.</summary>
+        internal static readonly string EnvironmentKeyInvalid =
+            SetupKeyPolicy.EnvironmentVariable + " ortam değişkeni geçerli bir kurulum anahtarı biçiminde değil (32 onaltılık karakter); "
+            + "alan boş bırakıldı. Anahtarı elle girin veya ortam değişkenini düzeltin.";
 
         /// <summary>Information dialogs; replaced in tests so no window opens.</summary>
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
@@ -121,6 +132,15 @@ namespace EtkinlikYonetim.UI
                 btnOlustur,
                 btnIptal);
             return session;
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            if (EnvironmentKeyWarning is { } warning)
+            {
+                Prompts.Warn(warning);
+            }
         }
 
         private async void btnOlustur_Click(object? sender, EventArgs e)

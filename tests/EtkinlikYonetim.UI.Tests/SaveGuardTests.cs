@@ -91,6 +91,26 @@ public sealed class SaveGuardTests
         Assert.True(Find<TextBox>(keyed, "txtAnahtar").UseSystemPasswordChar);
     });
 
+    /// <summary>ETKINLIK_SETUP_KEY only fills in the key field; a malformed value fills in nothing and becomes a configuration warning.</summary>
+    [Fact]
+    public void FirstRunSetup_EnvironmentKey_OnlyPrefillsAWellFormedKey() => Run(() =>
+    {
+        var setup = new PendingSetupService { Prefill = new("0123-4567-89AB-CDEF-0123-4567-89AB-CDEF", false) };
+        using var prefilled = new IlkKurulumForm(setup) { Prompts = new RecordingPrompts(), RequireSetupKey = true };
+        Assert.Equal("0123-4567-89AB-CDEF-0123-4567-89AB-CDEF", Find<TextBox>(prefilled, "txtAnahtar").Text);
+        Assert.Null(prefilled.EnvironmentKeyWarning);
+
+        setup.Prefill = new(null, true);
+        using var invalid = new IlkKurulumForm(setup) { Prompts = new RecordingPrompts(), RequireSetupKey = true };
+        Assert.Equal(string.Empty, Find<TextBox>(invalid, "txtAnahtar").Text);
+        Assert.Equal(IlkKurulumForm.EnvironmentKeyInvalid, invalid.EnvironmentKeyWarning);
+
+        // An empty database asks for no key, so the environment is not even read.
+        using var empty = new IlkKurulumForm(setup) { Prompts = new RecordingPrompts() };
+        Assert.Null(empty.EnvironmentKeyWarning);
+        Assert.Equal(string.Empty, Find<TextBox>(empty, "txtAnahtar").Text);
+    });
+
     [Fact]
     public void CreateEvent_WhilePending_IsNotSentTwice() => Run(() =>
     {
