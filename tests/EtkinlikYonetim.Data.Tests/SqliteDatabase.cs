@@ -1,6 +1,7 @@
 using EtkinlikYonetim.Data.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
@@ -38,6 +39,18 @@ public sealed class SqliteDatabase(bool demo = true) : IAsyncLifetime
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
 
         await Get<IDatabaseInitializer>().InitializeAsync();
+    }
+
+    /// <summary>
+    /// Another, independent set of the application's services on the same database, as a second
+    /// application instance (another Windows profile or computer) has; the caller disposes it.
+    /// </summary>
+    public ServiceProvider BuildServices(params IInterceptor[] interceptors)
+    {
+        var services = new ServiceCollection();
+        services.AddDataAccess(options => options.UseSqlite(_connection).AddInterceptors(interceptors), new DataAccessOptions { SeedDemoData = false });
+        services.AddTestBusinessServices(Clock);
+        return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
     }
 
     public async ValueTask DisposeAsync()

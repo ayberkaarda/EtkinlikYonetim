@@ -3,6 +3,7 @@ using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EtkinlikYonetim.Data.Tests;
 
@@ -61,7 +62,7 @@ public sealed class FirstRunTests : IAsyncLifetime
 
     /// <summary>
     /// A database with accounts but no admin (an upgraded or emptied one) keeps its sign-in and is no
-    /// invitation to become its founder: the first admin needs the local, single use setup key.
+    /// invitation to become its founder: the first admin needs a single use key issued for this database.
     /// </summary>
     [Fact]
     public async Task Setup_ExistingUsers_RequiresBootstrapAuthority()
@@ -70,64 +71,177 @@ public sealed class FirstRunTests : IAsyncLifetime
         var setup = _db.Get<ISetupService>();
         Assert.False(await setup.IsSetupRequiredAsync(Ct));
         Assert.True(await setup.IsAdminMissingAsync(Ct));
-        var key = TestServices.ReadSetupKey(_db.Services);
 
-        var withoutKey = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(null, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
-        var wrongKey = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync("YANLIS-ANAHTAR", "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
-        Assert.Equal(SetupService.SetupKeyInvalid, withoutKey.Message);
-        Assert.Equal(SetupService.SetupKeyInvalid, wrongKey.Message);
+        // Before a key is issued no value is an authority, also not one in the key format.
+        await AssertRefusedAsync(setup, null);
+        await AssertRefusedAsync(setup, SetupKeyPolicy.NewKey());
+        var key = await TestServices.CreateSetupKeyAsync(_db.Services);
+        await AssertRefusedAsync(setup, "YANLIS-ANAHTAR");
+        await AssertRefusedAsync(setup, SetupKeyPolicy.NewKey());
         Assert.Equal(0, await CountAdminsAsync());
         await Assert.ThrowsAsync<BusinessRuleException>(() => _db.Get<IAuthService>().SignInAsync("kurucu", "Gizli.Sifre1", Ct));
 
-        // A taken name is refused before the key is asked for, so the key stays valid; the account keeps its role.
+        // A taken name is refused before the key is checked, so the key stays valid; the account keeps its role.
         var taken = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(key, "uye", "Baska.Sifre1", "Baska.Sifre1", Ct));
         Assert.Equal(AuthService.UserNameTaken, taken.Message);
         Assert.Equal(UserRole.User, (await _db.Get<IAuthService>().SignInAsync("uye", "Gizli.Sifre1", Ct)).Role);
 
-        var session = await setup.CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
+        // Typed as shown or in lower case without dashes.
+        var session = await setup.CreateFirstAdminAsync(" " + key.ToLowerInvariant().Replace("-", " ", StringComparison.Ordinal) + " ", "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
         Assert.True(session.IsAdmin);
         Assert.True((await _db.Get<IAuthService>().SignInAsync("kurucu", "Gizli.Sifre1", Ct)).IsAdmin);
         Assert.Equal(1, await CountAdminsAsync());
 
         // Single use: with the admin gone again the same key is no authority any more.
-        await using (var context = _db.CreateContext())
-        {
-            await context.Users.Where(u => u.Role == UserRole.Admin).ExecuteDeleteAsync(Ct);
-        }
-
-        var reused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(key, "ikinci", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
-        Assert.Equal(SetupService.SetupKeyInvalid, reused.Message);
+        await DeleteAdminsAsync();
+        await AssertRefusedAsync(setup, key);
         Assert.Equal(0, await CountAdminsAsync());
     }
 
-    /// <summary>Wrong setup keys are counted; after the limit even the right key waits for the lockout.</summary>
+    /// <summary>Wrong keys are counted in the database; after the limit even the right key is refused until a new one is issued.</summary>
     [Fact]
-    public async Task Setup_ExistingUsersAndRepeatedWrongKeys_LocksTheKey()
+    public async Task Setup_ExistingUsersAndRepeatedWrongKeys_SpendTheKey()
     {
         await _db.Get<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
         var setup = _db.Get<ISetupService>();
-        var key = TestServices.ReadSetupKey(_db.Services);
+        var key = await TestServices.CreateSetupKeyAsync(_db.Services);
 
-        for (var i = 1; i < SetupKeyPolicy.MaxFailedAttempts; i++)
+        for (var i = 0; i < SetupKeyPolicy.MaxFailedAttempts; i++)
         {
-            var wrong = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync("YANLIS" + i, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
-            Assert.Equal(SetupService.SetupKeyInvalid, wrong.Message);
+            await AssertRefusedAsync(setup, i % 2 == 0 ? SetupKeyPolicy.NewKey() : "yanlis");
         }
 
-        var last = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync("YANLIS", "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
-        var right = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
-        Assert.Equal(SetupService.SetupKeyLocked, last.Message);
-        Assert.Equal(SetupService.SetupKeyLocked, right.Message);
-        Assert.Equal(0, await CountAdminsAsync());
+        // Counted by the database, so another application instance sees the same count.
+        await using (var other = _db.BuildServices())
+        {
+            await AssertRefusedAsync(other.GetRequiredService<ISetupService>(), key);
+        }
 
-        _db.Clock.Advance(SetupKeyPolicy.LockoutDuration);
+        await using (var context = _db.CreateContext())
+        {
+            Assert.Equal(SetupKeyPolicy.MaxFailedAttempts, await context.SetupKeys.Select(k => k.FailedAttempts).SingleAsync(Ct));
+        }
+
+        var fresh = await TestServices.CreateSetupKeyAsync(_db.Services);
+        Assert.True((await setup.CreateFirstAdminAsync(fresh, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct)).IsAdmin);
+    }
+
+    /// <summary>A key lives for 24 hours, and issuing a new one withdraws the older unused key.</summary>
+    [Fact]
+    public async Task Setup_ExpiredOrReplacedKey_IsRefused()
+    {
+        await _db.Get<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
+        var setup = _db.Get<ISetupService>();
+
+        var expired = await TestServices.CreateSetupKeyAsync(_db.Services);
+        _db.Clock.Advance(SetupKeyPolicy.Lifetime);
+        await AssertRefusedAsync(setup, expired);
+
+        var replaced = await TestServices.CreateSetupKeyAsync(_db.Services);
+        var current = await TestServices.CreateSetupKeyAsync(_db.Services);
+        await AssertRefusedAsync(setup, replaced);
+        _db.Clock.Advance(SetupKeyPolicy.Lifetime - TimeSpan.FromSeconds(1));
+        Assert.True((await setup.CreateFirstAdminAsync(current, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct)).IsAdmin);
+    }
+
+    /// <summary>
+    /// A client cannot make itself the founder: while an admin with a password exists no key can be
+    /// issued, a value chosen on the client (as ETKINLIK_SETUP_KEY of its own profile) is no authority,
+    /// and nothing about the admin account changes.
+    /// </summary>
+    [Fact]
+    public async Task SetupAuthority_UntrustedProfileCannotRecoverAdmin()
+    {
+        var setup = _db.Get<ISetupService>();
+        await setup.CreateFirstAdminAsync(null, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
+        await _db.Get<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
+        var before = await AdminRowAsync();
+
+        await using var untrusted = _db.BuildServices();
+        var untrustedSetup = untrusted.GetRequiredService<ISetupService>();
+        var issue = await Assert.ThrowsAsync<BusinessRuleException>(() => untrustedSetup.CreateSetupKeyAsync(Ct));
+        Assert.Equal(SetupService.SetupKeyNotNeeded, issue.Message);
+        var ownKey = await Assert.ThrowsAsync<BusinessRuleException>(
+            () => untrustedSetup.CreateFirstAdminAsync(SetupKeyPolicy.NewKey(), "kurucu", "Baska.Sifre1", "Baska.Sifre1", Ct));
+        Assert.Equal(SetupService.AlreadyDone, ownKey.Message);
+
+        await using (var context = _db.CreateContext())
+        {
+            Assert.Equal(0, await context.SetupKeys.CountAsync(Ct));
+        }
+
+        Assert.Equal(before, await AdminRowAsync());
+        Assert.True((await _db.Get<IAuthService>().SignInAsync("kurucu", "Gizli.Sifre1", Ct)).IsAdmin);
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _db.Get<IAuthService>().SignInAsync("kurucu", "Baska.Sifre1", Ct));
+    }
+
+    /// <summary>A key used through one application instance cannot be used again through another one (another profile or computer).</summary>
+    [Fact]
+    public async Task SetupAuthority_KeyUsedOnOneProfile_IsRefusedOnAnother()
+    {
+        await _db.Get<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
+        var key = await TestServices.CreateSetupKeyAsync(_db.Services);
+
+        await using (var first = _db.BuildServices())
+        {
+            Assert.True((await first.GetRequiredService<ISetupService>().CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct)).IsAdmin);
+        }
+
+        await DeleteAdminsAsync();
+        await using var second = _db.BuildServices();
+        await AssertRefusedAsync(second.GetRequiredService<ISetupService>(), key);
+        Assert.Equal(0, await CountAdminsAsync());
+    }
+
+    /// <summary>The key is used up in the transaction that writes the admin: a failed write leaves it unused.</summary>
+    [Fact]
+    public async Task Setup_FailedWriteDoesNotSpendAuthority()
+    {
+        await _db.Get<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", Ct);
+        var key = await TestServices.CreateSetupKeyAsync(_db.Services);
+        var failure = new FailingInsertInterceptor("Kullanicilar");
+        await using var provider = _db.BuildServices(failure);
+        var setup = provider.GetRequiredService<ISetupService>();
+
+        failure.FailNextInsert();
+        await Assert.ThrowsAnyAsync<Exception>(() => setup.CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
+
+        Assert.Equal(1, failure.Failures);
+        Assert.Equal(0, await CountAdminsAsync());
+        await using (var context = _db.CreateContext())
+        {
+            var record = await context.SetupKeys.SingleAsync(Ct);
+            Assert.Null(record.ConsumedAt);
+            Assert.Equal(0, record.FailedAttempts);
+        }
+
         Assert.True((await setup.CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct)).IsAdmin);
-        Assert.Equal(1, await CountAdminsAsync());
+        await DeleteAdminsAsync();
+        await AssertRefusedAsync(setup, key);
+    }
+
+    private static async Task AssertRefusedAsync(ISetupService setup, string? key)
+    {
+        var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", Ct));
+        Assert.Equal(SetupService.SetupKeyInvalid, refused.Message);
     }
 
     private async Task<int> CountAdminsAsync()
     {
         await using var context = _db.CreateContext();
         return await context.Users.CountAsync(u => u.Role == UserRole.Admin, Ct);
+    }
+
+    private async Task DeleteAdminsAsync()
+    {
+        await using var context = _db.CreateContext();
+        await context.Users.Where(u => u.Role == UserRole.Admin).ExecuteDeleteAsync(Ct);
+    }
+
+    private async Task<string> AdminRowAsync()
+    {
+        await using var context = _db.CreateContext();
+        var admin = await context.Users.AsNoTracking().SingleAsync(u => u.Role == UserRole.Admin, Ct);
+        return admin.Id + "/" + admin.UserName + "/" + admin.PasswordHash + "/" + admin.PasswordFormat;
     }
 }

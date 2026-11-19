@@ -1,4 +1,3 @@
-using System.Globalization;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
@@ -10,8 +9,9 @@ namespace EtkinlikYonetim.Business.Services;
 /// First-run setup. A new database contains no account at all (there is no default or documented
 /// password); the person installing the application creates the first admin account with a password
 /// of their own choosing. A database that has accounts but no admin (for example an upgraded one) is no
-/// such invitation: there the first admin needs the local setup key (<see cref="ISetupKeyStore"/>), so
-/// having no admin alone does not make whoever opens the application its founder.
+/// such invitation: there the first admin needs a setup key issued for that database by the
+/// <c>--create-setup-key</c> command (<see cref="SetupKeyPolicy"/>), so neither having no admin nor a
+/// value chosen on a client makes whoever opens the application its founder.
 /// </summary>
 public interface ISetupService
 {
@@ -21,20 +21,22 @@ public interface ISetupService
     /// </summary>
     Task<bool> IsSetupRequiredAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Whether no admin account exists, so the first one can still be created with the setup key.</summary>
+    /// <summary>Whether no admin account exists, so the first one can still be created with a setup key.</summary>
     Task<bool> IsAdminMissingAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Makes sure a setup key exists and returns the file that holds it, or <see langword="null"/> when
-    /// the key is taken from the environment.
+    /// Issues a new setup key for this database, valid for <see cref="SetupKeyPolicy.Lifetime"/> and
+    /// once, and returns it to be shown once; only its hash is stored. Every earlier unused key is
+    /// withdrawn.
     /// </summary>
-    string? IssueSetupKey();
+    /// <exception cref="BusinessRuleException">An admin exists: there is nothing a setup key may do.</exception>
+    Task<string> CreateSetupKeyAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates the first admin account and signs it in. Refused once any admin exists, also when two
     /// setups run at the same time. When the database has accounts, <paramref name="setupKey"/> must be
-    /// the current setup key; it is used up by the setup that creates the admin. An empty database
-    /// needs no key.
+    /// the valid key issued for it; it is used up in the transaction that creates the admin. An empty
+    /// database needs no key.
     /// </summary>
     /// <exception cref="BusinessRuleException">Invalid input, a wrong key, a taken user name or a finished setup.</exception>
     Task<UserSession> CreateFirstAdminAsync(
@@ -45,14 +47,14 @@ public interface ISetupService
         CancellationToken cancellationToken = default);
 }
 
-internal sealed class SetupService(IUserRepository users, IPasswordHasher passwordHasher, ISetupKeyStore setupKeys) : ISetupService
+internal sealed class SetupService(IUserRepository users, IPasswordHasher passwordHasher, TimeProvider timeProvider) : ISetupService
 {
     internal const string AlreadyDone = "Kurulum zaten tamamlanmış. Lütfen giriş yapın.";
-    internal const string SetupKeyInvalid = "Kurulum anahtarı hatalı veya daha önce kullanılmış.";
 
-    internal static readonly string SetupKeyLocked = string.Create(
-        CultureInfo.InvariantCulture,
-        $"Çok fazla hatalı kurulum anahtarı girildi. {SetupKeyPolicy.LockoutDuration.TotalMinutes:0} dakika sonra yeniden deneyin.");
+    internal const string SetupKeyInvalid =
+        "Kurulum anahtarı hatalı, süresi dolmuş veya daha önce kullanılmış. Gerekirse kurucu yeni bir anahtar üretmelidir.";
+
+    internal const string SetupKeyNotNeeded = "Bu veritabanında bir yönetici hesabı var; kurulum anahtarı üretilemez.";
 
     public async Task<bool> IsSetupRequiredAsync(CancellationToken cancellationToken = default) =>
         !await users.AnyUserAsync(cancellationToken).ConfigureAwait(false);
@@ -60,10 +62,12 @@ internal sealed class SetupService(IUserRepository users, IPasswordHasher passwo
     public async Task<bool> IsAdminMissingAsync(CancellationToken cancellationToken = default) =>
         !await users.AnyAdminAsync(cancellationToken).ConfigureAwait(false);
 
-    public string? IssueSetupKey()
+    public async Task<string> CreateSetupKeyAsync(CancellationToken cancellationToken = default)
     {
-        setupKeys.EnsureIssued();
-        return setupKeys.KeyFilePath;
+        var key = SetupKeyPolicy.NewKey();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var issued = await users.IssueSetupKeyAsync(SetupKeyPolicy.Hash(key)!, now, now + SetupKeyPolicy.Lifetime, cancellationToken).ConfigureAwait(false);
+        return issued ? key : throw new BusinessRuleException(SetupKeyNotNeeded);
     }
 
     public async Task<UserSession> CreateFirstAdminAsync(
@@ -104,14 +108,15 @@ internal sealed class SetupService(IUserRepository users, IPasswordHasher passwo
         };
 
         FirstAdminResult result;
-        var keyCheck = SetupKeyCheck.Wrong;
         try
         {
-            // The repository decides atomically and asks for the key inside its transaction, only when
-            // the database has accounts; a check here would leave a window for a second setup.
+            // The repository decides atomically and checks and uses up the key inside its transaction,
+            // only when the database has accounts; a check here would leave a window for a second setup.
             result = await users.AddFirstAdminAsync(
                 admin,
-                () => (keyCheck = setupKeys.TryConsume(setupKey)) == SetupKeyCheck.Consumed,
+                SetupKeyPolicy.Hash(setupKey),
+                timeProvider.GetUtcNow().UtcDateTime,
+                SetupKeyPolicy.MaxFailedAttempts,
                 cancellationToken).ConfigureAwait(false);
         }
         catch (DuplicateUserNameException ex)
@@ -122,7 +127,7 @@ internal sealed class SetupService(IUserRepository users, IPasswordHasher passwo
         return result.Status switch
         {
             FirstAdminStatus.Created => new UserSession(result.AdminId, name, UserRole.Admin),
-            FirstAdminStatus.NotAuthorized => throw new BusinessRuleException(keyCheck == SetupKeyCheck.LockedOut ? SetupKeyLocked : SetupKeyInvalid),
+            FirstAdminStatus.NotAuthorized => throw new BusinessRuleException(SetupKeyInvalid),
             _ => throw new BusinessRuleException(AlreadyDone),
         };
     }

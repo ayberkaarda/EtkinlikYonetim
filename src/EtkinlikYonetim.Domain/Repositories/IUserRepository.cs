@@ -20,15 +20,31 @@ public interface IUserRepository
     Task<bool> AnyUserAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Stores a new setup key by its hash, only while no admin exists, and withdraws every unused key
+    /// issued before, so at most one key is valid. The check and the write are one atomic step with
+    /// the first-admin setup.
+    /// </summary>
+    /// <returns><see langword="false"/> when an admin exists; nothing is written then.</returns>
+    Task<bool> IssueSetupKeyAsync(byte[] keyHash, DateTime now, DateTime expiresAt, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Stores <paramref name="admin"/> as the first admin account, only while no admin exists. The
     /// check and the insert are one atomic step, so of concurrent setups exactly one succeeds. When the
-    /// database already has accounts, <paramref name="authorize"/> is the final decision about the
-    /// caller's right to create the first admin: it is called inside the write transaction, after the
-    /// checks found no admin and a free user name and while concurrent setups wait, and nothing is
-    /// written when it returns <see langword="false"/>. An empty database needs no authorization.
+    /// database already has accounts, the setup key whose hash is <paramref name="setupKeyHash"/> is the
+    /// final decision about the caller's right: inside the same write transaction, after the checks
+    /// found no admin and a free user name, the valid issued key (unused, not expired at
+    /// <paramref name="now"/>, fewer than <paramref name="maxFailedAttempts"/> wrong attempts) is
+    /// compared in constant time and used up by a conditional UPDATE. A wrong key is counted on that
+    /// key. When the insert fails the transaction rolls back and the key stays unused. An empty
+    /// database needs no key.
     /// </summary>
     /// <exception cref="DuplicateUserNameException">The user name is taken by another account.</exception>
-    Task<FirstAdminResult> AddFirstAdminAsync(User admin, Func<bool> authorize, CancellationToken cancellationToken = default);
+    Task<FirstAdminResult> AddFirstAdminAsync(
+        User admin,
+        byte[]? setupKeyHash,
+        DateTime now,
+        int maxFailedAttempts,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Counts a failed sign-in atomically. When the count reaches <paramref name="maxAttempts"/> the
@@ -63,7 +79,10 @@ public enum FirstAdminStatus
     /// <summary>An admin existed already; nothing was written.</summary>
     AdminExists = 1,
 
-    /// <summary>The database has accounts and the authorization was refused; nothing was written.</summary>
+    /// <summary>
+    /// The database has accounts and no valid setup key matched; no account was written (a wrong key
+    /// was counted on the issued key).
+    /// </summary>
     NotAuthorized = 2,
 }
 

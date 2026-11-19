@@ -279,7 +279,7 @@ public sealed class LegacyUpgradeTests
 
     /// <summary>
     /// An upgraded database whose accounts are all users keeps its sign-in: whoever opens the
-    /// application cannot make themselves admin, only the holder of the local setup key can, once.
+    /// application cannot make themselves admin, only the holder of a key issued for this database can, once.
     /// </summary>
     [Fact]
     public async Task Initialize_LegacyDatabaseWithoutAdmin_NeedsTheSetupKeyForTheFirstAdmin()
@@ -296,7 +296,7 @@ public sealed class LegacyUpgradeTests
 
         Assert.False(await setup.IsSetupRequiredAsync(ct));
         Assert.True(await setup.IsAdminMissingAsync(ct));
-        var key = TestServices.ReadSetupKey(provider);
+        var key = await TestServices.CreateSetupKeyAsync(provider);
         var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(null, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));
         Assert.Equal(SetupService.SetupKeyInvalid, refused.Message);
         Assert.Equal(0, await database.ScalarAsync(Admins, ct));
@@ -433,6 +433,7 @@ public sealed class LegacyUpgradeTests
             "FK_Katilimcilar_Kullanicilar", "FK_Kayitlar_Katilimcilar", "FK_Kayitlar_Etkinlikler", "FK_Biletler_Kayitlar",
             "CK_Kullanicilar_Rol", "CK_Kullanicilar_BasarisizGiris", "CK_Kullanicilar_SifreBicimi",
             "CK_Etkinlikler_Kapasite", "CK_Etkinlikler_KayitSayisi", "CK_Kayitlar_Durum",
+            "PK_KurulumAnahtarlari", "CK_KurulumAnahtarlari_BasarisizDeneme",
         ];
         foreach (var name in expected)
         {
@@ -442,7 +443,7 @@ public sealed class LegacyUpgradeTests
         // The system-named unique, default and check constraints are replaced by named ones.
         Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.key_constraints WHERE type = 'UQ'", ct));
         Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.default_constraints", ct));
-        Assert.Equal(15, await database.ScalarAsync("SELECT COUNT(*) FROM sys.objects WHERE type IN ('PK', 'F', 'C') AND parent_object_id <> OBJECT_ID(N'dbo.__EFMigrationsHistory')", ct));
+        Assert.Equal(17, await database.ScalarAsync("SELECT COUNT(*) FROM sys.objects WHERE type IN ('PK', 'F', 'C') AND parent_object_id <> OBJECT_ID(N'dbo.__EFMigrationsHistory')", ct));
         Assert.Equal(4, await database.ScalarAsync(
             "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 1 AND has_filter = 0 AND name IN (N'IX_Kullanicilar_KullaniciAdi', N'IX_Katilimcilar_KullaniciId_TcKimlikNo', N'IX_Biletler_KayitId', N'IX_Biletler_BiletKodu')",
             ct));

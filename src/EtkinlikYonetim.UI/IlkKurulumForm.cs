@@ -9,7 +9,7 @@ namespace EtkinlikYonetim.UI
     /// First-run setup: opens by itself on an empty database, where the person installing the
     /// application creates the first admin account with a password of their own; there is no default
     /// password. A database with accounts but no admin offers it from the sign-in with
-    /// <see cref="RequireSetupKey"/> set: then the local setup key proves the founder's authority.
+    /// <see cref="RequireSetupKey"/> set: then a setup key issued for that database proves the founder's authority.
     /// Closes with <see cref="DialogResult.OK"/> and <see cref="Session"/> set on success.
     /// </summary>
     public partial class IlkKurulumForm : Form
@@ -47,9 +47,9 @@ namespace EtkinlikYonetim.UI
         public UserSession? Session { get; private set; }
 
         /// <summary>
-        /// Whether the setup key is asked for, because the database has accounts but no admin. Setting it
-        /// issues the key (when it comes from a file) and shows where to find it; the key itself is never
-        /// shown.
+        /// Whether the setup key is asked for, because the database has accounts but no admin. The key
+        /// field starts with the value of the ETKINLIK_SETUP_KEY environment variable, if any; the database
+        /// decides whether it is a valid key.
         /// </summary>
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public bool RequireSetupKey
@@ -66,9 +66,10 @@ namespace EtkinlikYonetim.UI
                 var shift = value ? KeySectionHeight : -KeySectionHeight;
                 SuspendLayout();
                 lblAciklama.Height += shift;
-                lblAciklama.Text = value ? SetupKeyHint(_setup.IssueSetupKey()) : _emptyDatabaseText;
+                lblAciklama.Text = value ? SetupKeyHint : _emptyDatabaseText;
                 lblAnahtar.Visible = value;
                 txtAnahtar.Visible = value;
+                txtAnahtar.Text = value ? Environment.GetEnvironmentVariable(SetupKeyPolicy.EnvironmentVariable) ?? string.Empty : string.Empty;
                 foreach (Control control in new Control[] { label1, txtKullaniciAdi, label2, txtSifre, label3, txtSifreTekrar, btnOlustur, btnIptal })
                 {
                     control.Top += shift;
@@ -84,13 +85,11 @@ namespace EtkinlikYonetim.UI
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         internal IUserPrompts Prompts { get; set; }
 
-        /// <summary>Where the installer finds the setup key; the key itself is never shown.</summary>
-        internal static string SetupKeyHint(string? keyFilePath) =>
-            "Bu veritabanında hesaplar var ama yönetici yok. İlk yönetici hesabını yalnızca bu bilgisayarın kurulum anahtarıyla oluşturabilirsiniz. "
-            + (keyFilePath is null
-                ? "Anahtar, " + FileSetupKeyStore.EnvironmentVariable + " ortam değişkeninde tanımlıdır."
-                : "Anahtar şu dosyadadır:\n" + keyFilePath)
-            + "\nAnahtar bir kez kullanılır.";
+        /// <summary>How the founder gets a setup key for this database; no key is issued or shown here.</summary>
+        internal static readonly string SetupKeyHint =
+            "Bu veritabanında hesaplar var ama yönetici yok. İlk yönetici hesabı yalnızca bu veritabanı için üretilmiş bir kurulum anahtarıyla oluşturulabilir. "
+            + "Anahtarı veritabanının kurucusu \"EtkinlikYonetim.exe --create-setup-key\" komutuyla üretir; "
+            + "anahtar 24 saat geçerlidir ve bir kez kullanılır.";
 
         /// <summary>Creates the first admin; ignored while a previous attempt is still running.</summary>
         internal async Task<UserSession?> CreateAsync()

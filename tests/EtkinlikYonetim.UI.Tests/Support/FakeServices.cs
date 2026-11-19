@@ -52,7 +52,7 @@ internal sealed class PendingSetupService : ISetupService
 
     public Task<bool> IsAdminMissingAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
 
-    public string? IssueSetupKey() => @"C:\Kurulum\setup-key.txt";
+    public Task<string> CreateSetupKeyAsync(CancellationToken cancellationToken = default) => Task.FromResult("ABCDE-FGHJK-MNPQR-STVWX");
 
     public Task<UserSession> CreateFirstAdminAsync(string? setupKey, string? userName, string? password, string? passwordRepeat, CancellationToken cancellationToken = default)
     {

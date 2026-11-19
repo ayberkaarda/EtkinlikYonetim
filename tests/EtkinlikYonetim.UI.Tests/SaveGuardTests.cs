@@ -66,7 +66,7 @@ public sealed class SaveGuardTests
         Assert.False(Find<Button>(form, "btnIptal").Enabled);
     });
 
-    /// <summary>An empty database sends no key; a database without admins asks for it and shows only where it is.</summary>
+    /// <summary>An empty database sends no key; a database without admins asks for it and tells how the founder issues one.</summary>
     [Fact]
     public void FirstRunSetup_SetupKeyMode_SendsTheTypedKeyOnly() => Run(() =>
     {
@@ -84,7 +84,7 @@ public sealed class SaveGuardTests
         _ = keyed.CreateAsync();
 
         Assert.Equal("ABCDE-FGHJK", setup.LastSetupKey);
-        Assert.Contains(setup.IssueSetupKey()!, Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
+        Assert.Contains("--create-setup-key", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
         Assert.DoesNotContain("ABCDE", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
         Assert.Equal(emptyHeight + 64, keyed.ClientSize.Height);
         Assert.True(Find<TextBox>(keyed, "txtAnahtar").UseSystemPasswordChar);

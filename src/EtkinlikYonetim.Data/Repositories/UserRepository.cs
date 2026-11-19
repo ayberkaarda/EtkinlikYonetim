@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using System.Security.Cryptography;
 using EtkinlikYonetim.Data.Persistence;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
@@ -75,10 +76,38 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return await db.Users.AnyAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<FirstAdminResult> AddFirstAdminAsync(User admin, Func<bool> authorize, CancellationToken cancellationToken = default)
+    public async Task<bool> IssueSetupKeyAsync(byte[] keyHash, DateTime now, DateTime expiresAt, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(keyHash);
+
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        // The same lock as the first-admin setup: a key is never issued next to an admin, and a setup
+        // in progress finishes before an older key is withdrawn.
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+        if (await AccountStateLockedAsync(db, cancellationToken).ConfigureAwait(false) == AccountState.AdminExists)
+        {
+            return false;
+        }
+
+        await db.SetupKeys
+            .Where(k => k.ConsumedAt == null && k.ExpiresAt > now)
+            .ExecuteUpdateAsync(s => s.SetProperty(k => k.ExpiresAt, now), cancellationToken)
+            .ConfigureAwait(false);
+        db.SetupKeys.Add(new SetupKeyRecord { KeyHash = keyHash, CreatedAt = now, ExpiresAt = expiresAt });
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<FirstAdminResult> AddFirstAdminAsync(
+        User admin,
+        byte[]? setupKeyHash,
+        DateTime now,
+        int maxFailedAttempts,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(admin);
-        ArgumentNullException.ThrowIfNull(authorize);
 
         try
         {
@@ -104,9 +133,11 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
                     throw new DuplicateUserNameException("The user name is already registered.");
                 }
 
-                // Decided while the lock is held: only the setup that gets here first can use the authority.
-                if (!authorize())
+                // Decided while the lock is held: only the setup that gets here first can use the key, and
+                // the key is used up in this transaction, so a failed insert leaves it unused.
+                if (!await TryConsumeSetupKeyAsync(db, setupKeyHash, now, maxFailedAttempts, cancellationToken).ConfigureAwait(false))
                 {
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                     return new FirstAdminResult(FirstAdminStatus.NotAuthorized, 0);
                 }
             }
@@ -189,6 +220,48 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
             .ConfigureAwait(false);
 
         return updated == 1;
+    }
+
+    /// <summary>
+    /// Compares <paramref name="candidateHash"/> with the valid issued key in constant time and uses the
+    /// key up with a conditional UPDATE. A wrong key is counted on the valid key (committed by the
+    /// caller); after <paramref name="maxFailedAttempts"/> the key is no longer valid.
+    /// </summary>
+    private static async Task<bool> TryConsumeSetupKeyAsync(
+        EventDbContext db,
+        byte[]? candidateHash,
+        DateTime now,
+        int maxFailedAttempts,
+        CancellationToken cancellationToken)
+    {
+        var key = await db.SetupKeys
+            .AsNoTracking()
+            .Where(k => k.ConsumedAt == null && k.ExpiresAt > now && k.FailedAttempts < maxFailedAttempts)
+            .OrderByDescending(k => k.Id)
+            .Select(k => new { k.Id, k.KeyHash })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (key is null)
+        {
+            return false;
+        }
+
+        var given = candidateHash is { Length: SchemaLimits.SetupKeyHashLength } ? candidateHash : new byte[SchemaLimits.SetupKeyHashLength];
+        var id = key.Id;
+        if (candidateHash is null || !CryptographicOperations.FixedTimeEquals(key.KeyHash, given))
+        {
+            await db.SetupKeys
+                .Where(k => k.Id == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(k => k.FailedAttempts, k => k.FailedAttempts + 1), cancellationToken)
+                .ConfigureAwait(false);
+            return false;
+        }
+
+        var consumed = await db.SetupKeys
+            .Where(k => k.Id == id && k.ConsumedAt == null && k.ExpiresAt > now && k.FailedAttempts < maxFailedAttempts)
+            .ExecuteUpdateAsync(s => s.SetProperty(k => k.ConsumedAt, now), cancellationToken)
+            .ConfigureAwait(false);
+        return consumed == 1;
     }
 
     /// <summary>Reads whether the table is empty, has accounts only or has an admin, locking all of it until the commit.</summary>
