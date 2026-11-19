@@ -52,14 +52,41 @@ public sealed class CheckInTests : IAsyncLifetime
         var receipt = await Registrations.RegisterAsync(User(SeedUserId), ConcertId, DenizNationalId, Ct);
         await Registrations.RegisterAsync(User(SeedUserId), ConcertId, EceNationalId, Ct);
         Assert.Equal(new CheckInCount(0, 2), await CheckIns.GetCountAsync(admin, ConcertId, Ct));
+        await MoveToTheDayOfAsync(ConcertId);
 
         var first = await CheckIns.CheckInAsync(admin, ConcertId, receipt.TicketCode, Ct);
         var second = await CheckIns.CheckInAsync(admin, ConcertId, receipt.TicketCode, Ct);
 
-        Assert.Equal(new CheckInResult(CheckInOutcome.CheckedIn, new CheckInCount(1, 2)), first);
-        Assert.Equal(new CheckInResult(CheckInOutcome.AlreadyUsed, new CheckInCount(1, 2)), second);
+        // The staff see the name of the participant who was let in, to compare it with an identity document.
         await using var context = _db.CreateContext();
-        Assert.Equal(Start.UtcDateTime, (await context.Tickets.SingleAsync(t => t.Code == receipt.TicketCode, Ct)).CheckedInAt);
+        var name = (await context.Participants.SingleAsync(p => p.NationalId == DenizNationalId, Ct)).FullName;
+        Assert.Equal(new CheckInResult(CheckInOutcome.CheckedIn, new CheckInCount(1, 2), name), first);
+        Assert.Equal(new CheckInResult(CheckInOutcome.AlreadyUsed, new CheckInCount(1, 2)), second);
+        Assert.Equal(_db.Clock.GetUtcNow().UtcDateTime, (await context.Tickets.SingleAsync(t => t.Code == receipt.TicketCode, Ct)).CheckedInAt);
+    }
+
+    /// <summary>
+    /// A ticket scanned before (or after) its event's day is not used up: the scan says so and writes nothing,
+    /// and the same ticket works on the day itself.
+    /// </summary>
+    [Fact]
+    public async Task CheckIn_OnAnotherDay_DoesNotUseTheTicket()
+    {
+        var admin = Admin(SeedAdminId);
+        var receipt = await Registrations.RegisterAsync(User(SeedUserId), ConcertId, DenizNationalId, Ct);
+
+        var early = await CheckIns.CheckInAsync(admin, ConcertId, receipt.TicketCode, Ct);
+
+        Assert.Equal(new CheckInResult(CheckInOutcome.NotEventDay, new CheckInCount(0, 1)), early);
+        await using (var context = _db.CreateContext())
+        {
+            Assert.Null((await context.Tickets.SingleAsync(Ct)).CheckedInAt);
+        }
+
+        await MoveToTheDayOfAsync(ConcertId);
+        Assert.Equal(CheckInOutcome.CheckedIn, (await CheckIns.CheckInAsync(admin, ConcertId, receipt.TicketCode, Ct)).Outcome);
+        _db.Clock.Advance(TimeSpan.FromDays(1));
+        Assert.Equal(CheckInOutcome.NotEventDay, (await CheckIns.CheckInAsync(admin, ConcertId, receipt.TicketCode, Ct)).Outcome);
     }
 
     [Fact]
@@ -144,6 +171,7 @@ public sealed class CheckInTests : IAsyncLifetime
         var first = await Registrations.RegisterAsync(admin, id, DenizNationalId, Ct);
         var waiting = await Registrations.RegisterAsync(admin, id, EceNationalId, Ct);
         await Registrations.CancelAsync(admin, first.RegistrationId, Ct);
+        await MoveToTheDayOfAsync(id);
 
         // Ece belongs to the user account, which is the one that sees her new ticket.
         var promoted = (await Registrations.GetMyRegistrationsAsync(User(SeedUserId), Ct)).Single(r => r.Id == waiting.RegistrationId);
@@ -151,4 +179,7 @@ public sealed class CheckInTests : IAsyncLifetime
         Assert.Equal(CheckInOutcome.CheckedIn, (await CheckIns.CheckInAsync(admin, id, promoted.TicketCode, Ct)).Outcome);
         Assert.Equal(CheckInOutcome.Rejected, (await CheckIns.CheckInAsync(admin, id, first.TicketCode, Ct)).Outcome);
     }
+
+    private async Task MoveToTheDayOfAsync(int eventId) =>
+        _db.Clock.MoveTo((await _db.Get<IEventService>().GetEventsAsync(Admin(SeedAdminId), Ct)).Single(e => e.Id == eventId).Date);
 }

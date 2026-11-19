@@ -27,7 +27,8 @@ public sealed class ExportTests : IAsyncLifetime
         var deniz = await registrations.RegisterAsync(admin, SmallEventId, DenizNationalId, Ct);
         var ece = await registrations.RegisterAsync(admin, SmallEventId, EceNationalId, Ct);
         await registrations.RegisterAsync(admin, SmallEventId, MertNationalId, Ct); // waits
-        await _db.Get<ICheckInService>().CheckInAsync(admin, SmallEventId, deniz.TicketCode, Ct);
+        _db.Clock.MoveTo((await _db.Get<IEventService>().GetEventsAsync(admin, Ct)).Single(e => e.Id == SmallEventId).Date);
+        Assert.Equal(CheckInOutcome.CheckedIn, (await _db.Get<ICheckInService>().CheckInAsync(admin, SmallEventId, deniz.TicketCode, Ct)).Outcome);
 
         var csv = Encoding.UTF8.GetString((await Exports.ExportCsvAsync(admin, SmallEventId, Ct)).Content);
         var html = Encoding.UTF8.GetString((await Exports.ExportHtmlAsync(admin, SmallEventId, Ct)).Content);

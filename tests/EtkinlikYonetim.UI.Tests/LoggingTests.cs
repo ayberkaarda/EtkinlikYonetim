@@ -399,8 +399,8 @@ public sealed partial class LoggingTests : IDisposable
         var tickets = new Mock<ITicketRepository>();
         tickets.Setup(t => t.FindForCheckInAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((byte[] hash, CancellationToken _) =>
-                hash.SequenceEqual(TicketCodeHash.Of(Valid)) ? new TicketForCheckIn(1, Valid, 1, RegistrationStatus.Active, false, null)
-                : hash.SequenceEqual(TicketCodeHash.Of(Used)) ? new TicketForCheckIn(2, Used, 1, RegistrationStatus.Active, false, Now.UtcDateTime)
+                hash.SequenceEqual(TicketCodeHash.Of(Valid)) ? new TicketForCheckIn(1, Valid, 1, RegistrationStatus.Active, false, null, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
+                : hash.SequenceEqual(TicketCodeHash.Of(Used)) ? new TicketForCheckIn(2, Used, 1, RegistrationStatus.Active, false, Now.UtcDateTime, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
                 : null);
         tickets.Setup(t => t.CheckInAsync(1, 1, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         tickets.Setup(t => t.GetCheckInCountAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new CheckInCount(1, 1));

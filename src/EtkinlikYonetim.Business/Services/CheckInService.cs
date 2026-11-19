@@ -21,10 +21,19 @@ public enum CheckInOutcome
     /// find out which codes exist.
     /// </summary>
     Rejected = 2,
+
+    /// <summary>
+    /// A valid ticket of the chosen event, but the event is not today (by the database's clock): nothing is
+    /// written, so a scan made on the wrong day by mistake does not use the ticket up.
+    /// </summary>
+    NotEventDay = 3,
 }
 
-/// <summary>The outcome of a check-in and the event's counter after it.</summary>
-public sealed record CheckInResult(CheckInOutcome Outcome, CheckInCount Count);
+/// <summary>
+/// The outcome of a check-in and the event's counter after it. <paramref name="ParticipantName"/> is set for
+/// <see cref="CheckInOutcome.CheckedIn"/> only, so the staff can compare it with an identity document.
+/// </summary>
+public sealed record CheckInResult(CheckInOutcome Outcome, CheckInCount Count, string? ParticipantName = null);
 
 /// <summary>The entrance: admins check tickets in for the event they chose.</summary>
 public interface ICheckInService
@@ -43,6 +52,7 @@ public interface ICheckInService
 internal sealed class CheckInService(
     ITicketRepository tickets,
     IDatabaseClock clock,
+    TimeProvider timeProvider,
     ISessionGuard sessions,
     IAuditLog audit) : ICheckInService
 {
@@ -52,7 +62,7 @@ internal sealed class CheckInService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var outcome = await DecideAsync(eventId, code, cancellationToken).ConfigureAwait(false);
+        var (outcome, name) = await DecideAsync(eventId, code, cancellationToken).ConfigureAwait(false);
         audit.Record(
             outcome switch
             {
@@ -62,7 +72,7 @@ internal sealed class CheckInService(
             },
             session.Role);
         var count = await tickets.GetCheckInCountAsync(eventId, cancellationToken).ConfigureAwait(false);
-        return new CheckInResult(outcome, count);
+        return new CheckInResult(outcome, count, outcome == CheckInOutcome.CheckedIn ? name : null);
     }
 
     public async Task<CheckInCount> GetCountAsync(UserSession session, int eventId, CancellationToken cancellationToken = default)
@@ -71,7 +81,7 @@ internal sealed class CheckInService(
         return await tickets.GetCheckInCountAsync(eventId, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<CheckInOutcome> DecideAsync(int eventId, string? typed, CancellationToken cancellationToken)
+    private async Task<(CheckInOutcome Outcome, string? ParticipantName)> DecideAsync(int eventId, string? typed, CancellationToken cancellationToken)
     {
         var wellFormed = TicketCode.TryNormalize(typed, out var code);
         var given = Encoding.ASCII.GetBytes(wellFormed ? code : string.Empty);
@@ -89,26 +99,33 @@ internal sealed class CheckInService(
             || ticket.EventCancelled
             || ticket.Status != RegistrationStatus.Active)
         {
-            return CheckInOutcome.Rejected;
+            return (CheckInOutcome.Rejected, null);
+        }
+
+        // Tickets are used on the event's day only, by the database's clock: a scan on another day (a test
+        // scan, the wrong event chosen) writes nothing and leaves the ticket valid for the day itself.
+        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        if (ticket.EventDate != now.Today)
+        {
+            return (CheckInOutcome.NotEventDay, null);
         }
 
         if (ticket.CheckedInAt is not null)
         {
-            return CheckInOutcome.AlreadyUsed;
+            return (CheckInOutcome.AlreadyUsed, null);
         }
 
         // The check-in time is the database's, so the clock of the scanning computer cannot change it.
-        var checkedInAt = await clock.GetUtcNowAsync(cancellationToken).ConfigureAwait(false);
-        if (await tickets.CheckInAsync(ticket.TicketId, eventId, checkedInAt, cancellationToken).ConfigureAwait(false))
+        if (await tickets.CheckInAsync(ticket.TicketId, eventId, now.Utc, cancellationToken).ConfigureAwait(false))
         {
-            return CheckInOutcome.CheckedIn;
+            return (CheckInOutcome.CheckedIn, ticket.ParticipantName);
         }
 
         // Lost to a concurrent scan of the same ticket, or the registration or event was cancelled since
         // the lookup: read again to tell the two apart.
-        var now = await tickets.FindForCheckInAsync(TicketCodeHash.Of(code), cancellationToken).ConfigureAwait(false);
-        return now is { CheckedInAt: not null, Status: RegistrationStatus.Active, EventCancelled: false } && now.EventId == eventId
+        var again = await tickets.FindForCheckInAsync(TicketCodeHash.Of(code), cancellationToken).ConfigureAwait(false);
+        return (again is { CheckedInAt: not null, Status: RegistrationStatus.Active, EventCancelled: false } && again.EventId == eventId
             ? CheckInOutcome.AlreadyUsed
-            : CheckInOutcome.Rejected;
+            : CheckInOutcome.Rejected, null);
     }
 }

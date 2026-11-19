@@ -16,8 +16,9 @@ internal sealed class TicketRepository(IDbContextFactory<EventDbContext> context
                 from t in db.Tickets.AsNoTracking()
                 join r in db.Registrations on t.RegistrationId equals r.Id
                 join e in db.Events on r.EventId equals e.Id
+                join p in db.Participants on r.ParticipantId equals p.Id
                 where t.CodeHash == codeHash
-                select new TicketForCheckIn(t.Id, t.Code, r.EventId, r.Status, e.Cancelled, t.CheckedInAt))
+                select new TicketForCheckIn(t.Id, t.Code, r.EventId, r.Status, e.Cancelled, t.CheckedInAt, e.Date, p.FullName))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }

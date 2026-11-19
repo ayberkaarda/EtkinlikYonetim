@@ -54,7 +54,7 @@ internal static class ServiceFactory
         new(users, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
     public static CheckInService CheckIn(ITicketRepository tickets, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
-        new(tickets, new TestDatabaseClock(time), sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+        new(tickets, new TestDatabaseClock(time), time, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
     public static Exports.ParticipantExportService Export(
         IEventRepository events,

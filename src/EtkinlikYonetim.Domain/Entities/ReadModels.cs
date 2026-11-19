@@ -110,8 +110,19 @@ public sealed record RegistrationOwnership(
     RegistrationStatus Status,
     bool CheckedIn = false);
 
-/// <summary>What the entrance needs to know about a ticket found by the hash of its code.</summary>
-public sealed record TicketForCheckIn(int TicketId, string Code, int EventId, RegistrationStatus Status, bool EventCancelled, DateTime? CheckedInAt);
+/// <summary>
+/// What the entrance needs to know about a ticket found by the hash of its code: its event's day, and the
+/// participant's name, which the staff compare with an identity document.
+/// </summary>
+public sealed record TicketForCheckIn(
+    int TicketId,
+    string Code,
+    int EventId,
+    RegistrationStatus Status,
+    bool EventCancelled,
+    DateTime? CheckedInAt,
+    DateOnly EventDate = default,
+    string? ParticipantName = null);
 
 /// <summary>The check-ins of an event: tickets used at the entrance and seats held.</summary>
 public readonly record struct CheckInCount(int CheckedIn, int Seats);
