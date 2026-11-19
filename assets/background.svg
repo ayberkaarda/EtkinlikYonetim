@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 920" width="1320" height="920">
+  <!-- Calm lavender backdrop for the sign-in and sign-up screens, with faint ticket shapes at the edges and the mark in a corner. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f6ff"/>
+      <stop offset="0.55" stop-color="#eeebfc"/>
+      <stop offset="1" stop-color="#e1dcf7"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b4fe0"/>
+      <stop offset="1" stop-color="#352a9c"/>
+    </linearGradient>
+    <mask id="markNotches">
+      <rect width="256" height="256" fill="#ffffff"/>
+      <circle cx="40" cy="128" r="17" fill="#000000"/>
+      <circle cx="216" cy="128" r="17" fill="#000000"/>
+      <circle cx="166" cy="72" r="13" fill="#000000"/>
+      <circle cx="166" cy="184" r="13" fill="#000000"/>
+    </mask>
+  </defs>
+  <rect width="1320" height="920" fill="url(#sky)"/>
+
+  <circle cx="1180" cy="120" r="330" fill="#4f46e5" fill-opacity="0.07"/>
+  <circle cx="1240" cy="60" r="180" fill="#4f46e5" fill-opacity="0.06"/>
+  <circle cx="90" cy="860" r="300" fill="#352a9c" fill-opacity="0.06"/>
+  <circle cx="1010" cy="250" r="40" fill="#fbd38a"/>
+  <circle cx="230" cy="700" r="18" fill="#fbd38a"/>
+
+  <g transform="translate(1085 620) rotate(-12)" fill="none" stroke="#352a9c" stroke-opacity="0.13" stroke-width="5">
+    <path d="M-180 -90 H40 A22 22 0 0 0 84 -90 H160 A20 20 0 0 1 180 -70 V-28 A28 28 0 0 0 180 28 V70 A20 20 0 0 1 160 90 H84 A22 22 0 0 0 40 90 H-180 A20 20 0 0 1 -200 70 V28 A28 28 0 0 0 -200 -28 V-70 A20 20 0 0 1 -180 -90 Z"/>
+    <line x1="62" y1="-56" x2="62" y2="56" stroke-dasharray="2 16" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(1085 620) rotate(-12)" fill="#352a9c" fill-opacity="0.10">
+    <rect x="-150" y="-42" width="150" height="16" rx="8"/>
+    <rect x="-150" y="-10" width="104" height="16" rx="8"/>
+    <rect x="-150" y="22" width="128" height="16" rx="8"/>
+  </g>
+
+  <g transform="translate(150 150) rotate(9)" fill="none" stroke="#352a9c" stroke-opacity="0.08" stroke-width="4">
+    <path d="M-90 -50 H20 A16 16 0 0 0 52 -50 H90 A14 14 0 0 1 104 -36 V-18 A18 18 0 0 0 104 18 V36 A14 14 0 0 1 90 50 H52 A16 16 0 0 0 20 50 H-90 A14 14 0 0 1 -104 36 V18 A18 18 0 0 0 -104 -18 V-36 A14 14 0 0 1 -90 -50 Z"/>
+    <line x1="36" y1="-28" x2="36" y2="28" stroke-dasharray="2 12" stroke-linecap="round"/>
+  </g>
+
+  <g fill="#352a9c" fill-opacity="0.12">
+    <circle cx="1170" cy="340" r="5"/>
+    <circle cx="1200" cy="340" r="5"/>
+    <circle cx="1230" cy="340" r="5"/>
+    <circle cx="1170" cy="370" r="5"/>
+    <circle cx="1200" cy="370" r="5"/>
+    <circle cx="1230" cy="370" r="5"/>
+  </g>
+
+  <g transform="translate(1000 834) scale(0.21875)">
+    <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
+    <rect x="40" y="72" width="176" height="112" rx="16" fill="#ffffff" mask="url(#markNotches)"/>
+    <path d="M102 93 L110.8 116.9 L136.2 117.9 L116.3 133.6 L123.2 158.1 L102 144 L80.8 158.1 L87.7 133.6 L67.8 117.9 L93.2 116.9 Z"
+          fill="#f5a524" stroke="#f5a524" stroke-width="6" stroke-linejoin="round"/>
+  </g>
+  <text x="1068" y="871" font-family="Segoe UI, sans-serif" font-size="24" font-weight="600" fill="#352a9c" fill-opacity="0.85">Etkinlik Yönetim</text>
+</svg>
