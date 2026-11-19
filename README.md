@@ -51,7 +51,9 @@ startup.
   later) and capacity ("Kapasite", 1-1000 seats).
 - ✅ **Event management** ("Etkinlik yönetimi", Event management): change the date, capacity and description of an
   event that has not passed; the capacity cannot go below the seats held, and added seats go to the waiting list.
-  A save over another admin's change made after the form was loaded is refused and the current values are shown.
+  A save over another admin's change made after the form was loaded is refused and the current values are shown
+  (an edit version decides, so also a change of only the case of the description is noticed). Which events can
+  still be changed follows the database's day, not the computer's clock.
   Cancelling an event ("Etkinliği iptal et", Cancel event) keeps it listed as cancelled and closes its
   registrations and waiting places (soft delete).
 - ✅ **Add participants** ("Katılımcı ekle") and **issue tickets** ("Kayıt ve bilet", Registration and ticket) for the
@@ -61,8 +63,9 @@ startup.
   unused ticket is checked in ("GİRİŞ YAPILDI"), a second scan says "ZATEN KULLANILDI" (already used) on the same
   screen, and unknown or cancelled tickets and those of other events get one refusal ("GEÇERSİZ BİLET"); a counter
   shows the check-ins against the seats. A check-in shows the participant's name to compare with an identity
-  document, tickets are used only on the event's day ("ETKİNLİK GÜNÜ DEĞİL" otherwise, and the ticket stays
-  valid), and the code field stays open so a scanner can read the next ticket while one is being checked.
+  document, tickets are used only on the event's day, decided again under the event's lock when the ticket is
+  written ("ETKİNLİK GÜNÜ DEĞİL" otherwise, and the ticket stays valid), and the code field stays open so a scanner
+  can read the next ticket while one is being checked.
 - ✅ **Participant list** ("Katılımcı listesi", Participant list): the participants of a chosen event ("Etkinlik",
   Event) with name, masked national id, e-mail and state (checked in, waiting, cancelled), saved as
   CSV ("CSV olarak kaydet") or as a printable HTML page ("Yazdırılabilir liste"). Exports contain no ticket codes.
@@ -79,8 +82,8 @@ startup.
 - ✅ **No duplicate registration**: a participant has at most one seat or waiting place per event (unique index);
   a cancelled registration stays as history.
 - ✅ **No past events**: events cannot be created, registered for or cancelled once their day has passed. "Today"
-  comes from the database's clock, not the computer's, and so do the times written for registrations,
-  cancellations and check-ins.
+  comes from the database's clock, not the computer's, read inside the writing transaction after its lock, and so
+  do the times written for registrations, cancellations and check-ins.
 - ✅ **KVKK**: national ids are shown masked (`123******01`) in admin lists and never written to log files; names and
   e-mail addresses are shown in full in the admin participant list.
 
@@ -92,8 +95,10 @@ startup.
   the same answer.
 - ✅ Every call is checked against the signed-in session and the session against the database: a demoted,
   disabled or deleted account cannot use a window that is still open, and such a window stays closed when the
-  account is enabled or promoted again (a session version changes with every change of access). Users reach only
-  their own participants and registrations, and a missing record and somebody else's record get the same answer.
+  account is enabled or promoted again (a session version changes with every change of access). Every write checks
+  its account again inside its own transaction, after its lock, so an account disabled while the write waited
+  writes nothing. Users reach only their own participants and registrations, and a missing record and somebody
+  else's record get the same answer.
 - ✅ Ticket codes are compared in constant time after a lookup by their SHA-256; they are never logged or exported.
 - ✅ Central FluentValidation validators with Turkish messages; write buttons ignore repeated clicks while an
   operation is pending.
@@ -372,8 +377,10 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the threat model.
 - Lockout counters are updated atomically, and a successful sign-in is written only while the account is still
   unlocked, so concurrent attempts cannot clear a fresh lock.
 - Ownership is checked in the services and repeated in the database statements.
-- Every operation of an open session reads the account's role and enabled state from the database first; account
-  changes check the acting admin again inside their own transaction.
+- Every operation of an open session reads the account's role, enabled state and session version from the database
+  first, and every write checks the acting account (id, role, session version) again inside its own transaction,
+  after its lock, keeping the account row locked until the commit on SQL Server; account changes take the accounts
+  lock first, then check the acting admin in the same way.
 - Ticket codes have 130 random bits (128 for tickets reissued by the upgrade). They are stored as they are, so the participant's account can show the QR
   code again, together with their SHA-256: the entrance finds a ticket by the hash and compares the code in
   constant time. Admin lists and exports never show them.
@@ -396,7 +403,7 @@ dotnet test -c Release
 | Project | Type | Scope |
 |---|---|---|
 | `tests/EtkinlikYonetim.Business.Tests` | Unit | Validator limits (user name 32, password 8/64 and 100 at sign-in, name 64, event name 80, capacity 0/1/1000/1001, description 500, past dates), national id checksum, PBKDF2 and format upgrade, lockout, setup key checks, database checked sessions, account rules, ticket codes and check-in outcomes, CSV and HTML exports, ownership and audit events with strict Moq mocks |
-| `tests/EtkinlikYonetim.Data.Tests` | Integration | Services and repositories on SQLite in-memory (capacity limits, waiting list order, cancellation and registering again, event changes and cancellation, check-in, exports, demoted and disabled sessions, IDOR answers, lockout timing); capacity, waiting list, duplicate, check-in, account, lockout and first-admin races, setup keys with the restricted login, the migrations, the legacy upgrade and its lock on SQL Server |
+| `tests/EtkinlikYonetim.Data.Tests` | Integration | Services and repositories on SQLite in-memory (capacity limits, waiting list order, cancellation and registering again, event changes and cancellation, check-in, exports, demoted and disabled sessions, IDOR answers, lockout timing); capacity, waiting list, duplicate, check-in, account, lockout and first-admin races, setup keys with the restricted login, the migrations, the legacy upgrade and its lock, accounts disabled while a write waits for its lock, an event moved while a check-in waits and a case-only description change on SQL Server |
 | `tests/EtkinlikYonetim.UI.Tests` | Unit | Every screen built without being shown: theme, layout on 1024x600, 1366x768 and 1920x1040 working areas at text scales 1-2, tab order, inline messages, palettes and contrast, live high contrast switch; example configuration, error messages, log content, focus after unlock, write guards, latest-wins loading, event management, entrance and account windows, ticket QR view, export files, session end, neutral branding |
 
 The SQL Server tests use throw-away databases on the server in `ETKINLIK_TEST_SQLSERVER` (default: local SQL
