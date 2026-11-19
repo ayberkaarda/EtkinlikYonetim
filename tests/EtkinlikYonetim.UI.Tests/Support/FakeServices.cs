@@ -216,6 +216,28 @@ internal sealed class ControlledAccountService : IAccountService
     }
 }
 
+/// <summary>Check-ins stay pending until the test answers them; counters are answered by the test, in any order.</summary>
+internal sealed class ControlledCheckInService : ICheckInService
+{
+    public List<(int EventId, string? Code, TaskCompletionSource<CheckInResult> Answer)> CheckIns { get; } = [];
+
+    public List<(int EventId, TaskCompletionSource<CheckInCount> Answer)> CountRequests { get; } = [];
+
+    public Task<CheckInResult> CheckInAsync(UserSession session, int eventId, string? code, CancellationToken cancellationToken = default)
+    {
+        var answer = new TaskCompletionSource<CheckInResult>();
+        CheckIns.Add((eventId, code, answer));
+        return answer.Task;
+    }
+
+    public Task<CheckInCount> GetCountAsync(UserSession session, int eventId, CancellationToken cancellationToken = default)
+    {
+        var answer = new TaskCompletionSource<CheckInCount>();
+        CountRequests.Add((eventId, answer));
+        return answer.Task;
+    }
+}
+
 /// <summary>Answers confirmations with yes and records every message instead of showing a dialog.</summary>
 internal sealed class RecordingPrompts : IUserPrompts
 {
