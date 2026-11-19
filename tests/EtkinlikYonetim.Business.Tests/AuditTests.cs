@@ -199,13 +199,13 @@ public sealed class AuditTests
             .ReturnsAsync([new ParticipantRecord(1, NationalId, "Deniz Örnek", null, Sessions.User.UserId)]);
         _events.Setup(e => e.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(1, "Konser", Today, 2, 1));
         _events.Setup(e => e.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(2, "Dolu", Today, 2, 2));
-        _registrations.Setup(r => r.AddAsync(It.IsAny<Actor>(), 1, 1, Today, Now, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _registrations.Setup(r => r.AddAsync(It.IsAny<Actor>(), 1, 1, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOutcome(5, RegistrationStatus.Active, null));
-        _registrations.Setup(r => r.AddAsync(It.IsAny<Actor>(), 1, 2, Today, Now, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _registrations.Setup(r => r.AddAsync(It.IsAny<Actor>(), 1, 2, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOutcome(6, RegistrationStatus.Waiting, 1));
         _registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOwnership(5, 1, Today, Sessions.User.UserId, RegistrationStatus.Active));
-        _registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 5, Sessions.User.UserId, Today, Now, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 5, Sessions.User.UserId, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CancellationOutcome.CancelledAndPromoted);
         var service = ServiceFactory.Registration(_registrations.Object, _participants.Object, _events.Object, _time, _audit);
 

@@ -182,10 +182,9 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     public async Task Repository_SecondRegistrationOfTheSameParticipant_IsReportedAndTheSeatIsKept()
     {
         var repository = _db.Get<IRegistrationRepository>();
-        var today = DateOnly.FromDateTime(Start.DateTime);
-        await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, ConcertId, today, Start.UtcDateTime, () => "ETK-AAAAAAAAAA", Ct);
+        await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, ConcertId, () => "ETK-AAAAAAAAAA", Ct);
 
-        await Assert.ThrowsAsync<AlreadyRegisteredException>(() => repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, ConcertId, today, Start.UtcDateTime, () => "ETK-BBBBBBBBBB", Ct));
+        await Assert.ThrowsAsync<AlreadyRegisteredException>(() => repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, ConcertId, () => "ETK-BBBBBBBBBB", Ct));
 
         await using var context = _db.CreateContext();
         Assert.Equal(1, (await context.Events.SingleAsync(e => e.Id == ConcertId, Ct)).RegisteredCount);
@@ -313,14 +312,16 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     public async Task Repository_FullOrPastEvent_IsDecidedInsideTheTransaction()
     {
         var repository = _db.Get<IRegistrationRepository>();
-        var today = DateOnly.FromDateTime(Start.DateTime);
         var codes = new Queue<string>(["ETK-AAAAAAAAAA", "ETK-BBBBBBBBBB", "ETK-CCCCCCCCCC"]);
-        await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, SmallEventId, today, Start.UtcDateTime, codes.Dequeue, Ct);
-        await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 2, SmallEventId, today, Start.UtcDateTime, codes.Dequeue, Ct);
+        await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, SmallEventId, codes.Dequeue, Ct);
+        await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 2, SmallEventId, codes.Dequeue, Ct);
 
-        var waiting = await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 3, SmallEventId, today, Start.UtcDateTime, codes.Dequeue, Ct);
-        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 3, ConcertId, new DateOnly(2027, 4, 18), Start.UtcDateTime, codes.Dequeue, Ct));
-        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 3, 999, today, Start.UtcDateTime, codes.Dequeue, Ct));
+        var waiting = await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 3, SmallEventId, codes.Dequeue, Ct);
+
+        // The day is the database's at the write: past the concert's day, the concert is closed.
+        _db.Clock.MoveTo(new DateOnly(2027, 4, 18));
+        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 3, ConcertId, codes.Dequeue, Ct));
+        await Assert.ThrowsAsync<EventClosedException>(() => repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 3, 999, codes.Dequeue, Ct));
 
         Assert.Equal((RegistrationStatus.Waiting, 1), (waiting.Status, waiting.QueuePosition!.Value));
         Assert.Single(codes); // only the two seats drew a ticket code
@@ -541,18 +542,21 @@ public sealed class SqliteServiceTests : IAsyncLifetime
     public async Task Repository_Cancel_RepeatsTheOwnerAndDateConditionsInTheUpdate()
     {
         var repository = _db.Get<IRegistrationRepository>();
-        var today = DateOnly.FromDateTime(Start.DateTime);
-        var id = (await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, ConcertId, today, Start.UtcDateTime, () => "ETK-AAAAAAAAAA", Ct)).RegistrationId;
+        var id = (await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 1, ConcertId, () => "ETK-AAAAAAAAAA", Ct)).RegistrationId;
+        var other = (await repository.AddAsync(Access.ActorOf(Admin(SeedAdminId)), 2, ConcertId, () => "ETK-BBBBBBBBBB", Ct)).RegistrationId;
         static string NoCode() => throw new InvalidOperationException("Nobody waits, so no ticket is issued.");
 
-        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(Admin(SeedAdminId)), id, SeedAdminId, today, Start.UtcDateTime, NoCode, Ct)); // participant 1 belongs to user 2
-        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(User(SeedUserId)), id, SeedUserId, new DateOnly(2027, 4, 18), Start.UtcDateTime, NoCode, Ct));
-        Assert.Equal(CancellationOutcome.Cancelled, await repository.CancelAsync(Access.ActorOf(User(SeedUserId)), id, SeedUserId, today, Start.UtcDateTime, NoCode, Ct));
-        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(Admin(SeedAdminId)), id, null, today, Start.UtcDateTime, NoCode, Ct));
-        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(Admin(SeedAdminId)), 404, null, today, Start.UtcDateTime, NoCode, Ct));
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(Admin(SeedAdminId)), id, SeedAdminId, NoCode, Ct)); // participant 1 belongs to user 2
+        Assert.Equal(CancellationOutcome.Cancelled, await repository.CancelAsync(Access.ActorOf(User(SeedUserId)), id, SeedUserId, NoCode, Ct));
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(Admin(SeedAdminId)), id, null, NoCode, Ct));
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(Admin(SeedAdminId)), 404, null, NoCode, Ct));
+
+        // The day is the database's at the write: past the concert's day nothing is cancelled any more.
+        _db.Clock.MoveTo(new DateOnly(2027, 4, 18));
+        Assert.Equal(CancellationOutcome.NotCancelled, await repository.CancelAsync(Access.ActorOf(User(SeedUserId)), other, SeedUserId, NoCode, Ct));
 
         await using var context = _db.CreateContext();
-        Assert.Equal(0, (await context.Events.SingleAsync(e => e.Id == ConcertId, Ct)).RegisteredCount);
+        Assert.Equal(1, (await context.Events.SingleAsync(e => e.Id == ConcertId, Ct)).RegisteredCount);
     }
 
     [Fact]

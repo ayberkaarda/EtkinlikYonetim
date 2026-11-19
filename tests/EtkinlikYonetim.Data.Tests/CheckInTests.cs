@@ -150,7 +150,7 @@ public sealed class CheckInTests : IAsyncLifetime
         var byUser = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.CancelAsync(User(SeedUserId), inside.RegistrationId, Ct));
         var byAdmin = await Assert.ThrowsAsync<BusinessRuleException>(() => Registrations.CancelAsync(admin, inside.RegistrationId, Ct));
         var direct = await _db.Get<IRegistrationRepository>().CancelAsync(
-            Access.ActorOf(admin), inside.RegistrationId, null, DateOnly.FromDateTime(Start.UtcDateTime), Start.UtcDateTime, () => "ETK-" + new string('C', 26), Ct);
+            Access.ActorOf(admin), inside.RegistrationId, null, () => "ETK-" + new string('C', 26), Ct);
 
         Assert.Equal(RegistrationService.CheckedInCannotCancel, byUser.Message);
         Assert.Equal(RegistrationService.CheckedInCannotCancel, byAdmin.Message);

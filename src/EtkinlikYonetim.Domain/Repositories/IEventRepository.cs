@@ -19,7 +19,8 @@ public interface IEventRepository
     /// <summary>
     /// Changes the date, capacity and description of an event to <paramref name="changed"/>, only while the
     /// event still has the <paramref name="expected"/> values the caller loaded and is neither cancelled nor
-    /// before <paramref name="today"/>, in one transaction under the event's lock. The capacity cannot go below
+    /// past, in one transaction under the event's lock; the new date must not be past either. "Today" is the
+    /// database's day, read in that transaction after the lock. The capacity cannot go below
     /// the seats held (the UPDATE checks it, and so does the check constraint); seats added by a larger capacity
     /// go to the waiting list in order, each with the ticket <paramref name="newTicketCode"/> returns.
     /// </summary>
@@ -29,18 +30,16 @@ public interface IEventRepository
         int id,
         EventValues expected,
         EventValues changed,
-        DateOnly today,
-        DateTime nowUtc,
         Func<string> newTicketCode,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Cancels an event that is neither cancelled nor before <paramref name="today"/> (soft delete): the row
+    /// Cancels an event that is neither cancelled nor past by the database's day, read after the lock (soft delete): the row
     /// stays, its seats and waiting places are closed with <see cref="RegistrationStatus.EventCancelled"/> and
     /// the seat counter goes to zero, in one transaction under the event's lock.
     /// </summary>
     /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
-    Task<EventChangeStatus> CancelAsync(Actor actor, int id, DateOnly today, DateTime cancelledAtUtc, CancellationToken cancellationToken = default);
+    Task<EventChangeStatus> CancelAsync(Actor actor, int id, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Outcome of a change of an event by an admin.</summary>
@@ -60,6 +59,9 @@ public enum EventChangeStatus
 
     /// <summary>The event no longer has the values the caller loaded (somebody else changed it); nothing was written.</summary>
     ChangedElsewhere = 4,
+
+    /// <summary>The new date has passed by the database's day at the time of the write; nothing was written.</summary>
+    DateInPast = 5,
 }
 
 /// <summary>The fields of an event an admin edits.</summary>

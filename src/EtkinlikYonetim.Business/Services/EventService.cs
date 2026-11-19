@@ -119,8 +119,6 @@ internal sealed class EventService(
             original.Id,
             new EventValues(original.Date, original.Capacity, original.Description),
             new EventValues(input.Day, input.Capacity, input.Description),
-            now.Today,
-            now.Utc,
             TicketCode.New,
             cancellationToken)).ConfigureAwait(false);
         Complete(status);
@@ -131,8 +129,8 @@ internal sealed class EventService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
-        var status = await audit.WriteAsAsync(session, actor => events.CancelAsync(actor, eventId, now.Today, now.Utc, cancellationToken)).ConfigureAwait(false);
+        // The repository reads the database's day itself, after the event's lock.
+        var status = await audit.WriteAsAsync(session, actor => events.CancelAsync(actor, eventId, cancellationToken)).ConfigureAwait(false);
         Complete(status);
         audit.Record(AuditEvent.EventCancelled, session.Role);
     }
@@ -145,6 +143,8 @@ internal sealed class EventService(
                 return;
             case EventChangeStatus.Closed:
                 throw new BusinessRuleException(EventClosed);
+            case EventChangeStatus.DateInPast:
+                throw new BusinessRuleException(NewDateInPast);
             case EventChangeStatus.CapacityBelowRegistrations:
                 throw new BusinessRuleException(CapacityBelowRegistrations);
             case EventChangeStatus.ChangedElsewhere:

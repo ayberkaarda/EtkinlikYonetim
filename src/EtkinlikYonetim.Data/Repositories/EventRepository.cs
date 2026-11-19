@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EtkinlikYonetim.Data.Repositories;
 
-internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextFactory) : IEventRepository
+internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextFactory, TimeProvider timeProvider) : IEventRepository
 {
     public async Task<IReadOnlyList<EventSummary>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -53,8 +53,6 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         int id,
         EventValues expected,
         EventValues changed,
-        DateOnly today,
-        DateTime nowUtc,
         Func<string> newTicketCode,
         CancellationToken cancellationToken = default)
     {
@@ -65,13 +63,17 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         await AppLocks.AcquireAsync(db, AppLocks.Event(id), cancellationToken).ConfigureAwait(false);
         await Actors.RequireAsync(db, actor, admin: true, cancellationToken).ConfigureAwait(false);
 
+        // The day is the database's as of now, after the wait for the lock: an event that ended while this
+        // change waited is closed, and the new date must not have passed either.
+        var (nowUtc, today) = await DatabaseTime.NowAsync(db, timeProvider, cancellationToken).ConfigureAwait(false);
+
         // The conditions are the WHERE clause: whatever changed since the caller read the event (a
         // registration took a seat, someone cancelled the event, another admin changed its date, capacity
         // or description) is decided by this statement. Without the expected values a form loaded earlier
         // would silently write another admin's change back.
         var (expectedDate, expectedCapacity, expectedDescription) = expected;
         var (day, capacity, description) = changed;
-        var updated = await db.Events
+        var updated = day < today ? 0 : await db.Events
             .Where(e => e.Id == id
                 && !e.Cancelled
                 && e.Date >= today
@@ -97,6 +99,7 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
             return current is null ? EventChangeStatus.NotFound
                 : current.Cancelled || current.Date < today ? EventChangeStatus.Closed
                 : new EventValues(current.Date, current.Capacity, current.Description) != expected ? EventChangeStatus.ChangedElsewhere
+                : day < today ? EventChangeStatus.DateInPast
                 : EventChangeStatus.CapacityBelowRegistrations;
         }
 
@@ -109,12 +112,13 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         return EventChangeStatus.Changed;
     }
 
-    public async Task<EventChangeStatus> CancelAsync(Actor actor, int id, DateOnly today, DateTime cancelledAtUtc, CancellationToken cancellationToken = default)
+    public async Task<EventChangeStatus> CancelAsync(Actor actor, int id, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await AppLocks.AcquireAsync(db, AppLocks.Event(id), cancellationToken).ConfigureAwait(false);
         await Actors.RequireAsync(db, actor, admin: true, cancellationToken).ConfigureAwait(false);
+        var (cancelledAtUtc, today) = await DatabaseTime.NowAsync(db, timeProvider, cancellationToken).ConfigureAwait(false);
 
         var cancelled = await db.Events
             .Where(e => e.Id == id && !e.Cancelled && e.Date >= today)

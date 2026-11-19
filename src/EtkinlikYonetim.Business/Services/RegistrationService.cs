@@ -133,8 +133,6 @@ internal sealed class RegistrationService(
                 actor,
                 participant.Id,
                 eventId,
-                now.Today,
-                now.Utc,
                 () => code = TicketCode.New(),
                 cancellationToken)).ConfigureAwait(false);
             if (outcome.Status == RegistrationStatus.Waiting)
@@ -197,8 +195,6 @@ internal sealed class RegistrationService(
             actor,
             registrationId,
             Access.OwnerFilter(session),
-            now.Today,
-            now.Utc,
             TicketCode.New,
             cancellationToken)).ConfigureAwait(false);
         if (outcome == CancellationOutcome.NotCancelled)
