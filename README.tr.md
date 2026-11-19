@@ -38,7 +38,8 @@ otomatik olarak oluşturulup güncellenir.
   yer iptal edildiğinde sıradaki katılımcı hemen o yere geçer ve bileti oluşturulur.
 - ✅ **Kayıtlarım ve biletlerim** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): hesabın kendi
   katılımcılarının yerleri ve bekleme sıraları ile etkinliği iptal edildiği için kapanan kayıtlar ("Etkinlik iptal
-  edildi"). Yerler ve bekleme sıraları etkinlik günü dahil iptal edilebilir ("Kaydı İptal Et", Cancel Registration).
+  edildi"). Yerler ve bekleme sıraları etkinlik günü dahil iptal edilebilir ("Kaydı İptal Et", Cancel Registration);
+  girişte bileti okutulmuş bir kayıt artık iptal edilemez.
 - ✅ **Bileti göster** ("Bileti Göster", Show Ticket): bir yerin QR kodu ve bilet kodu, istendiği kadar.
 
 ### Yönetim paneli
@@ -67,10 +68,13 @@ otomatik olarak oluşturulup güncellenir.
 
 - ✅ **Kapasite**: bir etkinlik kapasitesinden fazla kayıt almaz; yer sayısı aynı veritabanı işleminde, etkinlik
   başına bir uygulama kilidi altında kontrol edilip artırılır, bu yüzden eşzamanlı kayıtlar, iptaller ve kapasite
-  değişiklikleri kontenjanı aşamaz ve kimse bekleme listesinin önüne geçemez.
+  değişiklikleri kontenjanı aşamaz ve kimse bekleme listesinin önüne geçemez. Girişi yapılmış bir katılımcı yerini
+  korur: kaydı iptal edilemez ve giriş de aynı kilidi alır, bu yüzden salonda yer sayısından fazla kişi olmaz.
 - ✅ **Çift kayıt yok**: bir katılımcının bir etkinlikte en fazla bir yeri veya bekleme sırası olur (benzersiz
   indeks); iptal edilen kayıt geçmiş olarak kalır.
 - ✅ **Geçmiş etkinlik yok**: günü geçmiş bir etkinlik oluşturulamaz, ona kayıt yapılamaz ve kaydı iptal edilemez.
+  Bugünün hangi gün olduğunu bilgisayarın değil veritabanının saati belirler; kayıt, iptal ve giriş zamanları da
+  onunla yazılır.
 - ✅ **KVKK**: kimlik numaraları yönetim listelerinde maskelenmiş gösterilir (`123******01`) ve log dosyalarına asla
   yazılmaz; ad ve e-posta adresleri yöneticinin katılımcı listesinde açık gösterilir.
 
@@ -349,7 +353,7 @@ Tehdit modeli için [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) dosyasına bak�
 - Sahiplik servislerde denetlenir ve veritabanı komutlarında tekrarlanır.
 - Açık bir oturumun her işlemi önce hesabın rolünü ve etkinlik durumunu veritabanından okur; hesap değişiklikleri
   işlemi yapan yöneticiyi kendi işlemlerinin içinde yeniden denetler.
-- Bilet kodları 130 rastgele bittir. Katılımcının hesabı QR kodu yeniden gösterebilsin diye olduğu gibi, SHA-256
+- Bilet kodları 130 rastgele bittir (yükseltmenin yeniden verdiği biletlerde 128). Katılımcının hesabı QR kodu yeniden gösterebilsin diye olduğu gibi, SHA-256
   özetiyle birlikte saklanır: giriş bileti özetle bulur ve kodu sabit zamanda karşılaştırır. Yönetim listeleri ve
   dışa aktarımlar kodu asla göstermez.
 - Bağlantı dizeleri depo dışında tutulur (`appsettings.json` yok sayılır; user secrets ve ortam değişkenleri

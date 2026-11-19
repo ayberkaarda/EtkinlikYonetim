@@ -40,7 +40,7 @@ startup.
 - ✅ **My registrations and tickets** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): the seats and
   waiting places of the account's own participants, and registrations closed because their event was cancelled
   ("Etkinlik iptal edildi", Event cancelled). Seats and waiting places can be cancelled ("Kaydı İptal Et", Cancel
-  Registration) up to and including the event day.
+  Registration) up to and including the event day, unless the ticket has already been scanned at the entrance.
 - ✅ **Show the ticket** ("Bileti Göster", Show Ticket): the QR code and the code of a seat, as often as needed.
 
 ### Admin panel
@@ -68,10 +68,14 @@ startup.
 
 - ✅ **Capacity**: an event never takes more registrations than its capacity; the seat count is checked and
   increased in the same database transaction, under an application lock per event, so concurrent registrations,
-  cancellations and capacity changes cannot overbook it or let anyone pass the waiting list.
+  cancellations and capacity changes cannot overbook it or let anyone pass the waiting list. A participant who has
+  been checked in keeps the seat: the registration can no longer be cancelled, and the entrance takes the same lock,
+  so the room never holds more people than the event has seats.
 - ✅ **No duplicate registration**: a participant has at most one seat or waiting place per event (unique index);
   a cancelled registration stays as history.
-- ✅ **No past events**: events cannot be created, registered for or cancelled once their day has passed.
+- ✅ **No past events**: events cannot be created, registered for or cancelled once their day has passed. "Today"
+  comes from the database's clock, not the computer's, and so do the times written for registrations,
+  cancellations and check-ins.
 - ✅ **KVKK**: national ids are shown masked (`123******01`) in admin lists and never written to log files; names and
   e-mail addresses are shown in full in the admin participant list.
 
@@ -351,7 +355,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the threat model.
 - Ownership is checked in the services and repeated in the database statements.
 - Every operation of an open session reads the account's role and enabled state from the database first; account
   changes check the acting admin again inside their own transaction.
-- Ticket codes have 130 random bits. They are stored as they are, so the participant's account can show the QR
+- Ticket codes have 130 random bits (128 for tickets reissued by the upgrade). They are stored as they are, so the participant's account can show the QR
   code again, together with their SHA-256: the entrance finds a ticket by the hash and compares the code in
   constant time. Admin lists and exports never show them.
 - Connection strings are kept out of the repository (`appsettings.json` is ignored; user secrets and environment
