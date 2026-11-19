@@ -139,21 +139,17 @@ internal sealed class RegistrationRequestInputValidator : AbstractValidator<Regi
     }
 }
 
-/// <summary>The event of a registration takes place today or later and has a free seat.</summary>
+/// <summary>The event of a registration takes place today or later; a full event leads to the waiting list.</summary>
 internal sealed class RegistrationTargetInputValidator : AbstractValidator<RegistrationTargetInput>
 {
     public RegistrationTargetInputValidator()
     {
-        ClassLevelCascadeMode = CascadeMode.Stop;
-
         RuleFor(t => t.EventDate)
             .Must((t, day) => day >= t.Today).WithMessage(RegistrationService.PastEvent);
-        RuleFor(t => t.FreeSeats)
-            .GreaterThan(0).WithMessage(RegistrationService.EventFull);
     }
 }
 
-/// <summary>A cancellation: the registration is still active and its event is today or later.</summary>
+/// <summary>A cancellation: the registration still holds a seat or waits for one, and its event is today or later.</summary>
 internal sealed class CancellationInputValidator : AbstractValidator<CancellationInput>
 {
     public CancellationInputValidator()
@@ -161,7 +157,7 @@ internal sealed class CancellationInputValidator : AbstractValidator<Cancellatio
         ClassLevelCascadeMode = CascadeMode.Stop;
 
         RuleFor(c => c.Status)
-            .NotEqual(RegistrationStatus.Cancelled).WithMessage(RegistrationService.AlreadyCancelled);
+            .Must(s => s is RegistrationStatus.Active or RegistrationStatus.Waiting).WithMessage(RegistrationService.AlreadyCancelled);
         RuleFor(c => c.EventDate)
             .Must((c, day) => day >= c.Today).WithMessage(RegistrationService.PastCannotCancel);
     }

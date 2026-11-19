@@ -61,7 +61,9 @@ namespace EtkinlikYonetim.UI
                 {
                     var eventId = cmbEtkinlikler.SelectedItem is EventSummary selected ? selected.Id : 0;
                     var receipt = await _registrations.RegisterAsync(_session, eventId, txtKatilimciTC.Text);
-                    Prompts.Inform($"Kayıt tamamlandı. Bilet kodu: {receipt.TicketCode}");
+                    Prompts.Inform(receipt.QueuePosition is int position
+                        ? $"Etkinlik dolu. Katılımcı bekleme listesine alındı (sıra: {position}). Bir kayıt iptal edildiğinde sıradaki katılımcı kendiliğinden kayda geçer ve bileti oluşturulur."
+                        : $"Kayıt tamamlandı. Bilet kodu: {receipt.TicketCode}");
 
                     txtKatilimciTC.Clear();
                     if (cmbEtkinlikler.Items.Count > 0)

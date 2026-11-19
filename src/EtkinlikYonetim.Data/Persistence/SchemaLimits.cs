@@ -38,8 +38,21 @@ internal static class SchemaLimits
     /// <summary>The seat counter can neither go negative nor exceed the capacity: no event is ever overbooked.</summary>
     public const string RegisteredCountCheck = "[KayitSayisi] >= 0 AND [KayitSayisi] <= [Kapasite]";
 
-    public const string StatusCheck = "[Durum] IN (0, 1)";
+    /// <summary>Values of <see cref="Domain.Entities.RegistrationStatus"/>: 0 active, 1 cancelled, 2 waiting.</summary>
+    public const string StatusCheck = "[Durum] IN (0, 1, 2)";
 
-    /// <summary>Only active registrations take a seat and count as a registration; cancelled ones are history.</summary>
+    /// <summary>
+    /// The filter of the one-registration-per-participant index as InitialCreate made it (active only);
+    /// the legacy upgrade recreates that shape and the later migrations widen it to <see cref="PlaceHoldingFilter"/>.
+    /// </summary>
     public const string ActiveRegistrationFilter = "[Durum] = 0";
+
+    /// <summary>
+    /// Registrations that hold a seat (0) or wait for one (2): a participant has at most one of them per
+    /// event, so nobody is registered twice or waits twice. Cancelled ones are history.
+    /// </summary>
+    public const string PlaceHoldingFilter = "[Durum] IN (0, 2)";
+
+    /// <summary>Waiting list numbers are unique per event; registrations that never waited have none.</summary>
+    public const string QueueNumberFilter = "[SiraNo] IS NOT NULL";
 }

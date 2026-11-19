@@ -87,6 +87,10 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .HasColumnType("int")
                         .HasColumnName("KatilimciId");
 
+                    b.Property<int?>("QueueNumber")
+                        .HasColumnType("int")
+                        .HasColumnName("SiraNo");
+
                     b.Property<int>("Status")
                         .HasColumnType("int")
                         .HasColumnName("Durum");
@@ -96,13 +100,17 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
 
                     b.HasIndex(new[] { "EventId" }, "IX_Kayitlar_EtkinlikId");
 
+                    b.HasIndex(new[] { "EventId", "QueueNumber" }, "IX_Kayitlar_EtkinlikId_SiraNo")
+                        .IsUnique()
+                        .HasFilter("[SiraNo] IS NOT NULL");
+
                     b.HasIndex(new[] { "ParticipantId", "EventId" }, "IX_Kayitlar_KatilimciId_EtkinlikId")
                         .IsUnique()
-                        .HasFilter("[Durum] = 0");
+                        .HasFilter("[Durum] IN (0, 2)");
 
                     b.ToTable("Kayitlar", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Kayitlar_Durum", "[Durum] IN (0, 1)");
+                            t.HasCheckConstraint("CK_Kayitlar_Durum", "[Durum] IN (0, 1, 2)");
                         });
                 });
 

@@ -17,6 +17,7 @@ internal sealed class RegistrationConfiguration : IEntityTypeConfiguration<Regis
         builder.Property(r => r.CreatedAt).HasColumnName("KayitZamani");
         builder.Property(r => r.Status).HasColumnName("Durum").HasConversion<int>();
         builder.Property(r => r.CancelledAt).HasColumnName("IptalZamani");
+        builder.Property(r => r.QueueNumber).HasColumnName("SiraNo");
 
         // Registrations are history: deleting a participant or event that has registrations is refused.
         builder.HasOne<Participant>()
@@ -30,11 +31,17 @@ internal sealed class RegistrationConfiguration : IEntityTypeConfiguration<Regis
             .HasConstraintName("FK_Kayitlar_Etkinlikler")
             .OnDelete(DeleteBehavior.Restrict);
 
-        // One active registration per participant and event. This index is what prevents double
-        // registrations under concurrency; the service's own check only produces a friendlier message.
+        // One seat or waiting place per participant and event. This index is what prevents double
+        // registrations and double waiting under concurrency; the repository's own check only produces a
+        // friendlier message.
         builder.HasIndex(r => new { r.ParticipantId, r.EventId }, "IX_Kayitlar_KatilimciId_EtkinlikId")
             .IsUnique()
-            .HasFilter(SchemaLimits.ActiveRegistrationFilter);
+            .HasFilter(SchemaLimits.PlaceHoldingFilter);
+
+        // The order of the waiting list: one number per place, never given twice within an event.
+        builder.HasIndex(r => new { r.EventId, r.QueueNumber }, "IX_Kayitlar_EtkinlikId_SiraNo")
+            .IsUnique()
+            .HasFilter(SchemaLimits.QueueNumberFilter);
         builder.HasIndex(r => r.EventId, "IX_Kayitlar_EtkinlikId");
     }
 }

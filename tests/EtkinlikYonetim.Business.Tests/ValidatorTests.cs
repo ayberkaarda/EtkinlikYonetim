@@ -151,15 +151,15 @@ public sealed class ValidatorTests
     }
 
     [Theory]
-    [InlineData(-1, 5, RegistrationService.PastEvent)]
-    [InlineData(0, 0, RegistrationService.EventFull)]
-    [InlineData(-1, 0, RegistrationService.PastEvent)]
-    public void RegistrationTarget_PastOrFull_IsRefused(int days, int freeSeats, string expected) =>
-        AssertFails(new RegistrationTargetInputValidator(), new RegistrationTargetInput(Today.AddDays(days), freeSeats, Today), expected);
+    [InlineData(-1)]
+    [InlineData(-400)]
+    public void RegistrationTarget_Past_IsRefused(int days) =>
+        AssertFails(new RegistrationTargetInputValidator(), new RegistrationTargetInput(Today.AddDays(days), Today), RegistrationService.PastEvent);
 
+    /// <summary>The seats play no part any more: a full event leads to its waiting list.</summary>
     [Fact]
-    public void RegistrationTarget_TodayWithTheLastSeat_IsValid() =>
-        Assert.True(new RegistrationTargetInputValidator().Validate(new RegistrationTargetInput(Today, 1, Today)).IsValid);
+    public void RegistrationTarget_Today_IsValid() =>
+        Assert.True(new RegistrationTargetInputValidator().Validate(new RegistrationTargetInput(Today, Today)).IsValid);
 
     [Theory]
     [InlineData(RegistrationStatus.Cancelled, 0, RegistrationService.AlreadyCancelled)]
@@ -168,9 +168,11 @@ public sealed class ValidatorTests
     public void Cancellation_CancelledOrPast_IsRefused(RegistrationStatus status, int days, string expected) =>
         AssertFails(new CancellationInputValidator(), new CancellationInput(status, Today.AddDays(days), Today), expected);
 
-    [Fact]
-    public void Cancellation_ActiveToday_IsValid() =>
-        Assert.True(new CancellationInputValidator().Validate(new CancellationInput(RegistrationStatus.Active, Today, Today)).IsValid);
+    [Theory]
+    [InlineData(RegistrationStatus.Active)]
+    [InlineData(RegistrationStatus.Waiting)]
+    public void Cancellation_SeatOrWaitingPlaceToday_IsValid(RegistrationStatus status) =>
+        Assert.True(new CancellationInputValidator().Validate(new CancellationInput(status, Today, Today)).IsValid);
 
     /// <summary>The texts the screens show stay exactly as they were before the validators.</summary>
     [Fact]
@@ -192,7 +194,7 @@ public sealed class ValidatorTests
         Assert.Equal("Lütfen bir etkinlik seçin.", RegistrationService.EventRequired);
         Assert.Equal("Geçerli bir 11 haneli TC Kimlik No girin.", RegistrationService.NationalIdFormat);
         Assert.Equal("Geçmiş tarihli bir etkinliğe kayıt yapılamaz.", RegistrationService.PastEvent);
-        Assert.Equal("Etkinliğin kontenjanı dolu.", RegistrationService.EventFull);
+        Assert.Equal("Bu katılımcı bu etkinliğe zaten kayıtlı veya bekleme listesinde.", RegistrationService.AlreadyRegistered);
         Assert.Equal("Bu kayıt zaten iptal edilmiş.", RegistrationService.AlreadyCancelled);
         Assert.Equal("Geçmiş bir etkinliğin kaydı iptal edilemez.", RegistrationService.PastCannotCancel);
     }

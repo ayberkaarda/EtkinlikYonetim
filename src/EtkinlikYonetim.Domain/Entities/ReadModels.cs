@@ -20,8 +20,8 @@ public sealed record AccountSummary(int Id, string UserName, UserRole Role, bool
 /// <summary>A usable setup key, as a given key is compared with it.</summary>
 public sealed record StoredSetupKey(int Id, byte[] KeyHash);
 
-/// <summary>An event with its seat usage, for pickers and rule checks.</summary>
-public sealed record EventSummary(int Id, string Name, DateOnly Date, int Capacity, int RegisteredCount)
+/// <summary>An event with its seat usage and the length of its waiting list, for pickers and rule checks.</summary>
+public sealed record EventSummary(int Id, string Name, DateOnly Date, int Capacity, int RegisteredCount, int WaitingCount = 0)
 {
     public int FreeSeats => Math.Max(0, Capacity - RegisteredCount);
 
@@ -32,15 +32,23 @@ public sealed record EventSummary(int Id, string Name, DateOnly Date, int Capaci
 /// <summary>A participant as found by national id, with its owner for the ownership check.</summary>
 public sealed record ParticipantRecord(int Id, string NationalId, string? FullName, string? Email, int? OwnerUserId);
 
-/// <summary>An active registration of an event with its participant, for the admin listing.</summary>
+/// <summary>
+/// A registration of an event that holds a seat or waits for one, with its participant, for the admin
+/// listing. <paramref name="QueuePosition"/> is the current place in the waiting list (1 is next).
+/// </summary>
 public sealed record EventParticipant(
     int RegistrationId,
     string? FullName,
     string NationalId,
     string? Email,
-    string? TicketCode);
+    string? TicketCode,
+    RegistrationStatus Status = RegistrationStatus.Active,
+    int? QueuePosition = null);
 
-/// <summary>An active registration with event, participant and ticket, for "my registrations".</summary>
+/// <summary>
+/// A registration that holds a seat or waits for one, with event, participant and ticket, for "my
+/// registrations". <paramref name="QueuePosition"/> is the current place in the waiting list (1 is next).
+/// </summary>
 public sealed record RegistrationDetails(
     int Id,
     int EventId,
@@ -48,7 +56,28 @@ public sealed record RegistrationDetails(
     DateOnly EventDate,
     int ParticipantId,
     string? ParticipantName,
-    string? TicketCode);
+    string? TicketCode,
+    RegistrationStatus Status = RegistrationStatus.Active,
+    int? QueuePosition = null);
+
+/// <summary>
+/// The result of a registration: a seat with a ticket (<see cref="RegistrationStatus.Active"/>) or a
+/// place in the waiting list of a full event (<see cref="RegistrationStatus.Waiting"/>, with its position).
+/// </summary>
+public sealed record RegistrationOutcome(int RegistrationId, RegistrationStatus Status, int? QueuePosition);
+
+/// <summary>What a cancellation did.</summary>
+public enum CancellationOutcome
+{
+    /// <summary>No registration matched; nothing was changed.</summary>
+    NotCancelled = 0,
+
+    /// <summary>The registration was cancelled (a waiting one, or a seat no one was waiting for).</summary>
+    Cancelled = 1,
+
+    /// <summary>The seat was freed and the first waiting registration moved up to it with a new ticket.</summary>
+    CancelledAndPromoted = 2,
+}
 
 /// <summary>The parts of a registration that decide who may cancel it and whether it still can be.</summary>
 public sealed record RegistrationOwnership(

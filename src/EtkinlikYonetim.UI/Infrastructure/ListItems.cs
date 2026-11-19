@@ -12,12 +12,18 @@ internal static class DisplayFormat
     public static string Date(DateOnly value) => value.ToString("dd.MM.yyyy", Turkish);
 }
 
-/// <summary>A registration in "my registrations": event, date, participant and ticket code.</summary>
+/// <summary>A registration in "my registrations": event, date, participant and ticket code or waiting place.</summary>
 internal sealed record RegistrationItem(RegistrationDetails Registration)
 {
     public override string ToString() =>
         $"{Registration.EventName} - {DisplayFormat.Date(Registration.EventDate)} - "
-        + $"{Registration.ParticipantName ?? "Ad Bilinmiyor"} - Bilet: {Registration.TicketCode ?? "-"}";
+        + $"{Registration.ParticipantName ?? "Ad Bilinmiyor"} - {State(Registration)}";
+
+    private static string State(RegistrationDetails registration) => registration.Status switch
+    {
+        RegistrationStatus.Waiting => $"Bekleme listesi, sıra: {registration.QueuePosition}",
+        _ => $"Bilet: {registration.TicketCode ?? "-"}",
+    };
 }
 
 /// <summary>An account in the account management: name, role and state.</summary>

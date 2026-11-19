@@ -10,19 +10,19 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
     public async Task<IReadOnlyList<EventSummary>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        return await Summaries(db.Events).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return await Summaries(db, db.Events).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<EventSummary>> GetFromAsync(DateOnly from, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        return await Summaries(db.Events.Where(e => e.Date >= from)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return await Summaries(db, db.Events.Where(e => e.Date >= from)).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<EventSummary?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        return await Summaries(db.Events.Where(e => e.Id == id)).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        return await Summaries(db, db.Events.Where(e => e.Id == id)).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<int> AddAsync(ScheduledEvent newEvent, CancellationToken cancellationToken = default)
@@ -42,10 +42,16 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         return entity.Id;
     }
 
-    private static IQueryable<EventSummary> Summaries(IQueryable<ScheduledEvent> events) =>
+    private static IQueryable<EventSummary> Summaries(EventDbContext db, IQueryable<ScheduledEvent> events) =>
         events
             .AsNoTracking()
             .OrderBy(e => e.Date)
             .ThenBy(e => e.Id)
-            .Select(e => new EventSummary(e.Id, e.Name, e.Date, e.Capacity, e.RegisteredCount));
+            .Select(e => new EventSummary(
+                e.Id,
+                e.Name,
+                e.Date,
+                e.Capacity,
+                e.RegisteredCount,
+                db.Registrations.Count(r => r.EventId == e.Id && r.Status == RegistrationStatus.Waiting)));
 }

@@ -206,10 +206,15 @@ public sealed partial class LoggingTests : IDisposable
             .Callback<Participant, CancellationToken>((p, _) => stored.Add(new ParticipantRecord(3, p.NationalId, p.FullName, null, p.OwnerUserId)))
             .ReturnsAsync(3);
         var registrations = new Mock<IRegistrationRepository>();
-        registrations.Setup(r => r.AddAsync(3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(5);
+        registrations.Setup(r => r.AddAsync(3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((int _, int _, DateOnly _, DateTime _, Func<string> newTicketCode, CancellationToken _) =>
+            {
+                newTicketCode();
+                return Task.FromResult(new RegistrationOutcome(5, RegistrationStatus.Active, null));
+            });
         registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOwnership(5, 1, day, 7, RegistrationStatus.Active));
-        registrations.Setup(r => r.CancelAsync(5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        registrations.Setup(r => r.CancelAsync(5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
 
         var clock = new FakeTimeProvider(Now);
         await using var provider = new ServiceCollection()
@@ -253,6 +258,7 @@ public sealed partial class LoggingTests : IDisposable
         await provider.GetRequiredService<IParticipantService>().AddAsync(session, NationalId, FullName, Email, Ct);
         var registrationService = provider.GetRequiredService<IRegistrationService>();
         var receipt = await registrationService.RegisterAsync(session, 1, NationalId, Ct);
+        Assert.NotNull(receipt.TicketCode);
         await Attempt(() => registrationService.CancelAsync(new UserSession(9, "baska", UserRole.User), 5, Ct)); // not the owner
         await Attempt(() => provider.GetRequiredService<IEventService>().CreateAsync(session, EventName, Now.UtcDateTime, 10, Ct)); // not an admin
         await registrationService.CancelAsync(session, 5, Ct);

@@ -5,41 +5,43 @@ namespace EtkinlikYonetim.Domain.Repositories;
 public interface IRegistrationRepository
 {
     /// <summary>
-    /// Registers the participant for the event and issues the ticket, in one transaction: the event's
-    /// seat counter is raised by a conditional UPDATE that only matches while a seat is free and the
-    /// event is not before <paramref name="today"/>, so concurrent registrations can neither overbook the
-    /// event nor register for a past one. Returns the new registration id.
+    /// Registers the participant for the event in one transaction, serialized with every other change of
+    /// the event's seats (an application lock per event on SQL Server). While a seat is free and nobody is
+    /// waiting, the seat counter is raised by a conditional UPDATE that also checks the capacity and the
+    /// date, and the ticket <paramref name="newTicketCode"/> returns is issued. Otherwise the registration
+    /// joins the end of the event's waiting list without a ticket.
     /// </summary>
-    /// <exception cref="AlreadyRegisteredException">The participant already has an active registration for the event.</exception>
-    /// <exception cref="EventFullException">No seat is free.</exception>
+    /// <exception cref="AlreadyRegisteredException">The participant already holds a seat or waits for one at the event.</exception>
     /// <exception cref="EventClosedException">The event does not exist or is in the past.</exception>
-    Task<int> AddAsync(
+    Task<RegistrationOutcome> AddAsync(
         int participantId,
         int eventId,
         DateOnly today,
         DateTime createdAtUtc,
-        string ticketCode,
+        Func<string> newTicketCode,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Active registrations of the participants owned by <paramref name="ownerUserId"/>, or of everyone
-    /// when it is <see langword="null"/>; latest event first.
+    /// Registrations that hold a seat or wait for one, of the participants owned by
+    /// <paramref name="ownerUserId"/>, or of everyone when it is <see langword="null"/>; latest event first.
     /// </summary>
     Task<IReadOnlyList<RegistrationDetails>> GetActiveAsync(int? ownerUserId, CancellationToken cancellationToken = default);
 
     Task<RegistrationOwnership?> GetOwnershipAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Cancels the registration and frees its seat in one transaction, only if it is still active, its
-    /// event is not before <paramref name="today"/> and, when <paramref name="ownerUserId"/> is given, its
-    /// participant belongs to that account.
+    /// Cancels the registration in one transaction under the event's lock, only if it still holds a seat
+    /// or waits for one, its event is not before <paramref name="today"/> and, when
+    /// <paramref name="ownerUserId"/> is given, its participant belongs to that account. A freed seat goes
+    /// to the first waiting registration in the same transaction, with the ticket
+    /// <paramref name="newTicketCode"/> returns; the seat counter stays equal to the seats held.
     /// </summary>
-    /// <returns><see langword="false"/> when no registration matched; nothing is changed then.</returns>
-    Task<bool> CancelAsync(
+    Task<CancellationOutcome> CancelAsync(
         int id,
         int? ownerUserId,
         DateOnly today,
         DateTime cancelledAtUtc,
+        Func<string> newTicketCode,
         CancellationToken cancellationToken = default);
 }
 
@@ -57,25 +59,6 @@ public sealed class AlreadyRegisteredException : Exception
     }
 
     public AlreadyRegisteredException(string message, Exception innerException)
-        : base(message, innerException)
-    {
-    }
-}
-
-/// <summary>Raised when an event has no free seat.</summary>
-public sealed class EventFullException : Exception
-{
-    public EventFullException()
-        : base("The event has no free seat.")
-    {
-    }
-
-    public EventFullException(string message)
-        : base(message)
-    {
-    }
-
-    public EventFullException(string message, Exception innerException)
         : base(message, innerException)
     {
     }

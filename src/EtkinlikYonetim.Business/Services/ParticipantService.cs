@@ -1,3 +1,4 @@
+using System.Globalization;
 using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
@@ -42,6 +43,7 @@ internal sealed class ParticipantService(
     internal const string UnknownName = "Ad Bilinmiyor";
     internal const string UnknownEmail = "E-posta Yok";
     internal const string NoTicket = "Bilet Yok";
+    internal const string WaitingPrefix = "Bekleme listesi, sıra: ";
 
     public async Task<int> AddAsync(
         UserSession session,
@@ -99,7 +101,9 @@ internal sealed class ParticipantService(
                 string.IsNullOrWhiteSpace(p.FullName) ? UnknownName : p.FullName,
                 NationalIdNumber.Mask(p.NationalId),
                 string.IsNullOrWhiteSpace(p.Email) ? UnknownEmail : p.Email,
-                p.TicketCode ?? NoTicket))
+                p.Status == RegistrationStatus.Waiting
+                    ? string.Create(CultureInfo.InvariantCulture, $"{WaitingPrefix}{p.QueuePosition}")
+                    : p.TicketCode ?? NoTicket))
             .ToList();
     }
 }

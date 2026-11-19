@@ -113,8 +113,8 @@ public sealed class LegacyUpgradeTests
         // the derived seat counters.
         var receipt = await registrations.RegisterAsync(admin, 2, "20000000003", ct);
         Assert.True(receipt.RegistrationId > 2);
-        var full = await Assert.ThrowsAsync<BusinessRuleException>(() => registrations.RegisterAsync(admin, 2, "20000000002", ct));
-        Assert.Equal("Etkinliğin kontenjanı dolu.", full.Message);
+        var full = await registrations.RegisterAsync(admin, 2, "20000000002", ct);
+        Assert.Equal((null, 1), (full.TicketCode, full.QueuePosition)); // the derived counter says the event is full
         var participantId = await provider.GetRequiredService<IParticipantService>().AddAsync(user, "10000000450", "Yeni Katılımcı", "yeni@example.com", ct);
         Assert.True(participantId > 8);
         await registrations.RegisterAsync(user, 7, "10000000450", ct);
@@ -452,7 +452,10 @@ public sealed class LegacyUpgradeTests
             "SELECT COUNT(*) FROM sys.index_columns ic JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id WHERE i.name = N'IX_Katilimcilar_KullaniciId_TcKimlikNo'",
             ct));
         Assert.Equal(1, await database.ScalarAsync(
-            "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Kayitlar_KatilimciId_EtkinlikId' AND is_unique = 1 AND has_filter = 1 AND filter_definition = N'([Durum]=(0))'",
+            "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Kayitlar_KatilimciId_EtkinlikId' AND is_unique = 1 AND has_filter = 1 AND filter_definition = N'([Durum] IN ((0), (2)))'",
+            ct));
+        Assert.Equal(1, await database.ScalarAsync(
+            "SELECT COUNT(*) FROM sys.indexes WHERE name = N'IX_Kayitlar_EtkinlikId_SiraNo' AND is_unique = 1 AND has_filter = 1 AND filter_definition = N'([SiraNo] IS NOT NULL)'",
             ct));
         Assert.Equal(3, await database.ScalarAsync(
             "SELECT COUNT(*) FROM sys.indexes WHERE is_unique = 0 AND name IN (N'IX_Etkinlikler_Tarih', N'IX_Katilimcilar_KullaniciId', N'IX_Kayitlar_EtkinlikId')",

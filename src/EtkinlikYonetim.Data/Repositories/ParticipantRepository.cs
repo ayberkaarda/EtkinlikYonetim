@@ -67,9 +67,18 @@ internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> co
         return await (
                 from r in db.Registrations.AsNoTracking()
                 join p in db.Participants on r.ParticipantId equals p.Id
-                where r.EventId == eventId && r.Status == RegistrationStatus.Active
-                orderby p.FullName, r.Id
-                select new EventParticipant(r.Id, p.FullName, p.NationalId, p.Email, r.Ticket != null ? r.Ticket.Code : null))
+                where r.EventId == eventId && (r.Status == RegistrationStatus.Active || r.Status == RegistrationStatus.Waiting)
+                orderby r.Status, r.QueueNumber, p.FullName, r.Id
+                select new EventParticipant(
+                    r.Id,
+                    p.FullName,
+                    p.NationalId,
+                    p.Email,
+                    r.Ticket != null ? r.Ticket.Code : null,
+                    r.Status,
+                    r.Status == RegistrationStatus.Waiting
+                        ? db.Registrations.Count(w => w.EventId == r.EventId && w.Status == RegistrationStatus.Waiting && w.QueueNumber <= r.QueueNumber)
+                        : null))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }

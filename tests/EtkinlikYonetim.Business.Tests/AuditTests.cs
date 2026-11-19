@@ -49,6 +49,8 @@ public sealed class AuditTests
         { AuditEvent.AccountDisabled, 14, "admin.account.disabled" },
         { AuditEvent.AccountEnabled, 15, "admin.account.enabled" },
         { AuditEvent.RoleChanged, 16, "admin.account.role_changed" },
+        { AuditEvent.RegistrationWaitlisted, 17, "registration.waitlisted" },
+        { AuditEvent.RegistrationPromoted, 18, "registration.promoted" },
     };
 
     [Theory]
@@ -182,33 +184,34 @@ public sealed class AuditTests
     }
 
     [Fact]
-    public async Task Registration_RecordsTheTicketTheFullEventTheDenialAndTheCancellation()
+    public async Task Registration_RecordsTheTicketTheWaitingPlaceTheDenialTheCancellationAndThePromotion()
     {
         _participants.Setup(p => p.FindByNationalIdAsync(NationalId, Sessions.User.UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([new ParticipantRecord(1, NationalId, "Deniz Örnek", null, Sessions.User.UserId)]);
         _events.Setup(e => e.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(1, "Konser", Today, 2, 1));
         _events.Setup(e => e.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(new EventSummary(2, "Dolu", Today, 2, 2));
-        _registrations.SetupSequence(r => r.AddAsync(1, 1, Today, Now, It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(5)
-            .ThrowsAsync(new EventFullException());
+        _registrations.Setup(r => r.AddAsync(1, 1, Today, Now, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RegistrationOutcome(5, RegistrationStatus.Active, null));
+        _registrations.Setup(r => r.AddAsync(1, 2, Today, Now, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RegistrationOutcome(6, RegistrationStatus.Waiting, 1));
         _registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOwnership(5, 1, Today, Sessions.User.UserId, RegistrationStatus.Active));
-        _registrations.Setup(r => r.CancelAsync(5, Sessions.User.UserId, Today, Now, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _registrations.Setup(r => r.CancelAsync(5, Sessions.User.UserId, Today, Now, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CancellationOutcome.CancelledAndPromoted);
         var service = ServiceFactory.Registration(_registrations.Object, _participants.Object, _events.Object, _time, _audit);
 
         await service.RegisterAsync(Sessions.User, 1, NationalId, Ct);
-        await Assert.ThrowsAsync<BusinessRuleException>(() => service.RegisterAsync(Sessions.User, 2, NationalId, Ct)); // full before writing
-        await Assert.ThrowsAsync<BusinessRuleException>(() => service.RegisterAsync(Sessions.User, 1, NationalId, Ct)); // last seat lost in the transaction
+        await service.RegisterAsync(Sessions.User, 2, NationalId, Ct); // full: waiting list
         await Assert.ThrowsAsync<AccessDeniedException>(() => service.CancelAsync(Sessions.OtherUser, 5, Ct));
         await service.CancelAsync(Sessions.User, 5, Ct);
 
         Assert.Equal(
             [
                 (AuditEvent.RegistrationCreated, UserRole.User),
-                (AuditEvent.RegistrationEventFull, UserRole.User),
-                (AuditEvent.RegistrationEventFull, UserRole.User),
+                (AuditEvent.RegistrationWaitlisted, UserRole.User),
                 (AuditEvent.AccessDenied, UserRole.User),
                 (AuditEvent.RegistrationCancelled, UserRole.User),
+                (AuditEvent.RegistrationPromoted, UserRole.User),
             ],
             _audit.Events);
     }
