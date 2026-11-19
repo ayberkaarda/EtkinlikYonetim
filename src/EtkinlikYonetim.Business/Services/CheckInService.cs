@@ -62,7 +62,7 @@ internal sealed class CheckInService(
     {
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
-        var (outcome, name) = await DecideAsync(eventId, code, cancellationToken).ConfigureAwait(false);
+        var (outcome, name) = await DecideAsync(session, eventId, code, cancellationToken).ConfigureAwait(false);
         audit.Record(
             outcome switch
             {
@@ -81,7 +81,7 @@ internal sealed class CheckInService(
         return await tickets.GetCheckInCountAsync(eventId, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<(CheckInOutcome Outcome, string? ParticipantName)> DecideAsync(int eventId, string? typed, CancellationToken cancellationToken)
+    private async Task<(CheckInOutcome Outcome, string? ParticipantName)> DecideAsync(UserSession session, int eventId, string? typed, CancellationToken cancellationToken)
     {
         var wellFormed = TicketCode.TryNormalize(typed, out var code);
         var given = Encoding.ASCII.GetBytes(wellFormed ? code : string.Empty);
@@ -116,7 +116,7 @@ internal sealed class CheckInService(
         }
 
         // The check-in time is the database's, so the clock of the scanning computer cannot change it.
-        if (await tickets.CheckInAsync(ticket.TicketId, eventId, now.Utc, cancellationToken).ConfigureAwait(false))
+        if (await audit.WriteAsAsync(session, actor => tickets.CheckInAsync(actor, ticket.TicketId, eventId, now.Utc, cancellationToken)).ConfigureAwait(false))
         {
             return (CheckInOutcome.CheckedIn, ticket.ParticipantName);
         }

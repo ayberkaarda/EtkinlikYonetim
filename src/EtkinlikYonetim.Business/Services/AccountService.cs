@@ -38,7 +38,7 @@ internal sealed class AccountService(IUserRepository users, ISessionGuard sessio
     {
         await RequireOtherAccountAsync(session, userId, cancellationToken).ConfigureAwait(false);
 
-        var status = await users.SetDisabledAsync(session.UserId, userId, !enabled, cancellationToken).ConfigureAwait(false);
+        var status = await users.SetDisabledAsync(Access.ActorOf(session), userId, !enabled, cancellationToken).ConfigureAwait(false);
         Complete(status, session, enabled ? AuditEvent.AccountEnabled : AuditEvent.AccountDisabled);
     }
 
@@ -50,7 +50,7 @@ internal sealed class AccountService(IUserRepository users, ISessionGuard sessio
             throw new BusinessRuleException(RoleInvalid);
         }
 
-        var status = await users.SetRoleAsync(session.UserId, userId, role, cancellationToken).ConfigureAwait(false);
+        var status = await users.SetRoleAsync(Access.ActorOf(session), userId, role, cancellationToken).ConfigureAwait(false);
         Complete(status, session, AuditEvent.RoleChanged);
     }
 

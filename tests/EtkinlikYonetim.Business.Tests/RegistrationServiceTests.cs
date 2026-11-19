@@ -126,15 +126,15 @@ public sealed class RegistrationServiceTests
         Assert.False(first.Waitlisted);
         Assert.Matches("^ETK-[A-HJ-NP-Z2-9]{26}$", first.TicketCode);
         Assert.NotEqual(first.TicketCode, second.TicketCode);
-        _registrations.Verify(r => r.AddAsync(1, 1, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _registrations.Verify(r => r.AddAsync(It.IsAny<Actor>(), 1, 1, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     /// <summary>A full event is no refusal: the repository puts the participant on the waiting list without a ticket.</summary>
     [Fact]
     public async Task Register_FullEvent_PutsTheParticipantOnTheWaitingList()
     {
-        _registrations.Setup(r => r.AddAsync(1, 2, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
-            .Returns((int _, int _, DateOnly _, DateTime _, Func<string> _, CancellationToken _) =>
+        _registrations.Setup(r => r.AddAsync(It.IsAny<Actor>(), 1, 2, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((Actor _, int _, int _, DateOnly _, DateTime _, Func<string> _, CancellationToken _) =>
                 Task.FromResult(new RegistrationOutcome(12, RegistrationStatus.Waiting, 3)));
 
         var receipt = await Service().RegisterAsync(Sessions.User, 2, OwnNationalId, Ct);
@@ -147,7 +147,7 @@ public sealed class RegistrationServiceTests
     public async Task Register_RulesRepeatedInsideTheTransaction_AreTranslated()
     {
         var service = Service();
-        _registrations.SetupSequence(r => r.AddAsync(1, 1, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _registrations.SetupSequence(r => r.AddAsync(It.IsAny<Actor>(), 1, 1, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new AlreadyRegisteredException())
             .ThrowsAsync(new EventClosedException());
 
@@ -198,7 +198,7 @@ public sealed class RegistrationServiceTests
         await Assert.ThrowsAsync<AccessDeniedException>(() => Service().CancelAsync(Sessions.User, registrationId, Ct));
 
         _registrations.Verify(
-            r => r.CancelAsync(It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()),
+            r => r.CancelAsync(It.IsAny<Actor>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -206,18 +206,18 @@ public sealed class RegistrationServiceTests
     public async Task Cancel_OwnRegistration_RepeatsTheOwnerInTheUpdate()
     {
         SetupOwnership(5, Sessions.User.UserId);
-        _registrations.Setup(r => r.CancelAsync(5, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
+        _registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 5, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
 
         await Service().CancelAsync(Sessions.User, 5, Ct);
 
-        _registrations.Verify(r => r.CancelAsync(5, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()), Times.Once);
+        _registrations.Verify(r => r.CancelAsync(It.IsAny<Actor>(), 5, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Cancel_ByAdmin_HasNoOwnerFilter()
     {
         SetupOwnership(6, null);
-        _registrations.Setup(r => r.CancelAsync(6, null, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.CancelledAndPromoted);
+        _registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 6, null, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.CancelledAndPromoted);
 
         await Service().CancelAsync(Sessions.Admin, 6, Ct);
     }
@@ -228,7 +228,7 @@ public sealed class RegistrationServiceTests
         SetupOwnership(5, Sessions.User.UserId, status: RegistrationStatus.Cancelled);
         SetupOwnership(6, Sessions.User.UserId, eventDate: Today.AddDays(-1));
         SetupOwnership(7, Sessions.User.UserId);
-        _registrations.Setup(r => r.CancelAsync(7, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.NotCancelled);
+        _registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 7, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.NotCancelled);
 
         Assert.Equal(RegistrationService.AlreadyCancelled, (await Assert.ThrowsAsync<BusinessRuleException>(() => Service().CancelAsync(Sessions.User, 5, Ct))).Message);
         Assert.Equal(RegistrationService.PastCannotCancel, (await Assert.ThrowsAsync<BusinessRuleException>(() => Service().CancelAsync(Sessions.User, 6, Ct))).Message);
@@ -246,7 +246,7 @@ public sealed class RegistrationServiceTests
 
         Assert.Equal(RegistrationService.CheckedInCannotCancel, error.Message);
         _registrations.Verify(
-            r => r.CancelAsync(It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()),
+            r => r.CancelAsync(It.IsAny<Actor>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -255,7 +255,7 @@ public sealed class RegistrationServiceTests
     public async Task Cancel_WaitingPlace_IsAllowed()
     {
         SetupOwnership(8, Sessions.User.UserId, status: RegistrationStatus.Waiting);
-        _registrations.Setup(r => r.CancelAsync(8, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
+        _registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 8, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
 
         await Service().CancelAsync(Sessions.User, 8, Ct);
     }
@@ -284,7 +284,7 @@ public sealed class RegistrationServiceTests
         var service = BehindByTwoDays();
         SetupOwnership(6, Sessions.User.UserId, eventDate: Today.AddDays(-1));
         SetupOwnership(7, Sessions.User.UserId);
-        _registrations.Setup(r => r.CancelAsync(7, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
+        _registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 7, Sessions.User.UserId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
 
         Assert.Equal(RegistrationService.PastCannotCancel, (await Assert.ThrowsAsync<BusinessRuleException>(() => service.CancelAsync(Sessions.User, 6, Ct))).Message);
         await service.CancelAsync(Sessions.User, 7, Ct);
@@ -305,8 +305,8 @@ public sealed class RegistrationServiceTests
     };
 
     private void SetupAdd(int participantId, int eventId, int registrationId) =>
-        _registrations.Setup(r => r.AddAsync(participantId, eventId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
-            .Returns((int _, int _, DateOnly _, DateTime _, Func<string> newTicketCode, CancellationToken _) =>
+        _registrations.Setup(r => r.AddAsync(It.IsAny<Actor>(), participantId, eventId, Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((Actor _, int _, int _, DateOnly _, DateTime _, Func<string> newTicketCode, CancellationToken _) =>
             {
                 newTicketCode();
                 return Task.FromResult(new RegistrationOutcome(registrationId, RegistrationStatus.Active, null));

@@ -14,7 +14,8 @@ public interface ITicketRepository
     /// cancelled. Of two check-ins of the same ticket at the same time exactly one matches.
     /// </summary>
     /// <returns><see langword="false"/> when nothing matched; nothing is changed then.</returns>
-    Task<bool> CheckInAsync(int ticketId, int eventId, DateTime checkedInAtUtc, CancellationToken cancellationToken = default);
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
+    Task<bool> CheckInAsync(Actor actor, int ticketId, int eventId, DateTime checkedInAtUtc, CancellationToken cancellationToken = default);
 
     /// <summary>The used tickets and the seats held of the event.</summary>
     Task<CheckInCount> GetCheckInCountAsync(int eventId, CancellationToken cancellationToken = default);

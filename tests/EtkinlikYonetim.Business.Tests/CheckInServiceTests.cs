@@ -77,7 +77,7 @@ public sealed class CheckInServiceTests
     public async Task CheckIn_ValidUnusedTicket_IsCheckedInByItsHash()
     {
         Found(Ticket(9, Code, 1, RegistrationStatus.Active, false, null));
-        _tickets.Setup(t => t.CheckInAsync(9, 1, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _tickets.Setup(t => t.CheckInAsync(It.IsAny<Actor>(), 9, 1, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var result = await Service().CheckInAsync(Sessions.Admin, 1, Code.ToLowerInvariant(), Ct);
 
@@ -94,7 +94,7 @@ public sealed class CheckInServiceTests
         var result = await Service().CheckInAsync(Sessions.Admin, 1, Code, Ct);
 
         Assert.Equal(CheckInOutcome.AlreadyUsed, result.Outcome);
-        _tickets.Verify(t => t.CheckInAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        _tickets.Verify(t => t.CheckInAsync(It.IsAny<Actor>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>The UPDATE lost to a concurrent scan of the same ticket: the second scan reads it again and says "already used".</summary>
@@ -104,7 +104,7 @@ public sealed class CheckInServiceTests
         _tickets.SetupSequence(t => t.FindForCheckInAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Ticket(9, Code, 1, RegistrationStatus.Active, false, null))
             .ReturnsAsync(Ticket(9, Code, 1, RegistrationStatus.Active, false, Now.UtcDateTime));
-        _tickets.Setup(t => t.CheckInAsync(9, 1, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _tickets.Setup(t => t.CheckInAsync(It.IsAny<Actor>(), 9, 1, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         Assert.Equal(CheckInOutcome.AlreadyUsed, (await Service().CheckInAsync(Sessions.Admin, 1, Code, Ct)).Outcome);
     }
@@ -136,7 +136,7 @@ public sealed class CheckInServiceTests
         var result = await Service().CheckInAsync(Sessions.Admin, 1, Code, Ct);
 
         Assert.Equal(new CheckInResult(CheckInOutcome.Rejected, Count), result);
-        _tickets.Verify(t => t.CheckInAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        _tickets.Verify(t => t.CheckInAsync(It.IsAny<Actor>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal([(AuditEvent.TicketRejected, (UserRole?)UserRole.Admin)], _audit.Events);
     }
 
@@ -167,7 +167,7 @@ public sealed class CheckInServiceTests
         var result = await Service().CheckInAsync(Sessions.Admin, 1, Code, Ct);
 
         Assert.Equal(new CheckInResult(CheckInOutcome.NotEventDay, Count), result);
-        _tickets.Verify(t => t.CheckInAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        _tickets.Verify(t => t.CheckInAsync(It.IsAny<Actor>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>A valid ticket of the event, today, with the participant's name for the staff.</summary>

@@ -25,11 +25,15 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         return await Summaries(db, db.Events.Where(e => e.Id == id)).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<int> AddAsync(ScheduledEvent newEvent, CancellationToken cancellationToken = default)
+    public async Task<int> AddAsync(Actor actor, ScheduledEvent newEvent, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(newEvent);
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        // A new event has no lock of its own yet; the admin is checked in the transaction that inserts it.
+        await Actors.RequireAsync(db, actor, admin: true, cancellationToken).ConfigureAwait(false);
         var entity = new ScheduledEvent
         {
             Name = newEvent.Name,
@@ -40,10 +44,12 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         };
         db.Events.Add(entity);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return entity.Id;
     }
 
     public async Task<EventChangeStatus> UpdateAsync(
+        Actor actor,
         int id,
         EventValues expected,
         EventValues changed,
@@ -57,6 +63,7 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await AppLocks.AcquireAsync(db, AppLocks.Event(id), cancellationToken).ConfigureAwait(false);
+        await Actors.RequireAsync(db, actor, admin: true, cancellationToken).ConfigureAwait(false);
 
         // The conditions are the WHERE clause: whatever changed since the caller read the event (a
         // registration took a seat, someone cancelled the event, another admin changed its date, capacity
@@ -102,11 +109,12 @@ internal sealed class EventRepository(IDbContextFactory<EventDbContext> contextF
         return EventChangeStatus.Changed;
     }
 
-    public async Task<EventChangeStatus> CancelAsync(int id, DateOnly today, DateTime cancelledAtUtc, CancellationToken cancellationToken = default)
+    public async Task<EventChangeStatus> CancelAsync(Actor actor, int id, DateOnly today, DateTime cancelledAtUtc, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await AppLocks.AcquireAsync(db, AppLocks.Event(id), cancellationToken).ConfigureAwait(false);
+        await Actors.RequireAsync(db, actor, admin: true, cancellationToken).ConfigureAwait(false);
 
         var cancelled = await db.Events
             .Where(e => e.Id == id && !e.Cancelled && e.Date >= today)

@@ -225,19 +225,19 @@ public sealed partial class LoggingTests : IDisposable
         var stored = new List<ParticipantRecord>();
         var participants = new Mock<IParticipantRepository>();
         participants.Setup(p => p.FindByNationalIdAsync(NationalId, 7, It.IsAny<CancellationToken>())).ReturnsAsync(() => [.. stored]);
-        participants.Setup(p => p.AddAsync(It.IsAny<Participant>(), It.IsAny<CancellationToken>()))
-            .Callback<Participant, CancellationToken>((p, _) => stored.Add(new ParticipantRecord(3, p.NationalId, p.FullName, null, p.OwnerUserId)))
+        participants.Setup(p => p.AddAsync(It.IsAny<Actor>(), It.IsAny<Participant>(), It.IsAny<CancellationToken>()))
+            .Callback<Actor, Participant, CancellationToken>((_, p, _) => stored.Add(new ParticipantRecord(3, p.NationalId, p.FullName, null, p.OwnerUserId)))
             .ReturnsAsync(3);
         var registrations = new Mock<IRegistrationRepository>();
-        registrations.Setup(r => r.AddAsync(3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
-            .Returns((int _, int _, DateOnly _, DateTime _, Func<string> newTicketCode, CancellationToken _) =>
+        registrations.Setup(r => r.AddAsync(It.IsAny<Actor>(), 3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((Actor _, int _, int _, DateOnly _, DateTime _, Func<string> newTicketCode, CancellationToken _) =>
             {
                 newTicketCode();
                 return Task.FromResult(new RegistrationOutcome(5, RegistrationStatus.Active, null));
             });
         registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOwnership(5, 1, day, 7, RegistrationStatus.Active));
-        registrations.Setup(r => r.CancelAsync(5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
+        registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(CancellationOutcome.Cancelled);
 
         var clock = new FakeTimeProvider(Now);
         await using var provider = new ServiceCollection()
@@ -387,12 +387,12 @@ public sealed partial class LoggingTests : IDisposable
         participants.Setup(p => p.FindByNationalIdAsync(It.IsAny<string>(), 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string id, int? _, CancellationToken _) => id == NationalId ? [new ParticipantRecord(3, NationalId, FullName, null, 7)] : []);
         var registrations = new Mock<IRegistrationRepository>();
-        registrations.SetupSequence(r => r.AddAsync(3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        registrations.SetupSequence(r => r.AddAsync(It.IsAny<Actor>(), 3, 1, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOutcome(5, RegistrationStatus.Active, null))
             .ThrowsAsync(new AlreadyRegisteredException());
         registrations.Setup(r => r.GetOwnershipAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(new RegistrationOwnership(5, 1, day, 7, RegistrationStatus.Active));
         registrations.Setup(r => r.GetOwnershipAsync(6, It.IsAny<CancellationToken>())).ReturnsAsync(new RegistrationOwnership(6, 1, day, 9, RegistrationStatus.Active));
-        registrations.Setup(r => r.CancelAsync(5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        registrations.Setup(r => r.CancelAsync(It.IsAny<Actor>(), 5, 7, It.IsAny<DateOnly>(), It.IsAny<DateTime>(), It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CancellationOutcome.CancelledAndPromoted);
         const string Valid = "ETK-AAAAAAAAAAAAAAAAAAAAAAAAAA";
         const string Used = "ETK-BBBBBBBBBBBBBBBBBBBBBBBBBB";
@@ -402,7 +402,7 @@ public sealed partial class LoggingTests : IDisposable
                 hash.SequenceEqual(TicketCodeHash.Of(Valid)) ? new TicketForCheckIn(1, Valid, 1, RegistrationStatus.Active, false, null, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
                 : hash.SequenceEqual(TicketCodeHash.Of(Used)) ? new TicketForCheckIn(2, Used, 1, RegistrationStatus.Active, false, Now.UtcDateTime, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
                 : null);
-        tickets.Setup(t => t.CheckInAsync(1, 1, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        tickets.Setup(t => t.CheckInAsync(It.IsAny<Actor>(), 1, 1, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         tickets.Setup(t => t.GetCheckInCountAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new CheckInCount(1, 1));
         var user = new UserSession(7, UserName, UserRole.User);
         var admin = new UserSession(1, "yonetici", UserRole.Admin);

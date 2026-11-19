@@ -13,7 +13,8 @@ public interface IEventRepository
     Task<EventSummary?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>Stores a new event without registrations and returns its id.</summary>
-    Task<int> AddAsync(ScheduledEvent newEvent, CancellationToken cancellationToken = default);
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
+    Task<int> AddAsync(Actor actor, ScheduledEvent newEvent, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Changes the date, capacity and description of an event to <paramref name="changed"/>, only while the
@@ -22,7 +23,9 @@ public interface IEventRepository
     /// the seats held (the UPDATE checks it, and so does the check constraint); seats added by a larger capacity
     /// go to the waiting list in order, each with the ticket <paramref name="newTicketCode"/> returns.
     /// </summary>
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
     Task<EventChangeStatus> UpdateAsync(
+        Actor actor,
         int id,
         EventValues expected,
         EventValues changed,
@@ -36,7 +39,8 @@ public interface IEventRepository
     /// stays, its seats and waiting places are closed with <see cref="RegistrationStatus.EventCancelled"/> and
     /// the seat counter goes to zero, in one transaction under the event's lock.
     /// </summary>
-    Task<EventChangeStatus> CancelAsync(int id, DateOnly today, DateTime cancelledAtUtc, CancellationToken cancellationToken = default);
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
+    Task<EventChangeStatus> CancelAsync(Actor actor, int id, DateOnly today, DateTime cancelledAtUtc, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Outcome of a change of an event by an admin.</summary>

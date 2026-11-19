@@ -12,7 +12,8 @@ public interface IParticipantRepository
 
     /// <summary>Stores a new participant and returns its id.</summary>
     /// <exception cref="DuplicateNationalIdException">The owning account already has a participant with the same national id.</exception>
-    Task<int> AddAsync(Participant participant, CancellationToken cancellationToken = default);
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
+    Task<int> AddAsync(Actor actor, Participant participant, CancellationToken cancellationToken = default);
 
     /// <summary>Participants with an active registration for the event, by name.</summary>
     Task<IReadOnlyList<EventParticipant>> GetByEventAsync(int eventId, CancellationToken cancellationToken = default);

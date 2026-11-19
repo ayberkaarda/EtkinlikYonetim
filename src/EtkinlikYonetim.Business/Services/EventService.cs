@@ -89,9 +89,10 @@ internal sealed class EventService(
         var input = EventInput.Create(name, eventDate, capacity, now.Today);
         validator.ValidateOrThrow(input);
 
-        var id = await events.AddAsync(
+        var id = await audit.WriteAsAsync(session, actor => events.AddAsync(
+            actor,
             new ScheduledEvent { Name = input.Name, Date = input.Day, Capacity = input.Capacity, RegisteredCount = 0 },
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken)).ConfigureAwait(false);
         audit.Record(AuditEvent.EventCreated, session.Role);
         return id;
     }
@@ -113,14 +114,15 @@ internal sealed class EventService(
 
         // The repository decides whether the event is still open, still as the caller loaded it and whether
         // the capacity still holds its seats, in the transaction that writes.
-        var status = await events.UpdateAsync(
+        var status = await audit.WriteAsAsync(session, actor => events.UpdateAsync(
+            actor,
             original.Id,
             new EventValues(original.Date, original.Capacity, original.Description),
             new EventValues(input.Day, input.Capacity, input.Description),
             now.Today,
             now.Utc,
             TicketCode.New,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken)).ConfigureAwait(false);
         Complete(status);
         audit.Record(AuditEvent.EventUpdated, session.Role);
     }
@@ -130,7 +132,7 @@ internal sealed class EventService(
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
         var now = await clock.NowAsync(timeProvider, cancellationToken).ConfigureAwait(false);
-        var status = await events.CancelAsync(eventId, now.Today, now.Utc, cancellationToken).ConfigureAwait(false);
+        var status = await audit.WriteAsAsync(session, actor => events.CancelAsync(actor, eventId, now.Today, now.Utc, cancellationToken)).ConfigureAwait(false);
         Complete(status);
         audit.Record(AuditEvent.EventCancelled, session.Role);
     }

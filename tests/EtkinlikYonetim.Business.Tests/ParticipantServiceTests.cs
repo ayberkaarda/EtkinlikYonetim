@@ -36,8 +36,8 @@ public sealed class ParticipantServiceTests
     {
         Participant? added = null;
         _participants.Setup(p => p.FindByNationalIdAsync(NationalId, Sessions.User.UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        _participants.Setup(p => p.AddAsync(It.IsAny<Participant>(), It.IsAny<CancellationToken>()))
-            .Callback<Participant, CancellationToken>((p, _) => added = p)
+        _participants.Setup(p => p.AddAsync(It.IsAny<Actor>(), It.IsAny<Participant>(), It.IsAny<CancellationToken>()))
+            .Callback<Actor, Participant, CancellationToken>((_, p, _) => added = p)
             .ReturnsAsync(11);
 
         var id = await Service().AddAsync(Sessions.User, $" {NationalId} ", " Deniz Örnek ", " deniz@example.com ", Ct);
@@ -56,7 +56,7 @@ public sealed class ParticipantServiceTests
         _participants.Setup(p => p.FindByNationalIdAsync(NationalId, Sessions.User.UserId, It.IsAny<CancellationToken>()))
             .ReturnsAsync([new ParticipantRecord(1, NationalId, "X", null, Sessions.User.UserId)]);
         _participants.Setup(p => p.FindByNationalIdAsync("10000000214", Sessions.User.UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        _participants.Setup(p => p.AddAsync(It.IsAny<Participant>(), It.IsAny<CancellationToken>())).ThrowsAsync(new DuplicateNationalIdException());
+        _participants.Setup(p => p.AddAsync(It.IsAny<Actor>(), It.IsAny<Participant>(), It.IsAny<CancellationToken>())).ThrowsAsync(new DuplicateNationalIdException());
 
         var existing = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().AddAsync(Sessions.User, NationalId, "Deniz Örnek", "d@example.com", Ct));
         var raced = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().AddAsync(Sessions.User, "10000000214", "Ece Taslak", "e@example.com", Ct));
@@ -73,7 +73,7 @@ public sealed class ParticipantServiceTests
     public async Task Add_LooksOnlyInTheOwnList()
     {
         _participants.Setup(p => p.FindByNationalIdAsync(NationalId, Sessions.User.UserId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        _participants.Setup(p => p.AddAsync(It.IsAny<Participant>(), It.IsAny<CancellationToken>())).ReturnsAsync(12);
+        _participants.Setup(p => p.AddAsync(It.IsAny<Actor>(), It.IsAny<Participant>(), It.IsAny<CancellationToken>())).ReturnsAsync(12);
 
         Assert.Equal(12, await Service().AddAsync(Sessions.User, NationalId, "Deniz Örnek", "d@example.com", Ct));
 

@@ -51,7 +51,7 @@ public sealed class SessionGuardTests
             () => ServiceFactory.Account(_users.Object, _audit, Guard()).SetEnabledAsync(Sessions.Admin, 2, false, Ct));
 
         _events.VerifyNoOtherCalls();
-        _users.Verify(u => u.SetDisabledAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        _users.Verify(u => u.SetDisabledAsync(It.IsAny<Actor>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public sealed class SessionGuardTests
     public async Task CurrentAdminSession_IsAccepted()
     {
         State(Sessions.Admin.UserId, new SessionState(UserRole.Admin, false));
-        _events.Setup(e => e.AddAsync(It.IsAny<ScheduledEvent>(), It.IsAny<CancellationToken>())).ReturnsAsync(4);
+        _events.Setup(e => e.AddAsync(It.IsAny<Actor>(), It.IsAny<ScheduledEvent>(), It.IsAny<CancellationToken>())).ReturnsAsync(4);
 
         Assert.Equal(4, await Events().CreateAsync(Sessions.Admin, "Konser", Now.Date.AddDays(3), 10, Ct));
         Assert.Equal([(AuditEvent.EventCreated, UserRole.Admin)], _audit.Events);

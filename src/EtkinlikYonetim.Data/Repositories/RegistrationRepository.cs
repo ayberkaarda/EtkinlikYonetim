@@ -8,6 +8,7 @@ namespace EtkinlikYonetim.Data.Repositories;
 internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> contextFactory) : IRegistrationRepository
 {
     public async Task<RegistrationOutcome> AddAsync(
+        Actor actor,
         int participantId,
         int eventId,
         DateOnly today,
@@ -23,6 +24,7 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
         // Every change of this event's seats and waiting list waits here for the one before it, so the
         // decision between a seat and the waiting list below sees all of them.
         await AppLocks.AcquireAsync(db, AppLocks.Event(eventId), cancellationToken).ConfigureAwait(false);
+        await Actors.RequireAsync(db, actor, admin: false, cancellationToken).ConfigureAwait(false);
 
         if (await HoldsPlaceAsync(db, participantId, eventId, cancellationToken).ConfigureAwait(false))
         {
@@ -148,6 +150,7 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
     }
 
     public async Task<CancellationOutcome> CancelAsync(
+        Actor actor,
         int id,
         int? ownerUserId,
         DateOnly today,
@@ -172,6 +175,7 @@ internal sealed class RegistrationRepository(IDbContextFactory<EventDbContext> c
         }
 
         await AppLocks.AcquireAsync(db, AppLocks.Event(lockedEvent), cancellationToken).ConfigureAwait(false);
+        await Actors.RequireAsync(db, actor, admin: false, cancellationToken).ConfigureAwait(false);
         var heldSeat = await db.Registrations
             .AnyAsync(r => r.Id == id && r.Status == RegistrationStatus.Active, cancellationToken)
             .ConfigureAwait(false);

@@ -45,7 +45,7 @@ public sealed class AccountServiceTests
     [InlineData(AccountChangeStatus.NotFound, nameof(AccountService.AccountNotFound))]
     public async Task RefusedChanges_AreReportedAndNotAudited(AccountChangeStatus status, string expected)
     {
-        _users.Setup(u => u.SetRoleAsync(Sessions.Admin.UserId, 7, UserRole.User, It.IsAny<CancellationToken>())).ReturnsAsync(status);
+        _users.Setup(u => u.SetRoleAsync(It.Is<Actor>(a => a == new Actor(Sessions.Admin.UserId, UserRole.Admin, 0)), 7, UserRole.User, It.IsAny<CancellationToken>())).ReturnsAsync(status);
 
         var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().ChangeRoleAsync(Sessions.Admin, 7, UserRole.User, Ct));
 
@@ -57,7 +57,7 @@ public sealed class AccountServiceTests
     [Fact]
     public async Task Change_ByAnAdminDemotedMeanwhile_EndsTheSession()
     {
-        _users.Setup(u => u.SetDisabledAsync(Sessions.Admin.UserId, 7, true, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.ActorNotAuthorized);
+        _users.Setup(u => u.SetDisabledAsync(It.Is<Actor>(a => a == new Actor(Sessions.Admin.UserId, UserRole.Admin, 0)), 7, true, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.ActorNotAuthorized);
 
         await Assert.ThrowsAsync<SessionExpiredException>(() => Service().SetEnabledAsync(Sessions.Admin, 7, false, Ct));
 
@@ -67,9 +67,9 @@ public sealed class AccountServiceTests
     [Fact]
     public async Task Changes_AreStoredForTheActingAdminAndAudited()
     {
-        _users.Setup(u => u.SetDisabledAsync(Sessions.Admin.UserId, 7, true, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.Changed);
-        _users.Setup(u => u.SetDisabledAsync(Sessions.Admin.UserId, 7, false, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.Changed);
-        _users.Setup(u => u.SetRoleAsync(Sessions.Admin.UserId, 7, UserRole.Admin, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.Changed);
+        _users.Setup(u => u.SetDisabledAsync(It.Is<Actor>(a => a == new Actor(Sessions.Admin.UserId, UserRole.Admin, 0)), 7, true, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.Changed);
+        _users.Setup(u => u.SetDisabledAsync(It.Is<Actor>(a => a == new Actor(Sessions.Admin.UserId, UserRole.Admin, 0)), 7, false, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.Changed);
+        _users.Setup(u => u.SetRoleAsync(It.Is<Actor>(a => a == new Actor(Sessions.Admin.UserId, UserRole.Admin, 0)), 7, UserRole.Admin, It.IsAny<CancellationToken>())).ReturnsAsync(AccountChangeStatus.Changed);
 
         await Service().SetEnabledAsync(Sessions.Admin, 7, false, Ct);
         await Service().SetEnabledAsync(Sessions.Admin, 7, true, Ct);

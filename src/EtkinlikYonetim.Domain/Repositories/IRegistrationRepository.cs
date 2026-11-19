@@ -13,7 +13,9 @@ public interface IRegistrationRepository
     /// </summary>
     /// <exception cref="AlreadyRegisteredException">The participant already holds a seat or waits for one at the event.</exception>
     /// <exception cref="EventClosedException">The event does not exist, is cancelled or is in the past.</exception>
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
     Task<RegistrationOutcome> AddAsync(
+        Actor actor,
         int participantId,
         int eventId,
         DateOnly today,
@@ -37,7 +39,9 @@ public interface IRegistrationRepository
     /// to the first waiting registration in the same transaction, with the ticket
     /// <paramref name="newTicketCode"/> returns; the seat counter stays equal to the seats held.
     /// </summary>
+    /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
     Task<CancellationOutcome> CancelAsync(
+        Actor actor,
         int id,
         int? ownerUserId,
         DateOnly today,

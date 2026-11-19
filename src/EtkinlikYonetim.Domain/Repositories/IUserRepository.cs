@@ -68,14 +68,14 @@ public interface IUserRepository
     Task<IReadOnlyList<AccountSummary>> GetAccountsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Disables or enables <paramref name="targetId"/> on behalf of <paramref name="actorId"/>. One
+    /// Disables or enables <paramref name="targetId"/> on behalf of <paramref name="actor"/>. One
     /// transaction, serialized with every other account change, decides it all: the actor must still be
-    /// an enabled admin, the target must exist, and at least one enabled admin must remain.
+    /// an enabled admin with the session version of <paramref name="actor"/>, the target must exist, and at least one enabled admin must remain.
     /// </summary>
-    Task<AccountChangeStatus> SetDisabledAsync(int actorId, int targetId, bool disabled, CancellationToken cancellationToken = default);
+    Task<AccountChangeStatus> SetDisabledAsync(Actor actor, int targetId, bool disabled, CancellationToken cancellationToken = default);
 
     /// <summary>Gives <paramref name="targetId"/> the <paramref name="role"/>, under the rules of <see cref="SetDisabledAsync"/>.</summary>
-    Task<AccountChangeStatus> SetRoleAsync(int actorId, int targetId, UserRole role, CancellationToken cancellationToken = default);
+    Task<AccountChangeStatus> SetRoleAsync(Actor actor, int targetId, UserRole role, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Outcome of an account change by an admin.</summary>

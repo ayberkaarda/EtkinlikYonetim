@@ -35,7 +35,7 @@ public sealed class SqlServerLockTests
         var eventId = await app.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Meşgul", database.Today.AddDays(3), 5, Ct);
         var registrations = app.GetRequiredService<IRegistrationService>();
 
-        await using (var holder = await HoldLockAsync(database, AppLocks.Event(eventId)))
+        await using (var holder = await HeldAppLock.TakeAsync(database, AppLocks.Event(eventId), Ct))
         {
             var watch = Stopwatch.StartNew();
             await Assert.ThrowsAsync<DatabaseBusyException>(() => registrations.RegisterAsync(Admin(SeedAdminId), eventId, ids[0], Ct));
@@ -63,7 +63,7 @@ public sealed class SqlServerLockTests
         await using var app = database.BuildServices(configureContext: ShortCommandTimeout(database));
 
         Task initialize;
-        await using (var holder = await HoldLockAsync(database, "EtkinlikYonetim.LegacySchemaUpgrade"))
+        await using (var holder = await HeldAppLock.TakeAsync(database, "EtkinlikYonetim.LegacySchemaUpgrade", Ct))
         {
             initialize = app.GetRequiredService<IDatabaseInitializer>().InitializeAsync(Ct);
             await Task.Delay(TimeSpan.FromSeconds(ShortCommandTimeoutSeconds + 3), Ct);
@@ -127,29 +127,4 @@ public sealed class SqlServerLockTests
 
     private static Action<DbContextOptionsBuilder> ShortCommandTimeout(SqlServerTestDatabase database) =>
         builder => builder.UseSqlServer(database.ConnectionString, sql => sql.CommandTimeout(ShortCommandTimeoutSeconds));
-
-    /// <summary>Takes the exclusive application lock <paramref name="resource"/> on its own connection until disposed.</summary>
-    private static async Task<HeldLock> HoldLockAsync(SqlServerTestDatabase database, string resource)
-    {
-        var connection = new SqlConnection(new SqlConnectionStringBuilder(database.ConnectionString) { Pooling = false }.ConnectionString);
-        await connection.OpenAsync(Ct);
-        var transaction = (SqlTransaction)await connection.BeginTransactionAsync(Ct);
-        await using var command = new SqlCommand(
-            "DECLARE @r int; EXEC @r = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 0; SELECT @r;",
-            connection,
-            transaction);
-        command.Parameters.AddWithValue("@resource", resource);
-        Assert.Equal(0, (int)(await command.ExecuteScalarAsync(Ct))!);
-        return new HeldLock(connection, transaction);
-    }
-
-    private sealed class HeldLock(SqlConnection connection, SqlTransaction transaction) : IAsyncDisposable
-    {
-        public async ValueTask DisposeAsync()
-        {
-            await transaction.RollbackAsync(CancellationToken.None);
-            await transaction.DisposeAsync();
-            await connection.DisposeAsync();
-        }
-    }
 }

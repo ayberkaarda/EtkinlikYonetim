@@ -49,9 +49,9 @@ public sealed class EventManagementServiceTests
     public async Task Update_AtTheLimits_IsPassedOnTrimmed()
     {
         var description = " " + new string('a', 500) + " ";
-        _events.Setup(e => e.UpdateAsync(1, Expected(1), new EventValues(Today, 1, description.Trim()), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _events.Setup(e => e.UpdateAsync(It.IsAny<Actor>(), 1, Expected(1), new EventValues(Today, 1, description.Trim()), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(EventChangeStatus.Changed);
-        _events.Setup(e => e.UpdateAsync(2, Expected(2), new EventValues(Today.AddDays(3), 1000, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _events.Setup(e => e.UpdateAsync(It.IsAny<Actor>(), 2, Expected(2), new EventValues(Today.AddDays(3), 1000, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(EventChangeStatus.Changed);
 
         await Service().UpdateAsync(Sessions.Admin, Loaded(1), Now.Date.AddHours(20), 1, description, Ct);
@@ -66,7 +66,7 @@ public sealed class EventManagementServiceTests
     [InlineData(EventChangeStatus.NotFound, nameof(EventService.EventNotFound))]
     public async Task Update_RefusedByTheRepository_IsReportedAndNotAudited(EventChangeStatus status, string expected)
     {
-        _events.Setup(e => e.UpdateAsync(1, Expected(1), new EventValues(Today, 5, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _events.Setup(e => e.UpdateAsync(It.IsAny<Actor>(), 1, Expected(1), new EventValues(Today, 5, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(status);
 
         var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().UpdateAsync(Sessions.Admin, Loaded(1), Now.Date, 5, null, Ct));
@@ -82,7 +82,7 @@ public sealed class EventManagementServiceTests
     [Fact]
     public async Task Update_EventChangedElsewhere_IsReportedAsStale()
     {
-        _events.Setup(e => e.UpdateAsync(1, Expected(1), new EventValues(Today, 5, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
+        _events.Setup(e => e.UpdateAsync(It.IsAny<Actor>(), 1, Expected(1), new EventValues(Today, 5, null), Today, Now.UtcDateTime, It.IsAny<Func<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(EventChangeStatus.ChangedElsewhere);
 
         var error = await Assert.ThrowsAsync<StaleDataException>(() => Service().UpdateAsync(Sessions.Admin, Loaded(1), Now.Date, 5, null, Ct));
@@ -96,7 +96,7 @@ public sealed class EventManagementServiceTests
     [InlineData(EventChangeStatus.NotFound, nameof(EventService.EventNotFound))]
     public async Task Cancel_RefusedByTheRepository_IsReported(EventChangeStatus status, string expected)
     {
-        _events.Setup(e => e.CancelAsync(1, Today, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(status);
+        _events.Setup(e => e.CancelAsync(It.IsAny<Actor>(), 1, Today, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(status);
 
         var error = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().CancelAsync(Sessions.Admin, 1, Ct));
 
@@ -107,11 +107,28 @@ public sealed class EventManagementServiceTests
     [Fact]
     public async Task Cancel_IsAudited()
     {
-        _events.Setup(e => e.CancelAsync(1, Today, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(EventChangeStatus.Changed);
+        _events.Setup(e => e.CancelAsync(It.IsAny<Actor>(), 1, Today, Now.UtcDateTime, It.IsAny<CancellationToken>())).ReturnsAsync(EventChangeStatus.Changed);
 
         await Service().CancelAsync(Sessions.Admin, 1, Ct);
 
         Assert.Equal([(AuditEvent.EventCancelled, UserRole.Admin)], _audit.Events);
+    }
+
+    /// <summary>
+    /// The write goes out as the session's account (id, role and session version), and when the repository
+    /// finds that account changed after its lock, the session ends like one the guard rejects.
+    /// </summary>
+    [Fact]
+    public async Task Cancel_ActorRevokedInsideTheWrite_EndsTheSession()
+    {
+        var session = new UserSession(4, "ikinci", UserRole.Admin, sessionVersion: 3);
+        _events.Setup(e => e.CancelAsync(new Actor(4, UserRole.Admin, 3), 1, Today, Now.UtcDateTime, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ActorRevokedException());
+
+        var error = await Assert.ThrowsAsync<SessionExpiredException>(() => Service().CancelAsync(session, 1, Ct));
+
+        Assert.IsType<ActorRevokedException>(error.InnerException);
+        Assert.Equal([(AuditEvent.SessionRejected, UserRole.Admin)], _audit.Events);
     }
 
     [Fact]

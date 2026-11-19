@@ -54,8 +54,8 @@ public sealed class EventServiceTests
     public async Task Create_TodayAndCapacityBounds_AreStoredTrimmedWithoutRegistrations(int capacity)
     {
         ScheduledEvent? added = null;
-        _events.Setup(e => e.AddAsync(It.IsAny<ScheduledEvent>(), It.IsAny<CancellationToken>()))
-            .Callback<ScheduledEvent, CancellationToken>((e, _) => added = e)
+        _events.Setup(e => e.AddAsync(It.IsAny<Actor>(), It.IsAny<ScheduledEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<Actor, ScheduledEvent, CancellationToken>((_, e, _) => added = e)
             .ReturnsAsync(4);
 
         var id = await Service().CreateAsync(Sessions.Admin, " Konser ", Now.Date.AddHours(5), capacity, Ct);

@@ -129,13 +129,14 @@ internal sealed class RegistrationService(
             // The repository decides between a seat and the waiting list and repeats the date and
             // duplicate checks inside its transaction; the checks above only give the common cases a
             // quick answer. The ticket code is drawn only when a seat is taken.
-            var outcome = await registrations.AddAsync(
+            var outcome = await audit.WriteAsAsync(session, actor => registrations.AddAsync(
+                actor,
                 participant.Id,
                 eventId,
                 now.Today,
                 now.Utc,
                 () => code = TicketCode.New(),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken)).ConfigureAwait(false);
             if (outcome.Status == RegistrationStatus.Waiting)
             {
                 audit.Record(AuditEvent.RegistrationWaitlisted, session.Role);
@@ -192,13 +193,14 @@ internal sealed class RegistrationService(
 
         // The repository repeats the ownership, status and date conditions in the same statement, so a
         // concurrent change between the read above and this update cannot slip through.
-        var outcome = await registrations.CancelAsync(
+        var outcome = await audit.WriteAsAsync(session, actor => registrations.CancelAsync(
+            actor,
             registrationId,
             Access.OwnerFilter(session),
             now.Today,
             now.Utc,
             TicketCode.New,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken)).ConfigureAwait(false);
         if (outcome == CancellationOutcome.NotCancelled)
         {
             audit.Record(AuditEvent.RegistrationCancelRefused, session.Role);

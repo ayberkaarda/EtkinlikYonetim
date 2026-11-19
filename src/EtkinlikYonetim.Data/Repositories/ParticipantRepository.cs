@@ -28,11 +28,15 @@ internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> co
             .ConfigureAwait(false);
     }
 
-    public async Task<int> AddAsync(Participant participant, CancellationToken cancellationToken = default)
+    public async Task<int> AddAsync(Actor actor, Participant participant, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(participant);
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        // The account is checked in the transaction that inserts, so a disabled account adds nothing.
+        await Actors.RequireAsync(db, actor, admin: false, cancellationToken).ConfigureAwait(false);
         var entity = new Participant
         {
             NationalId = participant.NationalId,
@@ -45,11 +49,13 @@ internal sealed class ParticipantRepository(IDbContextFactory<EventDbContext> co
         try
         {
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (DbUpdateException ex)
         {
             // The unique index rejected a concurrent insert of the same national id for the same
             // account. Checked with a new query so the provider specific error code does not matter.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             if (await OwnerHasNationalIdAsync(participant.OwnerUserId, participant.NationalId).ConfigureAwait(false))
             {
                 throw new DuplicateNationalIdException("The national id is already registered.", ex);

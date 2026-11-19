@@ -23,7 +23,7 @@ internal sealed class TicketRepository(IDbContextFactory<EventDbContext> context
             .ConfigureAwait(false);
     }
 
-    public async Task<bool> CheckInAsync(int ticketId, int eventId, DateTime checkedInAtUtc, CancellationToken cancellationToken = default)
+    public async Task<bool> CheckInAsync(Actor actor, int ticketId, int eventId, DateTime checkedInAtUtc, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
@@ -32,6 +32,7 @@ internal sealed class TicketRepository(IDbContextFactory<EventDbContext> context
         // for the check-in or the check-in waits for it, so the two can never both succeed (also not under
         // READ_COMMITTED_SNAPSHOT, where the conditions below would otherwise read the last committed rows).
         await AppLocks.AcquireAsync(db, AppLocks.Event(eventId), cancellationToken).ConfigureAwait(false);
+        await Actors.RequireAsync(db, actor, admin: true, cancellationToken).ConfigureAwait(false);
 
         // The WHERE clause is the decision: a second scan, a cancellation or a cancelled event since the
         // lookup make the statement match nothing.

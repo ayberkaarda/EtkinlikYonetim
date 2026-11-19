@@ -127,9 +127,9 @@ public sealed class AccountManagementTests : IAsyncLifetime
 
         // The repository itself keeps the last one, whoever asks.
         var users = _db.Get<Domain.Repositories.IUserRepository>();
-        Assert.Equal(Domain.Repositories.AccountChangeStatus.LastActiveAdmin, await users.SetDisabledAsync(second.UserId, second.UserId, true, Ct));
-        Assert.Equal(Domain.Repositories.AccountChangeStatus.ActorNotAuthorized, await users.SetRoleAsync(SeedAdminId, second.UserId, UserRole.User, Ct));
-        Assert.Equal(Domain.Repositories.AccountChangeStatus.NotFound, await users.SetRoleAsync(second.UserId, 77, UserRole.User, Ct));
+        Assert.Equal(Domain.Repositories.AccountChangeStatus.LastActiveAdmin, await users.SetDisabledAsync(Access.ActorOf(second), second.UserId, true, Ct));
+        Assert.Equal(Domain.Repositories.AccountChangeStatus.ActorNotAuthorized, await users.SetRoleAsync(Access.ActorOf(Admin(SeedAdminId)), second.UserId, UserRole.User, Ct));
+        Assert.Equal(Domain.Repositories.AccountChangeStatus.NotFound, await users.SetRoleAsync(Access.ActorOf(second), 77, UserRole.User, Ct));
     }
 
     [Fact]
