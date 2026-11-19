@@ -1,4 +1,4 @@
-﻿namespace EtkinlikYonetim
+﻿namespace EtkinlikYonetim.UI
 {
     partial class KayitOlForm
     {
@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(KayitOlForm));
             this.txtKullaniciAdi = new System.Windows.Forms.TextBox();
             this.txtSifre = new System.Windows.Forms.TextBox();
             this.lblKullaniciAdi = new System.Windows.Forms.Label();
@@ -49,7 +48,6 @@
             this.txtKullaniciAdi.Name = "txtKullaniciAdi";
             this.txtKullaniciAdi.Size = new System.Drawing.Size(196, 29);
             this.txtKullaniciAdi.TabIndex = 0;
-            this.txtKullaniciAdi.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtKullaniciAdi_KeyPress);
             // 
             // txtSifre
             // 
@@ -147,7 +145,6 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("$this.BackgroundImage")));
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.ClientSize = new System.Drawing.Size(617, 447);
             this.Controls.Add(this.btnAsagial);
@@ -161,10 +158,9 @@
             this.Controls.Add(this.txtKullaniciAdi);
             this.DoubleBuffered = true;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "KayitOlForm";
-            this.Text = "EtkinlikYonetim |Kayıt Ol";
+            this.Text = "Etkinlik Yönetim - Kayıt Ol";
             this.ResumeLayout(false);
             this.PerformLayout();
 

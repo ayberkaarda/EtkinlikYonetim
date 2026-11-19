@@ -1,4 +1,4 @@
-﻿namespace EtkinlikYonetim
+﻿namespace EtkinlikYonetim.UI
 {
     partial class KayitEkleForm
     {
@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(KayitEkleForm));
             this.cmbEtkinlikler = new System.Windows.Forms.ComboBox();
             this.txtKatilimciTC = new System.Windows.Forms.TextBox();
             this.btnKayit = new System.Windows.Forms.Button();
@@ -36,7 +35,43 @@
             this.label2 = new System.Windows.Forms.Label();
             this.btnAsagial = new System.Windows.Forms.Button();
             this.btnkapat = new System.Windows.Forms.Button();
+            this.label3 = new System.Windows.Forms.Label();
+            this.lstKayitlar = new System.Windows.Forms.ListBox();
+            this.btnKayitIptal = new System.Windows.Forms.Button();
             this.SuspendLayout();
+            //
+            // label3
+            //
+            this.label3.AutoSize = true;
+            this.label3.Location = new System.Drawing.Point(68, 200);
+            this.label3.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(160, 16);
+            this.label3.TabIndex = 14;
+            this.label3.Text = "Kayıtlarım ve Biletlerim";
+            //
+            // lstKayitlar
+            //
+            this.lstKayitlar.FormattingEnabled = true;
+            this.lstKayitlar.HorizontalScrollbar = true;
+            this.lstKayitlar.ItemHeight = 16;
+            this.lstKayitlar.Location = new System.Drawing.Point(71, 222);
+            this.lstKayitlar.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.lstKayitlar.Name = "lstKayitlar";
+            this.lstKayitlar.Size = new System.Drawing.Size(534, 164);
+            this.lstKayitlar.TabIndex = 15;
+            //
+            // btnKayitIptal
+            //
+            this.btnKayitIptal.Font = new System.Drawing.Font("Segoe UI Semibold", 12F, System.Drawing.FontStyle.Bold);
+            this.btnKayitIptal.Location = new System.Drawing.Point(420, 396);
+            this.btnKayitIptal.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnKayitIptal.Name = "btnKayitIptal";
+            this.btnKayitIptal.Size = new System.Drawing.Size(185, 41);
+            this.btnKayitIptal.TabIndex = 16;
+            this.btnKayitIptal.Text = "Kaydı İptal Et";
+            this.btnKayitIptal.UseVisualStyleBackColor = true;
+            this.btnKayitIptal.Click += new System.EventHandler(this.btnKayitIptal_Click);
             // 
             // cmbEtkinlikler
             // 
@@ -56,7 +91,6 @@
             this.txtKatilimciTC.Name = "txtKatilimciTC";
             this.txtKatilimciTC.Size = new System.Drawing.Size(261, 22);
             this.txtKatilimciTC.TabIndex = 1;
-            this.txtKatilimciTC.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtKatilimciTC_KeyPress);
             // 
             // btnKayit
             // 
@@ -125,7 +159,10 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.LightGreen;
-            this.ClientSize = new System.Drawing.Size(676, 270);
+            this.ClientSize = new System.Drawing.Size(676, 460);
+            this.Controls.Add(this.btnKayitIptal);
+            this.Controls.Add(this.lstKayitlar);
+            this.Controls.Add(this.label3);
             this.Controls.Add(this.btnAsagial);
             this.Controls.Add(this.btnkapat);
             this.Controls.Add(this.label2);
@@ -134,10 +171,9 @@
             this.Controls.Add(this.txtKatilimciTC);
             this.Controls.Add(this.cmbEtkinlikler);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.Name = "KayitEkleForm";
-            this.Text = "EtkinlikYonetim |Kayıt Ekle";
+            this.Text = "Etkinlik Yönetim - Kayıt Ekle";
             this.Load += new System.EventHandler(this.KayitEkleForm_Load);
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -153,5 +189,8 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Button btnAsagial;
         private System.Windows.Forms.Button btnkapat;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.ListBox lstKayitlar;
+        private System.Windows.Forms.Button btnKayitIptal;
     }
 }

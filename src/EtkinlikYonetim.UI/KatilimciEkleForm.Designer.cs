@@ -1,4 +1,4 @@
-﻿namespace EtkinlikYonetim
+﻿namespace EtkinlikYonetim.UI
 {
     partial class KatilimciEkleForm
     {
@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(KatilimciEkleForm));
             this.txtTC = new System.Windows.Forms.TextBox();
             this.txtAdSoyad = new System.Windows.Forms.TextBox();
             this.txtEmail = new System.Windows.Forms.TextBox();
@@ -48,7 +47,6 @@
             this.txtTC.Name = "txtTC";
             this.txtTC.Size = new System.Drawing.Size(221, 22);
             this.txtTC.TabIndex = 0;
-            this.txtTC.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtTC_KeyPress);
             // 
             // txtAdSoyad
             // 
@@ -58,7 +56,6 @@
             this.txtAdSoyad.Name = "txtAdSoyad";
             this.txtAdSoyad.Size = new System.Drawing.Size(221, 22);
             this.txtAdSoyad.TabIndex = 1;
-            this.txtAdSoyad.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtAdSoyad_KeyPress);
             // 
             // txtEmail
             // 
@@ -150,12 +147,9 @@
             this.Controls.Add(this.txtEmail);
             this.Controls.Add(this.txtAdSoyad);
             this.Controls.Add(this.txtTC);
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "KatilimciEkleForm";
-            this.Text = "EtkinlikYonetim |Katilimci Ekle";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.KatilimciEkleForm_FormClosing);
-            this.Load += new System.EventHandler(this.KatilimciEkleForm_Load);
+            this.Text = "Etkinlik Yönetim - Katılımcı Ekle";
             this.ResumeLayout(false);
             this.PerformLayout();
 

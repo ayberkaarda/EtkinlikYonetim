@@ -1,4 +1,4 @@
-﻿namespace EtkinlikYonetim
+﻿namespace EtkinlikYonetim.UI
 {
     partial class KatilimciGoruntule
     {
@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(KatilimciGoruntule));
             this.cmbEtkinlikSec = new System.Windows.Forms.ComboBox();
             this.label1 = new System.Windows.Forms.Label();
             this.lstKatilimcilar = new System.Windows.Forms.ListBox();
@@ -61,7 +60,6 @@
             this.lstKatilimcilar.Name = "lstKatilimcilar";
             this.lstKatilimcilar.Size = new System.Drawing.Size(344, 260);
             this.lstKatilimcilar.TabIndex = 2;
-            this.lstKatilimcilar.SelectedIndexChanged += new System.EventHandler(this.lstKatilimcilar_SelectedIndexChanged);
             // 
             // KatilimciGoruntule
             // 
@@ -71,9 +69,8 @@
             this.Controls.Add(this.lstKatilimcilar);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.cmbEtkinlikSec);
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "KatilimciGoruntule";
-            this.Text = "EtkinlikYonetim |Katılımcı Görüntüle";
+            this.Text = "Etkinlik Yönetim - Katılımcı Görüntüle";
             this.Load += new System.EventHandler(this.KatilimciGoruntule_Load);
             this.ResumeLayout(false);
             this.PerformLayout();

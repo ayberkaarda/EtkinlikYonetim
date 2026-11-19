@@ -1,4 +1,4 @@
-﻿namespace EtkinlikYonetim
+﻿namespace EtkinlikYonetim.UI
 {
     partial class Form1
     {
@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.btnEtkinlikEkle = new System.Windows.Forms.Button();
             this.txtEtkinlikAd = new System.Windows.Forms.TextBox();
             this.dtpTarih = new System.Windows.Forms.DateTimePicker();
@@ -181,7 +180,6 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("$this.BackgroundImage")));
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.ClientSize = new System.Drawing.Size(688, 263);
             this.Controls.Add(this.btnAsagial);
@@ -197,10 +195,9 @@
             this.Controls.Add(this.btnEtkinlikEkle);
             this.DoubleBuffered = true;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "Form1";
-            this.Text = "EtkinlikYonetim";
+            this.Text = "Etkinlik Yönetim - Yönetim Paneli";
             this.Load += new System.EventHandler(this.Form1_Load);
             ((System.ComponentModel.ISupportInitialize)(this.numKapasite)).EndInit();
             this.ResumeLayout(false);
