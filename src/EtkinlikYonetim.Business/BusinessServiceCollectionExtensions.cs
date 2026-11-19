@@ -1,5 +1,7 @@
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Services;
+using EtkinlikYonetim.Business.Validation;
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -16,6 +18,13 @@ public static class BusinessServiceCollectionExtensions
         services.TryAddSingleton<IPasswordHasher>(_ => new PasswordHasher());
         services.TryAddSingleton(SetupKeyThrottle.Default);
         services.TryAddSingleton(_ => SetupKeyEnvironment.FromProcess());
+        services.AddSingleton<IValidator<AccountInput>, AccountInputValidator>();
+        services.AddSingleton<IValidator<SignInInput>, SignInInputValidator>();
+        services.AddSingleton<IValidator<ParticipantInput>, ParticipantInputValidator>();
+        services.AddSingleton<IValidator<EventInput>, EventInputValidator>();
+        services.AddSingleton<IValidator<RegistrationRequestInput>, RegistrationRequestInputValidator>();
+        services.AddSingleton<IValidator<RegistrationTargetInput>, RegistrationTargetInputValidator>();
+        services.AddSingleton<IValidator<CancellationInput>, CancellationInputValidator>();
         services.AddSingleton<SetupKeyGate>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<ISetupService, SetupService>();
