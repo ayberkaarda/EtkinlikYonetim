@@ -56,6 +56,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Ticket codes are found by their SHA-256 and compared in constant time; they are never logged or exported.
 - The log file writes one neutral code for every outcome of a sign-up, a registration, a cancellation and a scan at
   the entrance, so it no longer tells which accounts, registrations or tickets exist.
+- Dates and times come from the database's clock: which events are past, whether a registration can still be made
+  or cancelled, sign-in locks, and the times written for registrations, tickets, cancellations and check-ins. A
+  computer whose clock is wrong, or was set back on purpose, can no longer register for a past event, cancel its
+  registrations, end a sign-in lock early or write false check-in times.
 
 ## Foundation
 

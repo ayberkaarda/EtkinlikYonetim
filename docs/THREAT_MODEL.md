@@ -60,6 +60,14 @@ measures only; it is not a legal assessment.
 | Passing the waiting list, or a freed seat left empty while someone waits | A new registration takes a seat only while nobody waits; a freed or added seat goes to the lowest queue number in the transaction that frees it; queue numbers are unique per event. Tested with a cancellation racing a registration, two cancellations and two registrations on a full event | Mitigated |
 | Lowering the capacity below the seats held, or changing a past or cancelled event | The UPDATE itself requires the event to be open and the seats held not above the new capacity; the check constraint repeats the limit. Tested with a capacity change racing a registration | Mitigated |
 
+## Dates and times
+
+| Threat | Mitigation | Status |
+|---|---|---|
+| A computer clock set back (or running wrong) to register for, or cancel registrations of, a past event, or to change or cancel a past event | "Today" is the database's clock (`SYSUTCDATETIME()`) read for the operation, turned into a calendar day in the computer's time zone; the conditional `UPDATE`s repeat the date check with that day. Tested on SQL Server with client clocks days behind and ahead | Mitigated |
+| Forged registration, ticket, cancellation or check-in times | Every stored time is the database's UTC time of the operation; the computer's clock plays no part | Mitigated |
+| A sign-in lock ended early by a clock running ahead | The lock end is written and compared with the database's clock | Mitigated |
+
 ## National id data
 
 | Threat | Mitigation | Status |
@@ -146,6 +154,8 @@ measures only; it is not a legal assessment.
 - The session check reads the account before an operation; an admin demoted in the few milliseconds between that
   read and the operation's write can still complete that one operation. Account changes close this gap by checking
   the acting admin inside their own transaction.
+- The calendar day is the database's time in the computer's time zone; a computer with a wrong time zone (not a
+  wrong clock) still sees the day change some hours early or late.
 - On a Windows account shared by several application users, each of them can read when sign-ins and registrations
   happened from the log file, though not by whom.
 

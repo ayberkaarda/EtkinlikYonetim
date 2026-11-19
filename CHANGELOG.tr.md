@@ -56,6 +56,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
 - Bilet kodları SHA-256 özetleriyle bulunur ve sabit zamanda karşılaştırılır; loga ve dışa aktarımlara asla yazılmaz.
 - Log dosyası kayıt olma, etkinlik kaydı, iptal ve girişte okutmanın her sonucu için tek bir nötr kod yazar; artık
   hangi hesapların, kayıtların veya biletlerin var olduğunu belli etmez.
+- Tarihler ve saatler veritabanının saatinden alınır: hangi etkinliklerin geçmiş olduğu, bir kaydın hâlâ yapılıp
+  yapılamayacağı veya iptal edilip edilemeyeceği, giriş kilitleri ve kayıtlar, biletler, iptaller ve girişler için
+  yazılan zamanlar. Saati yanlış olan ya da bilerek geri alınmış bir bilgisayar artık geçmiş bir etkinliğe kayıt
+  yapamaz, kayıtlarını iptal edemez, bir giriş kilidini erken bitiremez ve sahte giriş zamanları yazamaz.
 
 ## Temel
 
