@@ -1,4 +1,3 @@
-using System.Reflection;
 using EtkinlikYonetim.Business;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Data.Repositories;
@@ -101,64 +100,31 @@ public sealed class StaleClockTests : IAsyncLifetime
         var midnight = new Midnight(_db.Clock);
         var app = _db.BuildServices(services =>
         {
-            services.AddSingleton(provider => LateWrites<IEventRepository>.Wrap(ActivatorUtilities.CreateInstance<EventRepository>(provider), midnight));
-            services.AddSingleton(provider => LateWrites<IRegistrationRepository>.Wrap(ActivatorUtilities.CreateInstance<RegistrationRepository>(provider), midnight));
+            services.AddSingleton(provider => BeforeCall<IEventRepository>.Wrap(ActivatorUtilities.CreateInstance<EventRepository>(provider), IsWrite, midnight.BeforeWriteAsync));
+            services.AddSingleton(provider => BeforeCall<IRegistrationRepository>.Wrap(ActivatorUtilities.CreateInstance<RegistrationRepository>(provider), IsWrite, midnight.BeforeWriteAsync));
         });
         var eventId = await app.GetRequiredService<IEventService>().CreateAsync(Admin(SeedAdminId), "Gece yarısı", day.ToDateTime(TimeOnly.MinValue), 5, Ct);
         var receipt = await app.GetRequiredService<IRegistrationService>().RegisterAsync(User(SeedUserId), eventId, DenizNationalId, Ct);
         return (app, midnight, eventId, receipt.RegistrationId);
     }
 
+    /// <summary>The repository writes: adding, changing and cancelling.</summary>
+    private static bool IsWrite(string method) => method is "AddAsync" or "UpdateAsync" or "CancelAsync";
+
     /// <summary>Once armed, lets two seconds pass on the clock the next time a write is about to start.</summary>
-    internal sealed class Midnight(FakeTimeProvider clock)
+    private sealed class Midnight(FakeTimeProvider clock)
     {
         public bool Armed { get; set; }
 
-        public void BeforeWrite()
+        public Task BeforeWriteAsync()
         {
             if (Armed)
             {
                 Armed = false;
                 clock.Advance(TimeSpan.FromSeconds(2));
             }
-        }
-    }
 
-    /// <summary>A repository whose writes (AddAsync, UpdateAsync, CancelAsync) start after <see cref="Midnight.BeforeWrite"/>.</summary>
-#pragma warning disable CA1852 // DispatchProxy needs a class it can derive from.
-    internal class LateWrites<T> : DispatchProxy
-#pragma warning restore CA1852
-        where T : class
-    {
-        private T _inner = null!;
-        private Midnight _midnight = null!;
-
-        public static T Wrap(T inner, Midnight midnight)
-        {
-            var proxy = Create<T, LateWrites<T>>();
-            var late = (LateWrites<T>)(object)proxy;
-            late._inner = inner;
-            late._midnight = midnight;
-            return proxy;
-        }
-
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            ArgumentNullException.ThrowIfNull(targetMethod);
-            if (targetMethod.Name is "AddAsync" or "UpdateAsync" or "CancelAsync")
-            {
-                _midnight.BeforeWrite();
-            }
-
-            try
-            {
-                return targetMethod.Invoke(_inner, args);
-            }
-            catch (TargetInvocationException ex) when (ex.InnerException is not null)
-            {
-                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(ex.InnerException);
-                throw;
-            }
+            return Task.CompletedTask;
         }
     }
 }

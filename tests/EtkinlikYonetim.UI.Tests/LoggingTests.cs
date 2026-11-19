@@ -402,7 +402,7 @@ public sealed partial class LoggingTests : IDisposable
                 hash.SequenceEqual(TicketCodeHash.Of(Valid)) ? new TicketForCheckIn(1, Valid, 1, RegistrationStatus.Active, false, null, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
                 : hash.SequenceEqual(TicketCodeHash.Of(Used)) ? new TicketForCheckIn(2, Used, 1, RegistrationStatus.Active, false, Now.UtcDateTime, DateOnly.FromDateTime(Now.UtcDateTime), FullName)
                 : null);
-        tickets.Setup(t => t.CheckInAsync(It.IsAny<Actor>(), 1, 1, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        tickets.Setup(t => t.CheckInAsync(It.IsAny<Actor>(), 1, 1, It.IsAny<CancellationToken>())).ReturnsAsync(CheckInWriteStatus.CheckedIn);
         tickets.Setup(t => t.GetCheckInCountAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new CheckInCount(1, 1));
         var user = new UserSession(7, UserName, UserRole.User);
         var admin = new UserSession(1, "yonetici", UserRole.Admin);

@@ -115,10 +115,18 @@ internal sealed class CheckInService(
             return (CheckInOutcome.AlreadyUsed, null);
         }
 
-        // The check-in time is the database's, so the clock of the scanning computer cannot change it.
-        if (await audit.WriteAsAsync(session, actor => tickets.CheckInAsync(actor, ticket.TicketId, eventId, now.Utc, cancellationToken)).ConfigureAwait(false))
+        // The repository decides the day again under the event's lock, with the event's date and the
+        // database's time as they are then, and stamps the check-in with that time: neither a move of the
+        // event while the scan waited nor the scanning computer's clock can make it count on another day.
+        var written = await audit.WriteAsAsync(session, actor => tickets.CheckInAsync(actor, ticket.TicketId, eventId, cancellationToken)).ConfigureAwait(false);
+        if (written == CheckInWriteStatus.CheckedIn)
         {
             return (CheckInOutcome.CheckedIn, ticket.ParticipantName);
+        }
+
+        if (written == CheckInWriteStatus.NotEventDay)
+        {
+            return (CheckInOutcome.NotEventDay, null);
         }
 
         // Lost to a concurrent scan of the same ticket, or the registration or event was cancelled since
