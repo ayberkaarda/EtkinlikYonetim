@@ -6,10 +6,12 @@ internal static class UiExtensions
 {
     /// <summary>
     /// Runs an asynchronous UI action with a wait cursor. Business rule violations are shown as
-    /// warnings; anything else is reported through <see cref="ErrorReporter"/>. A session the database
-    /// no longer accepts is reported and then ended, which returns the application to the sign-in.
+    /// warnings; anything else is reported through <see cref="ErrorReporter"/>, inline on a screen with a
+    /// message strip. A session the database no longer accepts is reported and then ended, which returns
+    /// the application to the sign-in.
     /// </summary>
-    public static async Task RunAsync(this Form form, Func<Task> action)
+    /// <param name="reportTo">Where failures are reported instead of <paramref name="form"/>, for a window that closes when its action fails.</param>
+    public static async Task RunAsync(this Form form, Func<Task> action, IWin32Window? reportTo = null)
     {
         ArgumentNullException.ThrowIfNull(form);
         ArgumentNullException.ThrowIfNull(action);
@@ -28,7 +30,7 @@ internal static class UiExtensions
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            ErrorReporter.Show(ex, form);
+            ErrorReporter.Show(ex, reportTo ?? form);
         }
         finally
         {
@@ -39,6 +41,7 @@ internal static class UiExtensions
     /// <summary>
     /// Like <see cref="RunAsync"/>, but through <paramref name="operation"/>: while a run is pending a
     /// new call is ignored and <paramref name="controls"/> stay disabled, so a write cannot be started twice.
+    /// A run that starts clears the previous inline message of the screen.
     /// </summary>
     public static Task<bool> RunExclusiveAsync(
         this Form form,
@@ -50,7 +53,13 @@ internal static class UiExtensions
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentNullException.ThrowIfNull(action);
 
-        return operation.RunAsync(() => form.RunAsync(action), controls);
+        return operation.RunAsync(
+            () =>
+            {
+                (form as IStatusSurface)?.ClearStatus();
+                return form.RunAsync(action);
+            },
+            controls);
     }
 
     /// <summary>Lets only digits (and editing keys) be typed, for national id fields.</summary>

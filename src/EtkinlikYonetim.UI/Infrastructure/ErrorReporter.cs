@@ -8,7 +8,10 @@ using Serilog;
 
 namespace EtkinlikYonetim.UI.Infrastructure;
 
-/// <summary>Logs exceptions and turns them into short, user friendly Turkish messages.</summary>
+/// <summary>
+/// Logs exceptions and turns them into short, user friendly Turkish messages, shown inline on a screen
+/// with a message strip and in a message window otherwise.
+/// </summary>
 internal static class ErrorReporter
 {
     private const int MaxLoggedExceptions = 8;
@@ -27,10 +30,30 @@ internal static class ErrorReporter
 
         Record(Log.Logger, exception);
 
-        // Rule and permission messages are fixed texts written for the user; they are shown as warnings.
-        if (exception is BusinessRuleException or AccessDeniedException or SessionExpiredException)
+        // An ended session closes the windows of the panel, so its message needs a window of its own.
+        if (exception is SessionExpiredException)
         {
             Dialogs.Show(owner, exception.Message, "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        // Rule and permission messages are fixed texts written for the user; they are shown as warnings,
+        // inline on a screen with a message strip.
+        if (exception is BusinessRuleException or AccessDeniedException)
+        {
+            if (owner is IStatusSurface surface)
+            {
+                surface.ShowStatus(Theming.StatusKind.Warning, exception.Message);
+                return;
+            }
+
+            Dialogs.Show(owner, exception.Message, "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (owner is IStatusSurface screen)
+        {
+            screen.ShowStatus(Theming.StatusKind.Error, Describe(exception));
             return;
         }
 

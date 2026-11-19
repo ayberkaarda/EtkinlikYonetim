@@ -15,6 +15,38 @@ public sealed class ExclusiveOperation
     public bool IsRunning { get; private set; }
 
     private Control? _focusAfterUnlock;
+    private Form? _closeAfterRun;
+
+    /// <summary>
+    /// Keeps <paramref name="form"/> open while a run is pending: a close request (X, Alt+F4, Esc) is
+    /// postponed until the run finished, so whoever opened the form reads its final outcome. A pending
+    /// shutdown of Windows is not held up.
+    /// </summary>
+    public void HoldClosingOf(Form form)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+
+        form.FormClosing += (_, e) =>
+        {
+            if (IsRunning && e.CloseReason is not (CloseReason.WindowsShutDown or CloseReason.TaskManagerClosing))
+            {
+                e.Cancel = true;
+                _closeAfterRun = form;
+            }
+        };
+    }
+
+    /// <summary>
+    /// Drops a close request that arrived while the pending run was working, so the form stays open after
+    /// the run: for a result the user still has to read, such as a single use code shown only once.
+    /// Returns whether a close request was dropped.
+    /// </summary>
+    public bool DropPendingClose()
+    {
+        var pending = _closeAfterRun is not null;
+        _closeAfterRun = null;
+        return pending;
+    }
 
     /// <summary>
     /// Chooses the control that receives the focus once the guarded controls are enabled again. A
@@ -70,6 +102,20 @@ public sealed class ExclusiveOperation
             if (target is { IsDisposed: false, Enabled: true } && target.FindForm() is { IsDisposed: false })
             {
                 target.Select();
+            }
+
+            // Posted, so the caller's own continuation (for example a dialog result) runs first.
+            var postponed = _closeAfterRun;
+            _closeAfterRun = null;
+            if (postponed is { IsDisposed: false, IsHandleCreated: true })
+            {
+                postponed.BeginInvoke(() =>
+                {
+                    if (!postponed.IsDisposed)
+                    {
+                        postponed.Close();
+                    }
+                });
             }
         }
     }
