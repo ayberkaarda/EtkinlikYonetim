@@ -118,8 +118,13 @@ namespace EtkinlikYonetim.UI
                 }
             }
 
-            var signIn = formFactory.Create<GirisYapForm>();
+            using var signIn = formFactory.Create<GirisYapForm>();
             signIn.OfferAdminSetup = adminMissing && !setupRequired;
+            if (setupRequired)
+            {
+                signIn.ShowNotice(GirisYapForm.AdminCreatedNotice);
+            }
+
             Application.Run(signIn);
         }
 

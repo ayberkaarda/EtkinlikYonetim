@@ -40,8 +40,8 @@ public sealed class BrandingTests
             }
         }
 
-        Assert.Same(AppAssets.Background, signIn.BackgroundImage);
-        Assert.Same(AppAssets.Background, signUp.BackgroundImage);
+        Assert.Null(signIn.BackgroundImage);
+        Assert.Null(signUp.BackgroundImage);
         Assert.Same(AppAssets.Background, panel.BackgroundImage);
     });
 

@@ -68,14 +68,14 @@ public sealed class FocusTests
         var password = Find<TextBox>(form, "txtSifre");
         Find<TextBox>(form, "txtKullaniciAdi").Text = "ornek";
         password.Text = "yanlis";
-        Find<Button>(form, "btnkayitol").Select();
+        Find<Button>(form, "btnKayitOl").Select();
 
         var signIn = form.SignInAsync();
         auth.RefuseSignIn();
 
         Assert.True(signIn.IsCompletedSuccessfully);
         Assert.Null(signIn.Result);
-        Assert.True(Find<Control>(form, "btnGiris2").Enabled);
+        Assert.True(Find<Control>(form, "btnGiris").Enabled);
         Assert.Empty(password.Text);
         Assert.Same(password, form.ActiveControl);
     });

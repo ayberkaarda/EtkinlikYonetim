@@ -64,7 +64,7 @@ internal sealed class BrandPanel : Panel
             {
                 Name = "brandPointBadge" + i.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 Fill = p.IsHighContrast ? null : p.AccentPressed,
-                GlyphColor = p.IsHighContrast ? null : p.Warm,
+                GlyphColor = p.IsHighContrast ? null : p.OnAccent,
                 Margin = new Padding(0, 0, Spacing.M, Spacing.M),
                 Anchor = AnchorStyles.Left | AnchorStyles.Top,
             };
