@@ -459,3 +459,7 @@ The target machine needs the .NET 10 Desktop Runtime. Put `appsettings.json` nex
 ## 📧 Contact
 
 Feel free to get in touch with questions about the project.
+
+## License
+
+Released under the [MIT License](LICENSE).

@@ -459,3 +459,7 @@ da `ETKINLIK_CONNECTION` tanımlayın.
 ## 📧 İletişim
 
 Proje hakkında sorularınız için benimle iletişime geçebilirsiniz.
+
+## Lisans
+
+[MIT Lisansı](LICENSE) ile yayımlanmıştır.
