@@ -166,11 +166,15 @@ public sealed class CheckInUiTests
         var registrations = new ControlledRegistrationService();
         var prompts = new RecordingPrompts();
         using var form = new KayitEkleForm(new ControlledEventService(), registrations, Sessions.User) { Prompts = prompts };
+        var registration = Sessions.Registration(5) with { TicketCode = Code };
+        registrations.Registrations.Add(registration);
         var list = Find<ListBox>(form, "lstKayitlar");
-        list.Items.Add(new RegistrationItem(Sessions.Registration(5) with { TicketCode = Code }));
+        list.Items.Add(new RegistrationItem(registration));
         list.SelectedIndex = 0;
 
-        using var ticket = form.CreateTicketView();
+        var view = form.CreateTicketViewAsync();
+        Assert.True(view.IsCompletedSuccessfully);
+        using var ticket = view.Result;
 
         Assert.NotNull(ticket);
         Assert.Equal(Code, Find<TextBox>(ticket, "txtKod").Text);
@@ -188,13 +192,43 @@ public sealed class CheckInUiTests
     public void TicketView_WithoutAVisibleTicket_TellsWhy(RegistrationStatus status, string message) => Run(() =>
     {
         var prompts = new RecordingPrompts();
-        using var form = new KayitEkleForm(new ControlledEventService(), new ControlledRegistrationService(), Sessions.Admin) { Prompts = prompts };
+        var registrations = new ControlledRegistrationService();
+        using var form = new KayitEkleForm(new ControlledEventService(), registrations, Sessions.Admin) { Prompts = prompts };
+        var registration = Sessions.Registration(5) with { TicketCode = null, Status = status };
+        registrations.Registrations.Add(registration);
         var list = Find<ListBox>(form, "lstKayitlar");
-        list.Items.Add(new RegistrationItem(Sessions.Registration(5) with { TicketCode = null, Status = status }));
+        list.Items.Add(new RegistrationItem(registration));
         list.SelectedIndex = 0;
 
-        Assert.Null(form.CreateTicketView());
+        var view = form.CreateTicketViewAsync();
+
+        Assert.True(view.IsCompletedSuccessfully);
+        Assert.Null(view.Result);
         Assert.Equal([message], prompts.Messages);
+    });
+
+    /// <summary>
+    /// The list still shows a seat with its ticket, but an admin has cancelled the event since: the ticket is
+    /// read again before it is shown, so no QR code of a cancelled ticket appears, and the list is updated.
+    /// </summary>
+    [Fact]
+    public void TicketView_OfARegistrationCancelledSinceTheListWasLoaded_ShowsNoTicket() => Run(() =>
+    {
+        var prompts = new RecordingPrompts();
+        var registrations = new ControlledRegistrationService();
+        using var form = new KayitEkleForm(new ControlledEventService(), registrations, Sessions.User) { Prompts = prompts };
+        var shown = Sessions.Registration(5) with { TicketCode = Code };
+        registrations.Registrations.Add(shown with { Status = RegistrationStatus.EventCancelled });
+        var list = Find<ListBox>(form, "lstKayitlar");
+        list.Items.Add(new RegistrationItem(shown));
+        list.SelectedIndex = 0;
+
+        var view = form.CreateTicketViewAsync();
+
+        Assert.True(view.IsCompletedSuccessfully);
+        Assert.Null(view.Result);
+        Assert.Equal(["Bu kaydın bileti yok: katılımcı bekleme listesinde ya da kayıt iptal edilmiş."], prompts.Messages);
+        Assert.Equal(RegistrationStatus.EventCancelled, Assert.IsType<RegistrationItem>(list.SelectedItem).Registration.Status);
     });
 
     private static BiletKontrolForm ChosenEvent(ControlledCheckInService checkIns, RecordingPrompts? prompts = null)
