@@ -58,7 +58,9 @@ startup.
 - ✅ **Entrance check-in** ("Bilet Kontrol", Ticket Check): choose the event and type or scan ticket codes. A valid
   unused ticket is checked in ("GİRİŞ YAPILDI"), a second scan says "ZATEN KULLANILDI" (already used) on the same
   screen, and unknown or cancelled tickets and those of other events get one refusal ("GEÇERSİZ BİLET"); a counter
-  shows the check-ins against the seats.
+  shows the check-ins against the seats. A check-in shows the participant's name to compare with an identity
+  document, tickets are used only on the event's day ("ETKİNLİK GÜNÜ DEĞİL" otherwise, and the ticket stays
+  valid), and the code field stays open so a scanner can read the next ticket while one is being checked.
 - ✅ **Participant list** ("Katılımcı Görüntüle", View Participants): the participants of a chosen event ("Etkinlik
   Seçin", Select Event) with name, masked national id, e-mail and state (checked in, waiting, cancelled), saved as
   CSV ("CSV Olarak Kaydet") or as a printable HTML page ("Yazdırılabilir Liste"). Exports contain no ticket codes.

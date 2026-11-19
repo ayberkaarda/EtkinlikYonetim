@@ -89,6 +89,9 @@ measures only; it is not a legal assessment.
 | A ticket used twice, also at two entrances at once | A conditional UPDATE sets the check-in time only while it is empty, for a seat of the chosen, not cancelled event; the second scan is told "already used". Tested with simultaneous scans from two instances on SQL Server | Mitigated |
 | A participant cancelled after being let in, so the seat goes to the next one waiting and the room holds more people than seats | The cancellation `UPDATE` requires an unused ticket, and the service refuses a checked-in registration with its own message; the check-in runs under the same per-event application lock as cancellations, so the two are decided one after the other (also under `READ_COMMITTED_SNAPSHOT`). Tested with a check-in racing a cancellation on SQL Server | Mitigated |
 | Tickets of cancelled registrations or events, or of another event, admitted | The lookup and the UPDATE both require an active seat of the chosen event; all such codes get the same refusal as unknown ones | Mitigated |
+| A ticket used up by a scan on the wrong day (a test scan, the wrong event chosen) | A valid ticket is checked in only on its event's day by the database's clock; on another day nothing is written and the entrance says so | Mitigated |
+| A ticket code passed on to somebody else (the code is a bearer token) | The entrance shows the participant's name with every check-in, so the staff can compare it with an identity document; whether they do is an operating decision | Partly mitigated |
+| A cancelled ticket shown as valid in an old window | The ticket window reads the registration again before it shows a QR code; the entrance rejects such codes anyway | Mitigated |
 | Ticket codes seen by others | Only the participant's own account sees its codes (an admin only those of participants it added); admin lists, exports and logs never contain them | Mitigated |
 
 ## Exports

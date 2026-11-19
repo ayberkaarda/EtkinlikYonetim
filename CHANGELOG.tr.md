@@ -47,6 +47,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
   ilgili bir mesaj yerine "hiçbir değişiklik yapılmadı, birkaç saniye sonra tekrar deneyin" diye reddedilir. Komutlar
   istemci tarafından iptal edilmeden önce 60 saniye, açılıştaki işlemler (eski veritabanı yükseltmesi ve
   migration'lar) beş dakika alır; böylece istemci, kilidin kendi bekleme süresinden önce vazgeçmez.
+- Giriş ekranı içeri alınan katılımcının adını gösterir, biletleri yalnızca etkinlik günü kullanır (başka bir gün
+  bileti harcamadan "ETKİNLİK GÜNÜ DEĞİL" gösterir), kod alanını açık tutar; böylece okuyucunun okuttuğu sonraki kod
+  kaybolmaz, süren denetimden hemen sonra denetlenir. Eski bir sayaç yanıtı artık yenisinin yerine geçmez.
+- Bilet penceresi QR kodu göstermeden önce kaydı yeniden okur; bu arada iptal edilmiş bir bilet gösterilmez.
 
 ### Güvenlik
 

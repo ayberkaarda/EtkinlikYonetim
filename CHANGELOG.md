@@ -47,6 +47,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   "nothing was changed, try again in a few seconds" instead of a message about the server. Statements get 60
   seconds before the client cancels them, and the start-up (legacy upgrade and migrations) five minutes, so the
   client never gives up before the lock's own wait.
+- The entrance shows the name of the participant let in, uses tickets only on their event's day ("ETKİNLİK GÜNÜ
+  DEĞİL" on another day, without using the ticket up), keeps the code field open so a scanner's next code is checked
+  right after the running check instead of being lost, and no longer lets an older counter replace a newer one.
+- The ticket window reads the registration again before it shows a QR code, so a ticket cancelled meanwhile is not
+  shown.
 
 ### Security
 

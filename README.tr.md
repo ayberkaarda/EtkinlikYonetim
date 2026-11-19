@@ -57,7 +57,9 @@ otomatik olarak oluşturulup güncellenir.
 - ✅ **Giriş kontrolü** ("Bilet Kontrol", Ticket Check): etkinlik seçilir, bilet kodu yazılır veya okutulur. Geçerli
   ve kullanılmamış bilet için "GİRİŞ YAPILDI", ikinci okutmada aynı ekranda "ZATEN KULLANILDI" gösterilir; bilinmeyen,
   iptal edilmiş ya da başka etkinliğe ait biletler tek bir retle ("GEÇERSİZ BİLET") karşılanır; sayaç girişleri yer
-  sayısıyla birlikte gösterir.
+  sayısıyla birlikte gösterir. Girişte katılımcının adı kimlik belgesiyle karşılaştırılmak üzere gösterilir; biletler
+  yalnızca etkinlik günü kullanılır (aksi hâlde "ETKİNLİK GÜNÜ DEĞİL" gösterilir ve bilet geçerli kalır); kod alanı
+  açık kalır, böylece bir bilet denetlenirken okuyucu sonrakini okuyabilir.
 - ✅ **Katılımcı listesi** ("Katılımcı Görüntüle", View Participants): seçilen etkinliğin ("Etkinlik Seçin", Select
   Event) katılımcıları; ad, maskelenmiş kimlik numarası, e-posta ve durumla (giriş yaptı, bekliyor, iptal). Liste CSV
   ("CSV Olarak Kaydet") veya yazdırılabilir HTML ("Yazdırılabilir Liste") olarak kaydedilir; dışa aktarımlarda bilet
