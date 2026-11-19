@@ -24,7 +24,7 @@ namespace EtkinlikYonetim.UI
         private bool _binding;
 
         private readonly ThemedListBox lstEtkinlikler = new() { Name = nameof(lstEtkinlikler) };
-        private readonly HeadingLabel lblSecili = new() { Name = nameof(lblSecili) };
+        private readonly Label lblSecili = FormLayout.Text(nameof(lblSecili));
         private readonly Label lblDoluluk = FormLayout.Text(nameof(lblDoluluk));
         private readonly DatePicker dtpTarih = new() { Name = nameof(dtpTarih), Format = DateTimePickerFormat.Short, Width = 130 };
         private readonly NumericUpDown numKapasite = new() { Name = nameof(numKapasite), Minimum = InputRules.MinCapacity, Maximum = InputRules.MaxCapacity };

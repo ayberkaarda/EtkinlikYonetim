@@ -39,14 +39,8 @@ namespace EtkinlikYonetim.UI
             Name = nameof(BiletForm);
 
             // The ticket: what and when, who, and the code on the left; the QR code on the stub.
-            var eventName = new HeadingLabel
-            {
-                Name = "lblEtkinlik",
-                Text = registration.EventName,
-                Font = Theme.Fonts.Title,
-                ForeColor = Theme.Current.Text,
-                Margin = Padding.Empty,
-            };
+            var eventName = FormLayout.Text("lblEtkinlik", registration.EventName);
+            eventName.Font = Theme.Fonts.Title;
             var date = FormLayout.Text("lblTarih", DisplayFormat.Date(registration.EventDate));
             date.ForeColor = Theme.Current.TextSecondary;
             date.Margin = new Padding(0, Spacing.XS, 0, Spacing.L);
