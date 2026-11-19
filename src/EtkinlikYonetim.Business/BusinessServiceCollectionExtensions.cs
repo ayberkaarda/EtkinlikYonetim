@@ -14,6 +14,7 @@ public static class BusinessServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IPasswordHasher>(_ => new PasswordHasher());
+        services.TryAddSingleton<ISetupKeyStore>(provider => FileSetupKeyStore.CreateDefault(provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<ISetupService, SetupService>();
         services.AddSingleton<IEventService, EventService>();
