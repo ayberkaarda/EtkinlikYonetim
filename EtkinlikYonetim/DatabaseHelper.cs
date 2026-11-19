@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 public class DatabaseHelper
 {
-    // MSSQL bağlantı cümlesi
-    private static string connectionString = "Server=localhost\\SQLEXPRESS;Database=EtkinlikYonetim;Trusted_Connection=True;";
+    // Connection string: ETKINLIK_CONNECTION environment variable, otherwise a local SQL Server Express instance.
+    private static string connectionString =
+        Environment.GetEnvironmentVariable("ETKINLIK_CONNECTION")
+        ?? "Server=localhost\\SQLEXPRESS;Database=EtkinlikYonetim;Trusted_Connection=True;TrustServerCertificate=True;";
 
     /// <summary>
     /// INSERT, UPDATE, DELETE gibi sorguları çalıştırır.
