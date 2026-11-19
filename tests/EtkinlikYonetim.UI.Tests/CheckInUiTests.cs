@@ -57,9 +57,25 @@ public sealed class CheckInUiTests
         Assert.False(form.IsDisposed);
     });
 
+    /// <summary>A check-in shows the participant's name, so the staff can compare it with an identity document.</summary>
+    [Fact]
+    public void CheckIn_ShowsTheNameOfTheParticipant() => Run(() =>
+    {
+        var checkIns = new ControlledCheckInService();
+        using var form = ChosenEvent(checkIns);
+        Find<TextBox>(form, "txtKod").Text = Code;
+
+        var run = form.CheckInAsync();
+        checkIns.CheckIns[0].Answer.SetResult(new CheckInResult(CheckInOutcome.CheckedIn, new CheckInCount(1, 5), "Deniz Örnek"));
+
+        Assert.True(run.IsCompletedSuccessfully);
+        Assert.Equal(BiletKontrolForm.CheckedInText + " - Deniz Örnek", Find<Label>(form, "lblSonuc").Text);
+    });
+
     [Theory]
     [InlineData(CheckInOutcome.AlreadyUsed, BiletKontrolForm.AlreadyUsedText)]
     [InlineData(CheckInOutcome.Rejected, BiletKontrolForm.RejectedText)]
+    [InlineData(CheckInOutcome.NotEventDay, BiletKontrolForm.NotEventDayText)]
     public void CheckIn_Refusals_AreShownOnTheSameScreen(CheckInOutcome outcome, string text) => Run(() =>
     {
         var checkIns = new ControlledCheckInService();

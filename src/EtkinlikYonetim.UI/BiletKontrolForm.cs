@@ -15,6 +15,7 @@ namespace EtkinlikYonetim.UI
         internal const string CheckedInText = "GİRİŞ YAPILDI";
         internal const string AlreadyUsedText = "ZATEN KULLANILDI - Bu bilet daha önce okutuldu.";
         internal const string RejectedText = "GEÇERSİZ BİLET - Bu etkinlik için geçerli bir bilet değil.";
+        internal const string NotEventDayText = "ETKİNLİK GÜNÜ DEĞİL - Bilet yalnızca etkinlik günü okutulabilir; bilet kullanılmadı.";
 
         private readonly IEventService _events;
         private readonly ICheckInService _checkIns;
@@ -76,8 +77,11 @@ namespace EtkinlikYonetim.UI
                     var result = await _checkIns.CheckInAsync(_session, selected.Id, code);
                     lblSonuc.Text = result.Outcome switch
                     {
+                        // The name lets the staff compare the ticket with an identity document.
+                        CheckInOutcome.CheckedIn when result.ParticipantName is { Length: > 0 } name => CheckedInText + " - " + name,
                         CheckInOutcome.CheckedIn => CheckedInText,
                         CheckInOutcome.AlreadyUsed => AlreadyUsedText,
+                        CheckInOutcome.NotEventDay => NotEventDayText,
                         _ => RejectedText,
                     };
                     ShowCount(result.Count);
