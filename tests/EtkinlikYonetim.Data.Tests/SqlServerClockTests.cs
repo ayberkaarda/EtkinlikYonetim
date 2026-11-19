@@ -166,8 +166,8 @@ public sealed class SqlServerClockTests
     private static Task<int> AddEventAsync(SqlServerTestDatabase database, int daysFromToday) =>
         database.ScalarAsync(
             """
-            INSERT dbo.Etkinlikler (EtkinlikAdi, Tarih, Kapasite, KayitSayisi, IptalEdildi)
-            VALUES (N'Saat Testi', DATEADD(DAY, @days, CAST(SYSUTCDATETIME() AS date)), 10, 0, 0);
+            INSERT dbo.Etkinlikler (EtkinlikAdi, Tarih, Kapasite, KayitSayisi, IptalEdildi, DuzenlemeSurumu)
+            VALUES (N'Saat Testi', DATEADD(DAY, @days, CAST(SYSUTCDATETIME() AS date)), 10, 0, 0, 0);
             SELECT CAST(SCOPE_IDENTITY() AS int);
             """,
             Ct,

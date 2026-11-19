@@ -96,4 +96,34 @@ public sealed class SqlServerEventManagementTests
             Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Etkinlikler WHERE Id = @id AND IptalEdildi = 1", ct, ("@id", eventId)));
         }
     }
+
+    /// <summary>
+    /// On the case-insensitive collation of the application's database, admin B changes the description
+    /// "Salon" to "SALON" only. Admin A's form, loaded before, changes the capacity: comparing values would
+    /// find "Salon" equal to "SALON" and silently write the old text back. The edit version tells the two
+    /// apart: A's change is refused and B's text stays.
+    /// </summary>
+    [Fact]
+    public async Task StaleForm_AfterACaseOnlyDescriptionChange_IsRefused()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.CreateAsync(ct);
+        await using var app = database.BuildServices(demo: true);
+        await app.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+        var events = app.GetRequiredService<IEventService>();
+        var day = database.Today.AddDays(10);
+        var eventId = await events.CreateAsync(Admin(SeedAdminId), "Salon Konseri", day, 5, ct);
+        var created = (await events.GetEventsAsync(Admin(SeedAdminId), ct)).Single(e => e.Id == eventId);
+        await events.UpdateAsync(Admin(SeedAdminId), created, day, 5, "Salon", ct);
+        var loadedByA = (await events.GetEventsAsync(Admin(SeedAdminId), ct)).Single(e => e.Id == eventId);
+        var loadedByB = loadedByA;
+
+        await events.UpdateAsync(Admin(SeedAdminId), loadedByB, day, 5, "SALON", ct);
+        var stale = await Assert.ThrowsAsync<StaleDataException>(() => events.UpdateAsync(Admin(SeedAdminId), loadedByA, day, 9, "Salon", ct));
+
+        Assert.Equal(EventService.ChangedElsewhere, stale.Message);
+        Assert.Equal("SALON", await database.TextAsync("SELECT Aciklama FROM dbo.Etkinlikler WHERE Id = @id", ct, ("@id", eventId)));
+        Assert.Equal(5, await database.ScalarAsync("SELECT Kapasite FROM dbo.Etkinlikler WHERE Id = @id", ct, ("@id", eventId)));
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM sys.databases WHERE name = DB_NAME() AND collation_name = N'Turkish_CI_AS'", ct));
+    }
 }

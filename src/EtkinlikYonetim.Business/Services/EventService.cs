@@ -117,7 +117,7 @@ internal sealed class EventService(
         var status = await audit.WriteAsAsync(session, actor => events.UpdateAsync(
             actor,
             original.Id,
-            new EventValues(original.Date, original.Capacity, original.Description),
+            original.EditVersion,
             new EventValues(input.Day, input.Capacity, input.Description),
             TicketCode.New,
             cancellationToken)).ConfigureAwait(false);

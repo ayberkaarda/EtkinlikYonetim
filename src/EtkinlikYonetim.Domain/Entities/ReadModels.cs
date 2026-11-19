@@ -26,7 +26,8 @@ public sealed record StoredSetupKey(int Id, byte[] KeyHash);
 
 /// <summary>
 /// An event with its seat usage, the length of its waiting list, its description and whether it was
-/// cancelled, for pickers, the event management and rule checks.
+/// cancelled, for pickers, the event management and rule checks. <paramref name="EditVersion"/> is the
+/// event's edit version as loaded; a change made on this summary is stored only while it is still current.
 /// </summary>
 public sealed record EventSummary(
     int Id,
@@ -36,7 +37,8 @@ public sealed record EventSummary(
     int RegisteredCount,
     int WaitingCount = 0,
     string? Description = null,
-    bool Cancelled = false)
+    bool Cancelled = false,
+    int EditVersion = 0)
 {
     public int FreeSeats => Math.Max(0, Capacity - RegisteredCount);
 

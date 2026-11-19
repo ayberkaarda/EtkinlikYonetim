@@ -18,17 +18,19 @@ public interface IEventRepository
 
     /// <summary>
     /// Changes the date, capacity and description of an event to <paramref name="changed"/>, only while the
-    /// event still has the <paramref name="expected"/> values the caller loaded and is neither cancelled nor
-    /// past, in one transaction under the event's lock; the new date must not be past either. "Today" is the
-    /// database's day, read in that transaction after the lock. The capacity cannot go below
-    /// the seats held (the UPDATE checks it, and so does the check constraint); seats added by a larger capacity
-    /// go to the waiting list in order, each with the ticket <paramref name="newTicketCode"/> returns.
+    /// event still has the edit version <paramref name="expectedVersion"/> the caller loaded (every change
+    /// raises it, so any change by somebody else, also one of only the case of the description, is noticed)
+    /// and is neither cancelled nor past, in one transaction under the event's lock; the new date must not be
+    /// past either. "Today" is the database's day, read in that transaction after the lock. The capacity
+    /// cannot go below the seats held (the UPDATE checks it, and so does the check constraint); seats added by
+    /// a larger capacity go to the waiting list in order, each with the ticket <paramref name="newTicketCode"/>
+    /// returns. A stored change raises the edit version.
     /// </summary>
     /// <exception cref="ActorRevokedException"><paramref name="actor"/> is no longer current, checked after the lock in the writing transaction; nothing was written.</exception>
     Task<EventChangeStatus> UpdateAsync(
         Actor actor,
         int id,
-        EventValues expected,
+        int expectedVersion,
         EventValues changed,
         Func<string> newTicketCode,
         CancellationToken cancellationToken = default);
@@ -57,7 +59,7 @@ public enum EventChangeStatus
     /// <summary>The new capacity is below the seats held; nothing was written.</summary>
     CapacityBelowRegistrations = 3,
 
-    /// <summary>The event no longer has the values the caller loaded (somebody else changed it); nothing was written.</summary>
+    /// <summary>The event no longer has the edit version the caller loaded (somebody else changed it); nothing was written.</summary>
     ChangedElsewhere = 4,
 
     /// <summary>The new date has passed by the database's day at the time of the write; nothing was written.</summary>

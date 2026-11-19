@@ -153,10 +153,10 @@ public sealed class EventManagementServiceTests
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
-    /// <summary>Event <paramref name="id"/> as an admin's window loaded it.</summary>
-    private static EventSummary Loaded(int id) => new(id, "Konser " + id, Today.AddDays(10), 50, 0, 0, id == 1 ? "Eski açıklama" : null);
+    /// <summary>Event <paramref name="id"/> as an admin's window loaded it, with an edit version of its own.</summary>
+    private static EventSummary Loaded(int id) => new(id, "Konser " + id, Today.AddDays(10), 50, 0, 0, id == 1 ? "Eski açıklama" : null, EditVersion: 3 + id);
 
-    private static EventValues Expected(int id) => new(Loaded(id).Date, Loaded(id).Capacity, Loaded(id).Description);
+    private static int Expected(int id) => Loaded(id).EditVersion;
 
     private EventService Service() => ServiceFactory.Event(_events.Object, _time, _audit);
 }
