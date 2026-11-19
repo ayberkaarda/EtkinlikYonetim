@@ -74,6 +74,57 @@ public sealed class SqlServerLockTests
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId LIKE N'%_InitialCreate'", Ct));
     }
 
+    /// <summary>
+    /// A transaction chosen as a deadlock victim (error 1205) wrote nothing and can be tried again; it is
+    /// recognised, so the screens answer with the busy message instead of a database failure.
+    /// </summary>
+    [Fact]
+    public async Task DeadlockVictim_IsRecognised()
+    {
+        await using var database = await SqlServerTestDatabase.ReserveAsync(Ct);
+        await using var app = database.BuildServices(demo: true);
+        await app.GetRequiredService<IDatabaseInitializer>().InitializeAsync(Ct);
+
+        await using var first = new SqlConnection(database.ConnectionString);
+        await using var second = new SqlConnection(database.ConnectionString);
+        await first.OpenAsync(Ct);
+        await second.OpenAsync(Ct);
+        await using var firstTransaction = (SqlTransaction)await first.BeginTransactionAsync(Ct);
+        await using var secondTransaction = (SqlTransaction)await second.BeginTransactionAsync(Ct);
+        await TouchAsync(first, firstTransaction, SeedAdminId);
+        await TouchAsync(second, secondTransaction, SeedUserId);
+
+        // Each waits for the row the other holds: SQL Server ends one of them with error 1205.
+        var results = await Task.WhenAll(
+            CaptureAsync(() => TouchAsync(first, firstTransaction, SeedUserId)),
+            CaptureAsync(() => TouchAsync(second, secondTransaction, SeedAdminId)));
+
+        var victim = Assert.Single(results, r => r is not null);
+        Assert.True(DatabaseErrors.IsDeadlock(victim));
+        Assert.True(DatabaseErrors.IsDeadlock(new InvalidOperationException("wrapped", victim)));
+        Assert.False(DatabaseErrors.IsDeadlock(new TimeoutException()));
+
+        static async Task TouchAsync(SqlConnection connection, SqlTransaction transaction, int id)
+        {
+            await using var command = new SqlCommand("UPDATE dbo.Kullanicilar SET BasarisizGiris = BasarisizGiris WHERE Id = @id;", connection, transaction);
+            command.Parameters.AddWithValue("@id", id);
+            await command.ExecuteNonQueryAsync(Ct);
+        }
+
+        static async Task<Exception?> CaptureAsync(Func<Task> operation)
+        {
+            try
+            {
+                await Task.Run(operation, Ct);
+                return null;
+            }
+            catch (SqlException ex)
+            {
+                return ex;
+            }
+        }
+    }
+
     private static Action<DbContextOptionsBuilder> ShortCommandTimeout(SqlServerTestDatabase database) =>
         builder => builder.UseSqlServer(database.ConnectionString, sql => sql.CommandTimeout(ShortCommandTimeoutSeconds));
 
