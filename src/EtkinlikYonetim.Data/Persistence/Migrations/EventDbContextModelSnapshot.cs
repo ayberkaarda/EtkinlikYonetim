@@ -291,6 +291,10 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .HasColumnType("nvarchar(20)")
                         .HasColumnName("Rol");
 
+                    b.Property<int>("SessionVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("OturumSurumu");
+
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(50)
