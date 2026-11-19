@@ -19,14 +19,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Original artwork, rendered from the SVG sources in assets/. -->
-    <EmbeddedResource Include="..\..\assets\logo.png" Link="Assets\logo.png" LogicalName="EtkinlikYonetim.UI.Assets.logo.png" />
+    <!-- Original artwork: the logo and icon are rasterized from assets/logo.svg by tools/Screenshots (icons command). -->
+    <EmbeddedResource Include="..\..\assets\logo-256.png" Link="Assets\logo-256.png" LogicalName="EtkinlikYonetim.UI.Assets.logo-256.png" />
     <EmbeddedResource Include="..\..\assets\background.png" Link="Assets\background.png" LogicalName="EtkinlikYonetim.UI.Assets.background.png" />
     <EmbeddedResource Include="..\..\assets\app.ico" Link="Assets\app.ico" LogicalName="EtkinlikYonetim.UI.Assets.app.ico" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="EtkinlikYonetim.UI.Tests" />
+    <InternalsVisibleTo Include="EtkinlikYonetim.Screenshots" />
   </ItemGroup>
 
   <ItemGroup>
