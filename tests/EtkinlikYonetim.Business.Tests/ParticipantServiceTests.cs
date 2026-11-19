@@ -113,5 +113,5 @@ public sealed class ParticipantServiceTests
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
-    private ParticipantService Service() => new(_participants.Object);
+    private ParticipantService Service() => ServiceFactory.Participant(_participants.Object);
 }

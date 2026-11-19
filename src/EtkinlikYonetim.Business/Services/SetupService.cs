@@ -1,7 +1,9 @@
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Validation;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
+using FluentValidation;
 
 namespace EtkinlikYonetim.Business.Services;
 
@@ -51,7 +53,9 @@ internal sealed class SetupService(
     IUserRepository users,
     IPasswordHasher passwordHasher,
     SetupKeyGate setupKeys,
-    SetupKeyEnvironment environment) : ISetupService
+    SetupKeyEnvironment environment,
+    IValidator<AccountInput> accountValidator,
+    IAuditLog audit) : ISetupService
 {
     internal const string AlreadyDone = "Kurulum zaten tamamlanmış. Lütfen giriş yapın.";
 
@@ -77,32 +81,15 @@ internal sealed class SetupService(
         CancellationToken cancellationToken = default)
     {
         // The same rules as a new account of the sign-up form.
-        var name = userName?.Trim();
-        if (string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(password))
-        {
-            throw new BusinessRuleException(AuthService.RegisterInputRequired);
-        }
-
-        if (!InputRules.IsValidUserName(name))
-        {
-            throw new BusinessRuleException(AuthService.UserNameInvalid);
-        }
-
-        if (!string.Equals(password, passwordRepeat, StringComparison.Ordinal))
-        {
-            throw new BusinessRuleException(AuthService.PasswordsDoNotMatch);
-        }
-
-        if (password.Length < PasswordPolicy.MinLength || password.Length > PasswordPolicy.MaxLength)
-        {
-            throw new BusinessRuleException(AuthService.PasswordInvalid);
-        }
+        var input = AccountInput.Create(userName, password, passwordRepeat);
+        accountValidator.ValidateOrThrow(input);
+        var name = input.UserName;
 
         var attempt = setupKeys.CreateAttempt(setupKey);
         var admin = new User
         {
             UserName = name,
-            PasswordHash = passwordHasher.Hash(password),
+            PasswordHash = passwordHasher.Hash(input.Password!),
             PasswordFormat = PasswordFormat.Pbkdf2,
             Role = UserRole.Admin,
         };
@@ -123,8 +110,10 @@ internal sealed class SetupService(
         switch (result.Status)
         {
             case FirstAdminStatus.Created:
+                audit.Record(AuditEvent.FirstAdminCreated, UserRole.Admin);
                 return new UserSession(result.AdminId, name, UserRole.Admin);
             case FirstAdminStatus.NotAuthorized:
+                audit.Record(AuditEvent.SetupKeyRefused, null);
                 await setupKeys.DelayAfterRefusalAsync(cancellationToken).ConfigureAwait(false);
                 throw new BusinessRuleException(SetupKeyInvalid);
             case FirstAdminStatus.KeyRequired:

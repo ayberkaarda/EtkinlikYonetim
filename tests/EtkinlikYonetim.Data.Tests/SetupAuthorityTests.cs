@@ -23,6 +23,8 @@ public sealed class SetupAuthorityTests
 
     private const string Admins = "SELECT COUNT(*) FROM dbo.Kullanicilar WHERE Rol = N'Admin'";
 
+    private const string UnusedKeys = "SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE Tuketildi = 0 AND TuketimTarihi IS NULL";
+
     /// <summary>
     /// A database with users but no admin, and two authorities: the owner and the ordinary client (the
     /// application's login with the rights of docs/grant-app-login.sql). The client can neither create,
@@ -160,6 +162,69 @@ public sealed class SetupAuthorityTests
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE Tuketildi = 1", ct));
     }
 
+    /// <summary>
+    /// The key is valid when the setup reads the usable keys, and expires by the database's clock while
+    /// the setup is paused just before its final UPDATE. The UPDATE must refuse it: no admin, and the
+    /// key stays unused with no use time. The test clock (2 March 2026) is far behind the database's,
+    /// so a check against the computer's clock would accept the key.
+    /// </summary>
+    [Fact]
+    public async Task SetupKey_ExpiresBeforeFinalUpdate_IsRefused()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+        await using (var owner = database.BuildServices())
+        {
+            await owner.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+            await owner.GetRequiredService<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", ct);
+        }
+
+        var key = await database.IssueSetupKeyAsync(ct);
+        await database.ExecuteAsync("UPDATE dbo.KurulumAnahtarlari SET SonKullanma = DATEADD(SECOND, 3, SYSUTCDATETIME())", ct);
+        var pause = new KeyUpdatePause(database);
+        await using var app = database.BuildServices(configureContext: b => b.AddInterceptors(pause));
+
+        var refused = await Assert.ThrowsAsync<BusinessRuleException>(
+            () => app.GetRequiredService<ISetupService>().CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));
+
+        Assert.True(pause.Paused, "The setup never reached the final UPDATE with the key still valid.");
+        Assert.Equal(SetupService.SetupKeyInvalid, refused.Message);
+        Assert.Equal(0, await database.ScalarAsync(Admins, ct));
+        Assert.Equal(1, await database.ScalarAsync(UnusedKeys, ct));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE Tuketildi = 1 OR TuketimTarihi IS NOT NULL", ct));
+    }
+
+    /// <summary>
+    /// The computer's clock is behind the database's: by the computer's clock the key would still be
+    /// valid, by the database's it has expired. The database decides, so the key is refused and stays
+    /// unused; a key issued afterwards works and its use is stamped with the database's time.
+    /// </summary>
+    [Fact]
+    public async Task SetupKey_ExpiredByTheDatabaseClock_IsRefusedWhileTheClientClockIsBehind()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+        await using var provider = database.BuildServices();
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+        await provider.GetRequiredService<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", ct);
+        var setup = provider.GetRequiredService<ISetupService>();
+
+        var expired = await database.IssueSetupKeyAsync(ct);
+        await database.ExecuteAsync("UPDATE dbo.KurulumAnahtarlari SET SonKullanma = DATEADD(SECOND, -1, SYSUTCDATETIME())", ct);
+        var clientNow = database.Clock.GetUtcNow().UtcDateTime;
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE SonKullanma > @client", ct, ("@client", clientNow)));
+
+        var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(expired, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));
+        Assert.Equal(SetupService.SetupKeyInvalid, refused.Message);
+        Assert.Equal(0, await database.ScalarAsync(Admins, ct));
+        Assert.Equal(1, await database.ScalarAsync(UnusedKeys, ct));
+
+        var current = await database.IssueSetupKeyAsync(ct);
+        Assert.True((await setup.CreateFirstAdminAsync(current, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct)).IsAdmin);
+        Assert.Equal(1, await database.ScalarAsync(UnusedKeys, ct));
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WHERE Tuketildi = 1 AND TuketimTarihi > DATEADD(MINUTE, -5, SYSUTCDATETIME())", ct));
+    }
+
     /// <summary>Waits until <paramref name="count"/> requests on the database are blocked by a lock.</summary>
     private static async Task WaitForBlockedRequestsAsync(SqlServerTestDatabase database, int count, CancellationToken ct)
     {
@@ -205,6 +270,43 @@ public sealed class SetupAuthorityTests
             parameter.Value = user;
             command.Parameters.Add(parameter);
             return command;
+        }
+    }
+
+    /// <summary>
+    /// A controlled pause after the usable keys were read: the first UPDATE of the key table waits,
+    /// inside the setup's transaction, until every key has expired by the database's clock. The clock
+    /// is read on a separate connection that takes no locks.
+    /// </summary>
+    private sealed class KeyUpdatePause(SqlServerTestDatabase database) : DbCommandInterceptor
+    {
+        private const string Unexpired = "SELECT COUNT(*) FROM dbo.KurulumAnahtarlari WITH (READUNCOMMITTED) WHERE SonKullanma > SYSUTCDATETIME()";
+
+        private int _fired;
+
+        /// <summary>Whether the UPDATE was reached while a key was still valid.</summary>
+        public bool Paused { get; private set; }
+
+        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("UPDATE", StringComparison.Ordinal)
+                && command.CommandText.Contains("KurulumAnahtarlari", StringComparison.Ordinal)
+                && Interlocked.Exchange(ref _fired, 1) == 0)
+            {
+                Paused = await database.ScalarAsync(Unexpired, cancellationToken) > 0;
+                var deadline = DateTime.UtcNow.AddSeconds(30);
+                while (await database.ScalarAsync(Unexpired, cancellationToken) > 0)
+                {
+                    Assert.True(DateTime.UtcNow < deadline, "The key did not expire.");
+                    await Task.Delay(100, cancellationToken);
+                }
+            }
+
+            return result;
         }
     }
 

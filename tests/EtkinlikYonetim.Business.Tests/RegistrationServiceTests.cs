@@ -223,5 +223,5 @@ public sealed class RegistrationServiceTests
         _registrations.Setup(r => r.GetOwnershipAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new RegistrationOwnership(id, 1, eventDate ?? Today, owner, status));
 
-    private RegistrationService Service() => new(_registrations.Object, _participants.Object, _events.Object, _time);
+    private RegistrationService Service() => ServiceFactory.Registration(_registrations.Object, _participants.Object, _events.Object, _time);
 }

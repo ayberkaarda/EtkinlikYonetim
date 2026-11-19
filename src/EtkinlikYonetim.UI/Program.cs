@@ -1,10 +1,12 @@
-﻿using EtkinlikYonetim.Business;
+using EtkinlikYonetim.Business;
+using EtkinlikYonetim.Business.Auditing;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Data;
 using EtkinlikYonetim.Data.Persistence;
 using EtkinlikYonetim.UI.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace EtkinlikYonetim.UI
 {
@@ -19,9 +21,36 @@ namespace EtkinlikYonetim.UI
         [STAThread]
         private static void Main()
         {
+            Log.Logger = AppLogging.CreateLogger(AppLogging.DefaultDirectory);
+            try
+            {
+                Log.Information("Application started");
+                Run();
+            }
+            finally
+            {
+                Log.Information("Application stopped");
+                Log.CloseAndFlush();
+            }
+        }
+
+        private static void Run()
+        {
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (_, e) => ErrorReporter.Show(e.Exception);
-            AppDomain.CurrentDomain.UnhandledException += (_, e) => ErrorReporter.Show(e.ExceptionObject as Exception);
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                if (e.IsTerminating)
+                {
+                    Log.Fatal("Unhandled exception terminates the application");
+                }
+
+                ErrorReporter.Show(e.ExceptionObject as Exception);
+                if (e.IsTerminating)
+                {
+                    Log.CloseAndFlush();
+                }
+            };
 
             ApplicationConfiguration.Initialize();
 
@@ -29,6 +58,7 @@ namespace EtkinlikYonetim.UI
             var connectionString = AppConfiguration.ResolveConnectionString(configuration);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
+                Log.Warning("No database connection string is configured");
                 Dialogs.Show(
                     null,
                     "Veritabanı bağlantı ayarı bulunamadı.\n\n"
@@ -41,6 +71,11 @@ namespace EtkinlikYonetim.UI
             }
 
             var options = new DataAccessOptions { SeedDemoData = AppConfiguration.IsDemoRequested(configuration) };
+            if (options.SeedDemoData)
+            {
+                Log.Warning("Demo mode is on: demo accounts with published passwords are added to an empty database");
+            }
+
             using var serviceProvider = ConfigureServices(connectionString, options);
             bool setupRequired;
             bool adminMissing;
@@ -89,6 +124,7 @@ namespace EtkinlikYonetim.UI
         private static ServiceProvider ConfigureServices(string connectionString, DataAccessOptions options)
         {
             var services = new ServiceCollection();
+            services.AddSingleton<IAuditLog>(new SerilogAuditLog(Log.Logger));
             services.AddSqlServerDataAccess(connectionString, options);
             services.AddBusinessServices();
             services.AddSingleton<IFormFactory, FormFactory>();

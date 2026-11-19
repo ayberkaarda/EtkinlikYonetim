@@ -1,77 +1,394 @@
-# 🎉 EtkinlikYonetim
+# 🎉 Etkinlik Yönetim - Event Management System (C# & SQL Server)
 
-**C# ve SQL ile geliştirilmiş bir Etkinlik Yönetim Sistemi**
+🇬🇧 **English** · 🇹🇷 [Türkçe](README.tr.md)
 
-Bu proje, etkinlik organizasyonlarının dijital ortamda kolayca yönetilmesini sağlar. Kullanıcılar sisteme kaydolup etkinliklere katılabilirken, yöneticiler (admin) yeni etkinlikler oluşturabilir, katılımcıları görüntüleyebilir ve sistemin genel yönetimini gerçekleştirebilir.
+A Windows Forms application built with .NET 10 and SQL Server for running events: accounts sign up and sign in,
+add the participants they bring, register them for events and get a ticket for each registration; admins create
+events, see every registration and list the participants of an event. The code is split into Domain, Business,
+Data and UI layers; database access uses EF Core, and the database is created and migrated automatically on
+startup.
 
-## 🚀 Özellikler
+> The application's user interface is in Turkish. Screen and button names below are given with their Turkish
+> labels followed by an English translation, e.g. "Etkinlik Ekle" (Add Event).
 
-### 👤 Kullanıcı Paneli
-- Kullanıcı, sisteme TC Kimlik No, Ad Soyad, E-posta gibi bilgilerle kayıt olur.
-- Aktif etkinlikleri görüntüler.
-- TC Kimlik No ile doğrulama yaptıktan sonra istediği etkinliğe katılabilir.
+---
 
-### 🔐 Admin Paneli
-- Yeni etkinlik oluşturabilir.
-- Katılımcı ekleyebilir veya silebilir.
-- Bilet düzenleyebilir.
-- Her etkinlik için kayıtlı katılımcı listesini görüntüleyebilir.
+## 📦 Features
 
-## 🖥️ Ekran Görüntüleri
+### Accounts
 
-### Giriş Ekranı
-![Giriş Ekranı](screenshots/login.png)
+- ✅ **Sign-up** ("Kayıt Ol", Sign Up): a user name of letters only (at most 32 characters) and a password of
+  8-64 characters, typed twice ("Şifre (Tekrar)", Password (Again)). New accounts get the user role.
+- ✅ **Sign-in** ("Giriş", Sign In) with the user name and the password ("Kullanıcı Adı", "Şifre"). Admins open
+  the admin panel, users the participant screen.
+- ✅ **First-run setup** ("İlk Kurulum", First-Run Setup): on an empty database the first admin is created with a
+  password of the installer's own choosing; there is no default account and no published password.
 
-### Kullanıcı Kayıt Ekranı
-![Kullanıcı Kayıt](screenshots/user_register.png)
+### User panel
 
-### Etkinliğe Katılım Ekranı
-![Etkinliğe Katılım](screenshots/event_register.png)
+- ✅ **Add a participant** ("Katılımcı Ekle", Add Participant): national identity number ("TC Kimlik No"), full name
+  ("Ad Soyad") and e-mail ("E-posta"). The national id is checked for 11 digits and its checksum; the name may
+  contain letters and single spaces (at most 64 characters). A participant belongs to the account that added it,
+  and a national id can be added only once per account.
+- ✅ **Register for an event** ("Kayıt Ekle", Add Registration): choose an event that has not passed ("Etkinlik
+  Seçimi", Event Selection) and enter the participant's national id ("Katılımcı TC Kimlik Numarası"). A ticket code
+  such as `ETK-7KQ2M9XA4C` is issued with every registration. A participant can be registered for several events.
+- ✅ **My registrations and tickets** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): the active
+  registrations of the account's own participants, which can be cancelled ("Kaydı İptal Et", Cancel Registration)
+  up to and including the event day; the seat becomes free again and the participant can register again.
 
-### Admin Paneli
-![Admin Paneli](screenshots/admin_panel.png)
+### Admin panel
 
-### Katılımcı Listesi
-![Katılımcı Listesi](screenshots/shows_members.png)
+- ✅ **Create an event** ("Etkinlik Ekle", Add Event): name ("Etkinlik Adı", at most 80 characters), date (today or
+  later) and capacity ("Kişi Kapasitesi", 1-1000 seats).
+- ✅ **Add participants** ("Katılımcı Ekleme") and **issue tickets** ("Bilet Oluştur", Create Ticket) for the
+  participants of every account; an admin sees and cancels every active registration.
+- ✅ **Participant list** ("Katılımcı Görüntüle", View Participants): the participants of a chosen event ("Etkinlik
+  Seçin", Select Event) with name, masked national id, e-mail and ticket code.
 
-## 🛠️ Kullanılan Teknolojiler
+### Rules and protection
 
-- C# (Windows Forms)
-- MSSQL (SQL Server)
-- ADO.NET ile veritabanı bağlantısı
+- ✅ **Capacity**: an event never takes more registrations than its capacity; the seat count is checked and
+  increased in the same database transaction, so concurrent registrations cannot overbook it.
+- ✅ **No duplicate registration**: a participant has at most one active registration per event (unique index);
+  a cancelled registration stays as history.
+- ✅ **No past events**: events cannot be created, registered for or cancelled once their day has passed.
+- ✅ **KVKK**: national ids are shown masked (`123******01`) in admin lists and never written to log files.
 
-## 📦 Kurulum ve Kullanım
+### Security
 
-1. Bu projeyi GitHub'dan klonlayın:
-   ```bash
-   git clone https://github.com/kullaniciadi/EtkinlikYonetim.git
+- ✅ Passwords are stored as PBKDF2-HMAC-SHA256 hashes (600,000 iterations, random salt); plain text passwords of
+  the original application are replaced with a hash on the next successful sign-in.
+- ✅ 5 failed sign-ins lock the account for 15 minutes; unknown accounts, wrong passwords and locked accounts get
+  the same answer.
+- ✅ Every call is checked against the signed-in session: users reach only their own participants and
+  registrations, and a missing record and somebody else's record get the same answer.
+- ✅ Central FluentValidation validators with Turkish messages; write buttons ignore repeated clicks while an
+  operation is pending.
+- ✅ Daily log files without personal data, with anonymous audit codes.
+
+---
+
+## 🖼️ Screenshots
+
+These images show the screens of the original application; they will be replaced by the design update.
+
+### Sign-in ("Giriş Yap")
+![Sign-in](screenshots/login.png)
+
+### Sign-up ("Kayıt Ol")
+![Sign-up](screenshots/user_register.png)
+
+### Event registration ("Kayıt Ekle")
+![Event registration](screenshots/event_register.png)
+
+### Admin panel ("Yönetim Paneli")
+![Admin panel](screenshots/admin_panel.png)
+
+### Participant list ("Katılımcı Görüntüle")
+![Participant list](screenshots/shows_members.png)
+
+---
+
+## 🔑 Permission Matrix
+
+| Action | User | Admin |
+|---|---|---|
+| Sign up an account | ✅ (from the sign-in screen, user role) | ❌ (the first admin comes from the setup) |
+| Sign in | ✅ | ✅ |
+| List events | ✅ | ✅ |
+| Create an event | ❌ | ✅ |
+| Add a participant | ✅ owned by their account | ✅ owned by their account |
+| Register a participant for an event | ✅ their own participants only | ✅ any participant |
+| List registrations and tickets | ✅ of their own participants | ✅ all |
+| Cancel a registration | ✅ their own, up to the event day | ✅ any, up to the event day |
+| List the participants of an event (masked national id) | ❌ | ✅ |
+| Create the first admin | ❌ (empty database, or with the owner's setup key only) | - |
+
+---
+
+## 🧰 Tech Stack
+
+| Area | Used |
+|---|---|
+| Platform | .NET 10 (`net10.0-windows` UI, `net10.0` libraries) |
+| UI | Windows Forms |
+| Data access | Entity Framework Core 10 (SQL Server provider) |
+| Database | Microsoft SQL Server (Express is enough) |
+| Password hashing | PBKDF2-HMAC-SHA256 (`Rfc2898DeriveBytes.Pbkdf2`) |
+| Validation | FluentValidation |
+| Configuration / DI | Microsoft.Extensions.Configuration (JSON, user secrets, environment), Microsoft.Extensions.DependencyInjection |
+| Logging | Serilog (file sink, daily rolling) |
+| Testing | xUnit v3, Moq, EF Core SQLite (in-memory), real SQL Server tests |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) |
+
+---
+
+## 🗂️ Project Structure
+
+```text
+EtkinlikYonetim/
+├── src/
+│   ├── EtkinlikYonetim.Domain/     # Entities (User, Event, Participant, Registration, SetupKey) and repository contracts
+│   ├── EtkinlikYonetim.Business/   # Auth, setup, event, participant and registration services, Security/ (PBKDF2, lockout, setup keys), Validation/ (FluentValidation), Auditing/
+│   ├── EtkinlikYonetim.Data/       # EF Core DbContext, configurations, Migrations/, legacy upgrade, demo data, repositories
+│   └── EtkinlikYonetim.UI/         # WinForms screens, Infrastructure/ (errors, logging, dialogs, write guard), Program.cs (composition root)
+├── tests/
+│   ├── EtkinlikYonetim.Business.Tests/  # Validators, national id, hashing, lockout, capacity, dates and ownership (Moq)
+│   ├── EtkinlikYonetim.Data.Tests/      # Services on SQLite; races, setup keys and the legacy upgrade on SQL Server
+│   └── EtkinlikYonetim.UI.Tests/        # Configuration, errors, logs, focus and write guards (no windows shown)
+├── assets/                         # Original logo, background and icon with their SVG sources
+├── docs/
+│   ├── issue-setup-key.sql         # Setup key, run by the database owner
+│   ├── grant-app-login.sql         # Rights of the application's own login
+│   └── THREAT_MODEL.md             # Threat model
+├── screenshots/
+├── .github/workflows/ci.yml        # Build, test, SQL Server and release workflow
+├── CHANGELOG.md
+└── EtkinlikYonetim.sln
+```
+
+```mermaid
+flowchart TD
+    UI["EtkinlikYonetim.UI<br/>WinForms, DI, error handling, Serilog"] --> BUS["EtkinlikYonetim.Business<br/>Auth, setup, event, participant and registration services, FluentValidation, PBKDF2, audit events"]
+    UI --> DATA["EtkinlikYonetim.Data<br/>EF Core, repositories, migrations, legacy upgrade"]
+    BUS --> DOM["EtkinlikYonetim.Domain<br/>Entities, repository contracts"]
+    DATA --> DOM
+    DATA --> DB[("SQL Server<br/>EtkinlikYonetim")]
+    UI -.-> LOG[["%LOCALAPPDATA%\EtkinlikYonetim\logs"]]
+```
+
+The UI references Data only to register dependencies at startup; forms work through the Business services, which
+take the signed-in session on every call. All database access is asynchronous and parameterised. The provider is
+configured through DI (`AddDataAccess`), so tests can use SQLite in-memory.
+
+---
+
+## 🛠️ Setup and Usage
+
+### Requirements
+
+- .NET 10 SDK (Windows)
+- SQL Server (Express is enough)
+
+```powershell
+git clone https://github.com/ayberkaarda/EtkinlikYonetim.git
+cd EtkinlikYonetim
+dotnet build -c Release
+```
+
+### 1. Configuration
+
+Provide a connection string named `EtkinlikYonetim`. Any of the following works (later ones override earlier ones):
+
+1. **`appsettings.json`**: copy `src/EtkinlikYonetim.UI/appsettings.example.json` to `appsettings.json` in the
+   same folder and edit `ConnectionStrings:EtkinlikYonetim`. `appsettings.json` is git-ignored.
+
+   ```json
+   {
+     "ConnectionStrings": {
+       "EtkinlikYonetim": "Server=localhost\\SQLEXPRESS;Database=EtkinlikYonetim;Trusted_Connection=True;TrustServerCertificate=True;"
+     },
+     "Seed": {
+       "Demo": false
+     }
+   }
    ```
 
-2. .NET 10 SDK ve SQL Server (Express yeterli) kurulu olmalıdır. `EtkinlikYonetim.sln` dosyasını Visual Studio'da açın ya da `dotnet build` çalıştırın.
+2. **User secrets**:
 
-3. Bağlantı bilgisini verin (birini seçin):
-   - `src/EtkinlikYonetim.UI/appsettings.example.json` dosyasını aynı klasöre `appsettings.json` adıyla kopyalayıp düzenleyin (bu dosya git'e eklenmez),
-   - `dotnet user-secrets set "ConnectionStrings:EtkinlikYonetim" "<bağlantı>" --project src/EtkinlikYonetim.UI`,
-   - ya da `ETKINLIK_CONNECTION` ortam değişkenini tanımlayın.
+   ```powershell
+   dotnet user-secrets set "ConnectionStrings:EtkinlikYonetim" "<connection string>" --project src/EtkinlikYonetim.UI
+   ```
 
-4. Tabloları elle oluşturmanız gerekmez: uygulama ilk açılışta EF Core migration'larını uygular. Varsayılan kurulum hiçbir hesap oluşturmaz ve hiçbir hazır şifre içermez; veritabanı tamamen boşsa (hiç hesap yoksa) açılan **İlk Kurulum** ekranında ilk yönetici hesabını kendi belirlediğiniz şifreyle oluşturursunuz. Eski sürümün oluşturduğu bir veritabanı verileri korunarak yerinde yükseltilir.
-   - **Hesapları olan ama yöneticisi olmayan veritabanı** (örneğin yükseltilmiş eski bir veritabanı): uygulama normal giriş ekranıyla açılır; yönetici yokluğu tek başına kimseye yetki vermez. İlk yönetici yalnızca **kurulum anahtarı** ile oluşturulur: giriş ekranındaki **İlk yönetici hesabını oluştur** bağlantısı kurulum formunu açar ve anahtarı ister.
-   - Anahtarı uygulama üretmez; yalnızca **veritabanı sahibi** (db_owner veya sysadmin) `docs/issue-setup-key.sql` betiğini uygulamanın veritabanına bağlanarak çalıştırır, örneğin `sqlcmd -S <sunucu> -d <veritabanı> -E -i docs\issue-setup-key.sql`. Betik 16 rastgele bayttan (128 bit, `CRYPT_GEN_RANDOM`) 32 onaltılık karakterlik anahtarı üretir, `KurulumAnahtarlari` tablosuna yalnızca SHA-256 özetini yazar ve anahtarı bir kez gösterir. Anahtarı kurucuya güvenli bir yoldan iletin; başka hiçbir yerde saklanmaz ve uygulama onu loglamaz.
-   - Betik, veritabanında yönetici hesabı varsa anahtar üretmeyi reddeder. Kaybolan veya başkasına görünen kullanılmamış anahtarları iptal etmek için betikteki `@RevokeUnusedKeys` değerini `1` yapıp yeniden çalıştırın.
-   - Uygulamanın kendi oturumu için `docs/grant-app-login.sql` örnek yetkileri verir: anahtar tablosunda yalnızca okuma (`SELECT`) ve kullanıldı işareti (`Tuketildi`, `TuketimTarihi` sütunlarında `UPDATE`); anahtar ekleme, silme, özet veya son kullanma tarihini değiştirme yetkisi yoktur. İlk açılışı (şema oluşturma/yükseltme) veritabanı sahibinin bağlantısıyla yapın, ardından uygulamanın bağlantı ayarını bu oturuma çevirin.
-   - Anahtarı formdaki **Kurulum Anahtarı** alanına yazın (tireler, boşluklar ve büyük/küçük harf önemli değildir) ya da `ETKINLIK_SETUP_KEY` ortam değişkeniyle verin; ortam değişkeni yalnızca alanı doldurur ve geçerli anahtar biçiminde değilse alanı boş bırakıp uyarır. Değer her durumda veritabanındaki kayıtla doğrulanır; istemcide seçilen veya üretilen bir değer yetki sayılmaz.
-   - Anahtar 24 saat geçerlidir ve tek kullanımlıktır: yönetici hesabını yazan işlemle birlikte veritabanında kullanıldı olarak işaretlenir, bu nedenle başka bir profil veya bilgisayardan yeniden kullanılamaz; yazma başarısız olursa anahtar harcanmaz. Yönetici hesabı oluştuktan sonra kullanılmamış anahtarlar da kabul edilmez. Hatalı denemeler sayılmaz ve anahtarı iptal etmez (128 bitlik anahtar tahmin edilemez); her hatalı denemeden sonra 1 saniye beklenir.
-   - Demo modu isteğe bağlıdır ve varsayılan olarak kapalıdır: `ETKINLIK_DEMO=1` ortam değişkeni ya da `appsettings.json` içinde `"Seed": { "Demo": true }` yalnızca tamamen boş bir veritabanına kurgusal örnek veriler ekler. Yalnızca demo modu açıksa şu hesaplar oluşur: `admin` / `Demo.Admin1` ve `ornek` / `Demo.Kullanici1`. Demo modunu gerçek bir kurulumda açmayın.
+3. **Environment variable** `ConnectionStrings__EtkinlikYonetim`.
+4. **Environment variable** `ETKINLIK_CONNECTION` (highest priority).
 
-5. Uygulamayı çalıştırın (`dotnet run --project src/EtkinlikYonetim.UI`) ve testleri `dotnet test` ile çalıştırın; SQL Server gerektiren testleri atlamak için `ETKINLIK_SKIP_SQL_TESTS=1` tanımlayın.
+> Inside JSON the `\` in `localhost\SQLEXPRESS` is written as `\\`. `TrustServerCertificate=True` is meant for a
+> local development server only.
 
-## 📌 Notlar
-- TC Kimlik numarası doğrulaması yalnızca sistem içi kontrolle yapılmaktadır.
-- Kullanıcıların sisteme birden fazla etkinlik kaydı yapması mümkündür.
-- Admin yetkisi giriş ekranında kontrol edilmektedir.
-- **Güvenlik notu:** Bu sürümden önceki ara sürümlerle kurulmuş veritabanlarında `admin` ve `ornek` örnek hesapları, yukarıda yayımlanmış şifreleriyle bulunabilir. Böyle bir veritabanında bu hesapları (sahip oldukları örnek katılımcı ve kayıtlarla birlikte) silin ya da şifrelerini değiştirin. Hiç yönetici hesabı kalmazsa yeni yönetici, giriş ekranından veritabanı sahibinin ürettiği kurulum anahtarıyla oluşturulur.
-- **Geri alma notu:** ScopeNationalIdToOwner migration'ı kayıpsız geri alınamaz. Farklı hesaplarda aynı TC Kimlik numarasına sahip katılımcı varsa geri alma hiçbir şeyi değiştirmeden durur; bu satırları önce elle çözün.
+If no connection string is found, the application shows a Turkish message explaining these options and exits.
 
-## 📧 İletişim
+### 2. Running
 
-Proje hakkında sorularınız için benimle iletişime geçebilirsiniz.
+```powershell
+dotnet run --project src/EtkinlikYonetim.UI
+```
+
+You do not need to create tables by hand: the database is created on first start and pending EF Core migrations
+are applied automatically on every start, so no manual `dotnet ef database update` and no `.bak` file are needed.
+
+### 3. First-run setup
+
+- **Empty database (no account at all):** the default installation creates no account and contains no ready-made
+  password. The **"İlk Kurulum"** (First-Run Setup) screen opens and you create the first admin account with a
+  password of your own choosing. No key is needed. Closing the setup ends the application.
+- **Database with accounts but no admin** (for example an upgraded old database): the application opens with the
+  normal sign-in; a missing admin alone gives nobody any rights. The first admin can be created only with a
+  **setup key**: the **"İlk yönetici hesabını oluştur"** (Create the first admin account) link on the sign-in screen
+  opens the setup form, which asks for the key.
+- The application never creates keys. Only the **database owner** (db_owner or sysadmin) runs
+  `docs/issue-setup-key.sql` connected to the application's database, for example
+  `sqlcmd -S <server> -d <database> -E -i docs\issue-setup-key.sql`. The script makes a 32 hexadecimal character
+  key from 16 random bytes (128 bits, `CRYPT_GEN_RANDOM`), stores only its SHA-256 hash in the `KurulumAnahtarlari`
+  table and shows the key once. Give the key to the founder over a safe channel; it is stored nowhere else and the
+  application never logs it.
+- The script refuses to create a key when the database already has an admin account. To revoke unused keys that
+  were lost or seen by someone else, set `@RevokeUnusedKeys` to `1` in the script and run it again.
+- `docs/grant-app-login.sql` gives the application's own login example rights: on the key table only reading
+  (`SELECT`) and marking a key used (`UPDATE` of the `Tuketildi` and `TuketimTarihi` columns); it cannot add,
+  delete, or change the hash or the expiry of a key. On the other tables it may read, insert and update, but never
+  delete. Do the first start (schema creation or upgrade) with the database owner's connection, then point the
+  application's connection string at this login.
+- Type the key into the **"Kurulum Anahtarı"** (Setup Key) field of the form (dashes, spaces and letter case do not
+  matter) or provide it with the `ETKINLIK_SETUP_KEY` environment variable; the variable only fills in the field,
+  and when it is not a well-formed key the field is left empty with a warning. The value is always checked against
+  the database record; a value chosen or generated on the client is never an authority.
+- A key is valid for 24 hours and works once: it is marked used in the database together with the write that
+  creates the admin account, so it cannot be reused from another profile or computer; if that write fails the key
+  is not spent. The expiry is decided by the database's clock at the moment the key is used, not by the computer's
+  clock. Once an admin exists, unused keys are refused too. Wrong attempts are not counted and do not revoke the
+  key (a 128-bit key cannot be guessed); every wrong attempt is followed by a 1 second pause.
+
+### 4. Demo mode
+
+Demo mode is optional and off by default. The environment variable `ETKINLIK_DEMO=1` (or `true`), or
+`"Seed": { "Demo": true }` in `appsettings.json`, adds fictional sample data only to a completely empty database.
+Only with demo mode on are these accounts created:
+
+| Role | User name (demo mode only) | Password (demo mode only) |
+|---|---|---|
+| Admin | `admin` | `Demo.Admin1` |
+| User | `ornek` | `Demo.Kullanici1` |
+
+Never switch demo mode on for a real installation.
+
+### 5. Upgrading an existing database
+
+A database created by the original application (tables `Kullanicilar`, `Etkinlikler` and `Katilimcilar` without a
+migrations history) is upgraded in place on first start, keeping its data: existing rows, identity values and
+plain text passwords are kept; the passwords are marked as legacy plain text and hashed on each account's next
+successful sign-in. A participant's single event, stored by name in the original application, becomes an active
+registration with a ticket, and the events' seat counters are filled in. The upgrade runs in one transaction under
+an application lock (`sp_getapplock`) and is safe to repeat. When existing rows break the new rules, it stops
+before changing anything and reports what has to be corrected.
+
+Take a backup of the database before the first start with the new version and keep it protected: it still
+contains the plain text passwords.
+
+### 6. Migrations
+
+```powershell
+dotnet tool restore
+dotnet ef migrations list --project src/EtkinlikYonetim.Data
+dotnet ef migrations add <Name> --project src/EtkinlikYonetim.Data --output-dir Persistence/Migrations
+```
+
+The design-time factory reads `ETKINLIK_CONNECTION` and otherwise uses a local SQL Server Express instance. Apply
+new migrations with the database owner's connection; the application's restricted login has no DDL rights.
+
+> **Rollback note:** the `ScopeNationalIdToOwner` migration cannot be rolled back without loss. When participants
+> of different accounts share a national id, the rollback stops without changing anything; resolve those rows by
+> hand first.
+
+### 7. Logs
+
+Logs are written to `%LOCALAPPDATA%\EtkinlikYonetim\logs`, one file per day. Files older than 30 days are deleted,
+and at most 30 files are kept. The folder is outside the repository. Error entries contain only exception types,
+HResult codes and the method names of the stack trace (no file paths); refused operations log only the exception
+type. Audit entries are a fixed code and a role only, never an account; every failed sign-in (unknown account,
+wrong password or locked account) writes the same code, `auth.sign_in.failed`.
+
+Names, e-mail addresses, national ids, passwords, setup keys and exception messages are never written to the log.
+
+---
+
+## 🔐 Security
+
+See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the threat model.
+
+- National ids, names and e-mail addresses are personal data (KVKK). They are stored only in the configured SQL
+  Server database, shown masked in admin lists and never written to log files.
+- Passwords are hashed with PBKDF2; the stored format is kept in its own column, so a value is never read in
+  another format.
+- Lockout counters are updated atomically, and a successful sign-in is written only while the account is still
+  unlocked, so concurrent attempts cannot clear a fresh lock.
+- Ownership is checked in the services and repeated in the database statements.
+- Connection strings are kept out of the repository (`appsettings.json` is ignored; user secrets and environment
+  variables are supported). All queries go through EF Core with parameters.
+- Users only see Turkish messages; raw exception text is never shown.
+- **Security note:** databases set up with interim versions before this one may contain the sample accounts
+  `admin` and `ornek` with the passwords published above. In such a database delete these accounts (with their
+  sample participants and registrations) or change their passwords. If no admin account is left, a new admin is
+  created from the sign-in screen with a setup key issued by the database owner.
+
+---
+
+## 🧪 Testing
+
+```powershell
+dotnet test -c Release
+```
+
+| Project | Type | Scope |
+|---|---|---|
+| `tests/EtkinlikYonetim.Business.Tests` | Unit | Validator limits (user name 32, password 8/64 and 100 at sign-in, name 64, event name 80, capacity 1/1000, past dates), national id checksum, PBKDF2 and format upgrade, lockout, setup key checks, ownership and audit events with strict Moq mocks |
+| `tests/EtkinlikYonetim.Data.Tests` | Integration | Services and repositories on SQLite in-memory (capacity limits, cancellation and registering again, IDOR answers, lockout timing); capacity, duplicate, lockout and first-admin races, setup keys with the restricted login, the legacy upgrade and its lock on SQL Server |
+| `tests/EtkinlikYonetim.UI.Tests` | Unit | Example configuration, error messages, log content and retention, focus after unlock, write guards, latest-wins loading, neutral branding |
+
+The SQL Server tests use throw-away databases on the server in `ETKINLIK_TEST_SQLSERVER` (default: local SQL
+Express with Windows authentication). They are skipped when `ETKINLIK_SKIP_SQL_TESTS=1` is set or no server is
+reachable; with `ETKINLIK_REQUIRE_SQL_TESTS=1` (the SQL Server job of the CI) an unreachable server fails them
+instead. The temporary databases are dropped afterwards. The test with a restored backup of the original database
+runs only when `ETKINLIK_LEGACY_BACKUP` points to a `.bak` file readable by the SQL Server service.
+
+```powershell
+$env:ETKINLIK_SKIP_SQL_TESTS = "1"; dotnet test -c Release
+```
+
+On SQLite the schema is created from the model instead of migrations. The UI tests create forms without showing
+them, replace every message box and run serially, so no window opens.
+
+---
+
+## 🚀 CI and Release
+
+`.github/workflows/ci.yml` runs on pushes to `main`, on pull requests and on `v*` tags:
+
+1. **build-test** (Windows): `dotnet build -c Release` and `dotnet test -c Release` (SQL Server tests skipped)
+2. **sql-server** (Linux): the data tests against a throw-away SQL Server container, with
+   `ETKINLIK_REQUIRE_SQL_TESTS=1`
+3. **release** (only on `v*` tags): the tag name is passed through an environment variable and checked against
+   `^v[A-Za-z0-9._-]+$`; a framework-dependent win-x64 build is then published and uploaded as the workflow
+   artifact `EtkinlikYonetim-<tag>-win-x64.zip`
+
+To produce the same build locally:
+
+```powershell
+dotnet publish src/EtkinlikYonetim.UI -c Release -r win-x64 --self-contained false -o ./publish
+```
+
+The target machine needs the .NET 10 Desktop Runtime. Put `appsettings.json` next to `EtkinlikYonetim.exe` or set
+`ETKINLIK_CONNECTION`.
+
+---
+
+## 👨‍💻 Developer Notes
+
+- See [CHANGELOG.md](CHANGELOG.md) for the version history.
+- `Program.cs` is the composition root: configuration, DI, logging, the audit sink and the global
+  `ThreadException` / `UnhandledException` handlers are set up there.
+- Business rule violations raise `BusinessRuleException` and ownership violations `AccessDeniedException`, both
+  with fixed Turkish messages that the UI shows as warnings.
+- Validators live in `EtkinlikYonetim.Business/Validation` and stop at the first failure, so the user sees one
+  message at a time.
+- New write buttons should go through `ExclusiveOperation` and move the focus with `FocusAfterUnlock`; loads
+  triggered by a selection should use `RequestSequence` so only the latest response is shown. Message boxes go
+  through `Dialogs` or `IUserPrompts`, never `MessageBox` directly.
+- Audit events carry only an event kind and a role; do not add identifying data to them.
+
+---
+
+## 📧 Contact
+
+Feel free to get in touch with questions about the project.

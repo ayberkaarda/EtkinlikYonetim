@@ -86,5 +86,5 @@ public sealed class EventServiceTests
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
-    private EventService Service() => new(_events.Object, _time);
+    private EventService Service() => ServiceFactory.Event(_events.Object, _time);
 }

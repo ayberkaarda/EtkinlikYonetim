@@ -1,3 +1,5 @@
+using EtkinlikYonetim.Business.Auditing;
+
 namespace EtkinlikYonetim.Business.Services;
 
 /// <summary>Role checks and the local calendar day shared by the services.</summary>
@@ -5,11 +7,13 @@ internal static class Access
 {
     public static void RequireSignedIn(UserSession? session) => ArgumentNullException.ThrowIfNull(session);
 
-    public static void RequireAdmin(UserSession? session)
+    /// <summary>Refuses every account but an admin; the refusal is audited with the caller's role.</summary>
+    public static void RequireAdmin(UserSession? session, IAuditLog audit)
     {
         ArgumentNullException.ThrowIfNull(session);
         if (!session.IsAdmin)
         {
+            audit.Record(AuditEvent.AccessDenied, session.Role);
             throw new AccessDeniedException();
         }
     }

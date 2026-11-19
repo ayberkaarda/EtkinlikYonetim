@@ -208,8 +208,7 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
     /// </summary>
     private static async Task<bool> UseSetupKeyAsync(EventDbContext db, SetupKeyAttempt attempt, CancellationToken cancellationToken)
     {
-        var now = attempt.Now;
-        var keys = await AccountLocks.UsableSetupKeysLockedAsync(db, now, cancellationToken).ConfigureAwait(false);
+        var keys = await AccountLocks.UsableSetupKeysLockedAsync(db, attempt.Now, cancellationToken).ConfigureAwait(false);
         if (attempt.FindMatch(keys) is not { } id)
         {
             return false;
@@ -217,6 +216,23 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
 
         // The WHERE clause is the final decision: of two transactions with the same key only one can
         // match the unused row.
+        if (db.Database.IsSqlServer())
+        {
+            // The expiry is decided again at the moment of use, against the database's clock (the one
+            // the issuing script set SonKullanma with), and the use is stamped with it: a key that
+            // expired after it was read matches no row, and the computer's clock plays no part.
+            var used = await db.Database.ExecuteSqlAsync(
+                $"""
+                UPDATE dbo.KurulumAnahtarlari
+                SET Tuketildi = 1, TuketimTarihi = SYSUTCDATETIME()
+                WHERE AnahtarID = {id} AND Tuketildi = 0 AND SonKullanma > SYSUTCDATETIME()
+                """,
+                cancellationToken).ConfigureAwait(false);
+            return used == 1;
+        }
+
+        // Other providers (the tests' SQLite) have no database clock and use the attempt's time.
+        var now = attempt.Now;
         var consumed = await db.SetupKeys
             .Where(k => k.Id == id && !k.Consumed && k.ExpiresAt > now)
             .ExecuteUpdateAsync(

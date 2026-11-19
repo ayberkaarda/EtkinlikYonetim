@@ -143,7 +143,7 @@ public sealed class AuthServiceTests
         _users.Setup(u => u.RecordSuccessfulLoginAsync(It.IsAny<AccountCredentials>(), Now, It.IsNotNull<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        await new AuthService(_users.Object, new PasswordHasher(iterations: 2_000), _time).SignInAsync(UserName, "Gizli.Sifre1", Ct);
+        await ServiceFactory.Auth(_users.Object, new PasswordHasher(iterations: 2_000), _time).SignInAsync(UserName, "Gizli.Sifre1", Ct);
 
         _users.Verify(u => u.RecordSuccessfulLoginAsync(It.IsAny<AccountCredentials>(), Now, It.Is<string>(h => h.StartsWith("PBKDF2-SHA256$2000$", StringComparison.Ordinal)), It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -230,5 +230,5 @@ public sealed class AuthServiceTests
         _users.Setup(u => u.RecordSuccessfulLoginAsync(It.Is<AccountCredentials>(c => c.Id == 7), Now, newHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(result);
 
-    private AuthService Service() => new(_users.Object, _hasher, _time);
+    private AuthService Service() => ServiceFactory.Auth(_users.Object, _hasher, _time);
 }
