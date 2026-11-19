@@ -6,8 +6,9 @@ namespace EtkinlikYonetim.Data.Persistence;
 public interface IDatabaseInitializer
 {
     /// <summary>
-    /// Applies pending EF Core migrations (creating the database when it does not exist). Providers
-    /// without migrations get the schema from the model.
+    /// Applies pending EF Core migrations (creating the database when it does not exist). A database
+    /// created by the original application is upgraded in place first, keeping its data.
+    /// Providers without migrations get the schema from the model.
     /// </summary>
     Task InitializeAsync(CancellationToken cancellationToken = default);
 }
@@ -22,6 +23,8 @@ internal sealed class DatabaseInitializer(IDbContextFactory<EventDbContext> cont
         {
             if (db.Database.IsSqlServer())
             {
+                // A database from the original application has the tables but no migration history.
+                await LegacySchemaUpgrader.UpgradeIfLegacyAsync(db, cancellationToken).ConfigureAwait(false);
                 await db.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
             }
             else
