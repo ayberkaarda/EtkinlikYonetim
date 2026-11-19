@@ -200,6 +200,72 @@ public sealed class LegacyUpgradeTests
     }
 
     /// <summary>
+    /// The original sign-in compared <c>rol.ToLower() == "admin"</c>, so a role with a trailing space
+    /// opened the user panel, while SQL Server comparisons ignore trailing spaces and would match
+    /// "Admin". Such roles, whose meaning the upgrade cannot decide, stop the upgrade before anything
+    /// is changed instead of being turned into either role.
+    /// </summary>
+    [Theory]
+    [InlineData("admin ")]
+    [InlineData("Admin  ")]
+    [InlineData("Kullanici ")]
+    public async Task Initialize_PaddedLegacyRole_DoesNotGrantAdmin(string role)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.CreateAsync(ct);
+        await database.ExecuteAsync(LegacySchema, ct);
+        await database.ExecuteAsync(
+            "INSERT dbo.Kullanicilar (KullaniciAdi, Sifre, Rol) VALUES (N'bosluklu', N'gizli1', @role), (N'yonetici', N'admin1', N'Admin')",
+            ct,
+            ("@role", role));
+
+        await using var provider = database.BuildServices();
+        var error = await Assert.ThrowsAsync<DatabaseInitializationException>(
+            () => provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct));
+
+        var message = error.InnerException?.Message;
+        Assert.Contains("1 users with a missing or too long name or password or an unknown role", message, StringComparison.Ordinal);
+        Assert.Contains("No changes were made.", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("bosluklu", message, StringComparison.Ordinal);
+        Assert.Equal(1, await database.ScalarAsync(
+            "SELECT COUNT(*) FROM dbo.Kullanicilar WHERE KullaniciAdi = N'bosluklu' AND CONVERT(varbinary(100), Rol) = CONVERT(varbinary(100), @role)",
+            ct,
+            ("@role", role)));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.tables WHERE name IN (N'__EFMigrationsHistory', N'Kayitlar', N'Biletler')", ct));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Kullanicilar') AND name = N'SifreBicimi'", ct));
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.Katilimcilar') AND name = N'EtkinlikAdi'", ct));
+        await Assert.ThrowsAsync<DatabaseInitializationException>(() => provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct));
+    }
+
+    /// <summary>Exactly the role values the original application wrote are still upgraded, each to its own role.</summary>
+    [Theory]
+    [InlineData("Admin", true)]
+    [InlineData("admin", true)]
+    [InlineData("Kullanici", false)]
+    [InlineData("kullanici", false)]
+    [InlineData(null, false)]
+    public async Task Initialize_ExactLegacyRole_KeepsItsMeaning(string? role, bool admin)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.CreateAsync(ct);
+        await database.ExecuteAsync(LegacySchema, ct);
+        await database.ExecuteAsync(
+            "INSERT dbo.Kullanicilar (KullaniciAdi, Sifre, Rol) VALUES (N'hesap', N'gizli1', @role)",
+            ct,
+            ("@role", (object?)role ?? DBNull.Value));
+
+        await using var provider = database.BuildServices();
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+
+        var expected = admin ? "Admin" : "Kullanici";
+        Assert.Equal(1, await database.ScalarAsync(
+            "SELECT COUNT(*) FROM dbo.Kullanicilar WHERE CONVERT(varbinary(100), Rol) = CONVERT(varbinary(100), @role)",
+            ct,
+            ("@role", expected)));
+        Assert.Equal(admin, (await provider.GetRequiredService<IAuthService>().SignInAsync("hesap", "gizli1", ct)).IsAdmin);
+    }
+
+    /// <summary>
     /// A default installation contains no account at all, so no documented or shared password can
     /// open it; the first admin is created by the first-run setup with a password of its own.
     /// </summary>

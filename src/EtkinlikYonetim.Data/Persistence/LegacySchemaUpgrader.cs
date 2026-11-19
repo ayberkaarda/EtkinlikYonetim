@@ -161,6 +161,28 @@ internal static class LegacySchemaUpgrader
     }
 
     /// <summary>
+    /// Role values whose meaning in the original application is certain: its sign-in made an account
+    /// an admin when <c>rol.ToLower() == "admin"</c> and a user otherwise. Only the exact values below
+    /// are accepted, compared by their bytes and length because SQL Server ignores trailing spaces in
+    /// comparisons under every collation (a role "admin " was a user in the original application but
+    /// equals "Admin" in SQL). Anything else, such as padded or differently cased text, stops the
+    /// upgrade so the role is decided by a person and never widened by the upgrade.
+    /// </summary>
+    private static string ExactRole(string value) =>
+        $"(Rol COLLATE Latin1_General_BIN2 = N'{value}' AND DATALENGTH(CONVERT(nvarchar(4000), Rol)) = {value.Length * 2})";
+
+    private static readonly string LegacyAdminRole = ExactRole("admin");
+    private static readonly string LegacyUserRole = ExactRole("kullanici");
+
+    private static readonly string KnownRoleCondition = string.Join(
+        " OR ",
+        "Rol IS NULL",
+        ExactRole(SchemaLimits.AdminRoleValue),
+        LegacyAdminRole,
+        ExactRole(SchemaLimits.UserRoleValue),
+        LegacyUserRole);
+
+    /// <summary>
     /// Refuses the upgrade, before anything is changed, when existing rows cannot satisfy the new
     /// constraints. Fixing such rows needs a human decision, so no data is altered or deleted here.
     /// Only counts are reported; row contents (names, national ids, passwords) never appear in the message.
@@ -169,10 +191,10 @@ internal static class LegacySchemaUpgrader
     {
         (string Sql, string Problem)[] checks =
         [
-            ("""
+            ($"""
              SELECT COUNT(*) AS [Value] FROM dbo.Kullanicilar
              WHERE KullaniciAdi IS NULL OR LEN(KullaniciAdi) > 50 OR Sifre IS NULL OR LEN(Sifre) > 256
-                OR (Rol IS NOT NULL AND Rol COLLATE Latin1_General_CI_AS NOT IN (N'Kullanici', N'Admin'))
+                OR NOT ({KnownRoleCondition})
              """,
                 "users with a missing or too long name or password or an unknown role"),
             ("""
@@ -234,14 +256,14 @@ internal static class LegacySchemaUpgrader
         DropConstraints("Kullanicilar", "UQ"),
         DropConstraints("Katilimcilar", "UQ"),
 
-        // The original form compared the role case-insensitively and the database accepted "admin";
+        // The original form lowered the role before comparing it and the database accepted "admin";
         // the stored value is now exactly "Admin" or "Kullanici" (also for rows without a role, which
-        // the original column default would have made users).
-        """
-        UPDATE dbo.Kullanicilar SET Rol = CASE
-            WHEN Rol COLLATE Latin1_General_CI_AS = N'Admin' THEN N'Admin'
-            ELSE N'Kullanici' END
-        WHERE Rol IS NULL OR Rol COLLATE Latin1_General_BIN NOT IN (N'Admin', N'Kullanici');
+        // the original column default would have made users). Only the exact legacy spellings are
+        // rewritten, each to the role the original application gave it; validation has refused any
+        // other value, and the canonical values are left as they are.
+        $"""
+        UPDATE dbo.Kullanicilar SET Rol = CASE WHEN {LegacyAdminRole} THEN N'{SchemaLimits.AdminRoleValue}' ELSE N'{SchemaLimits.UserRoleValue}' END
+        WHERE Rol IS NULL OR {LegacyAdminRole} OR {LegacyUserRole};
         """,
 
         AlterColumn("Kullanicilar", "KullaniciAdi", "nvarchar", 100, "NVARCHAR(50) NOT NULL"),
