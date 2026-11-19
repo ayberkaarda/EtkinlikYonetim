@@ -1,5 +1,6 @@
 using System.Globalization;
 using EtkinlikYonetim.Business;
+using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Data.Persistence;
 using Microsoft.Data.SqlClient;
@@ -190,6 +191,49 @@ public sealed class SqlServerConcurrencyTests
         }
 
         Assert.False(await second.GetRequiredService<ISetupService>().IsSetupRequiredAsync(ct));
+    }
+
+    /// <summary>
+    /// A database with a user but no admin: two application instances on the same computer race with
+    /// the right setup key and with wrong ones. Exactly one admin is created, the key is used once, and
+    /// a wrong key never creates anything.
+    /// </summary>
+    [Fact]
+    public async Task Setup_ExistingUsersConcurrentKeyedRuns_CreateExactlyOneAdmin()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+        await using var first = database.BuildServices();
+        await first.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+
+        for (var round = 0; round < 4; round++)
+        {
+            await database.ExecuteAsync("DELETE dbo.Kullanicilar", ct);
+            await first.GetRequiredService<IAuthService>().RegisterAsync("uye", "Gizli.Sifre1", "Gizli.Sifre1", ct);
+
+            // Both instances read the same key folder, as two windows on one computer do.
+            var keys = NewSetupKeyStore(database.Clock);
+            await using var a = database.BuildServices(services => services.AddSingleton<ISetupKeyStore>(keys));
+            await using var b = database.BuildServices(services => services.AddSingleton<ISetupKeyStore>(keys));
+            var providers = new[] { a, b };
+            var key = ReadSetupKey(a);
+            var names = Enumerable.Range(0, 8).Select(i => "kurucu" + (char)('a' + round) + (char)('a' + i)).ToList();
+
+            // Every third attempt uses a wrong key (three in all, below the lockout limit).
+            var results = await RaceAsync(
+                names,
+                name => providers[name[^1] % 2].GetRequiredService<ISetupService>()
+                    .CreateFirstAdminAsync(name[^1] % 3 == 1 ? "YANLIS-" + name : key, name, "Gizli.Sifre1", "Gizli.Sifre1", ct),
+                ct);
+
+            Assert.Single(results, r => r is null);
+            Assert.All(
+                results.Where(r => r is not null),
+                r => Assert.Contains(Assert.IsType<BusinessRuleException>(r).Message, new[] { SetupService.AlreadyDone, SetupService.SetupKeyInvalid }));
+            Assert.Equal(2, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar", ct));
+            Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar WHERE Rol = N'Admin' AND SifreBicimi = 0", ct));
+            Assert.False(File.Exists(keys.KeyFilePath));
+        }
     }
 
     /// <summary>

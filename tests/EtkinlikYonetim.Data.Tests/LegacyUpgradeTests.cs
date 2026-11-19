@@ -273,6 +273,37 @@ public sealed class LegacyUpgradeTests
             ct,
             ("@role", expected)));
         Assert.Equal(admin, (await provider.GetRequiredService<IAuthService>().SignInAsync("hesap", "gizli1", ct)).IsAdmin);
+        Assert.False(await provider.GetRequiredService<ISetupService>().IsSetupRequiredAsync(ct));
+        Assert.Equal(!admin, await provider.GetRequiredService<ISetupService>().IsAdminMissingAsync(ct));
+    }
+
+    /// <summary>
+    /// An upgraded database whose accounts are all users keeps its sign-in: whoever opens the
+    /// application cannot make themselves admin, only the holder of the local setup key can, once.
+    /// </summary>
+    [Fact]
+    public async Task Initialize_LegacyDatabaseWithoutAdmin_NeedsTheSetupKeyForTheFirstAdmin()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.CreateAsync(ct);
+        await database.ExecuteAsync(LegacySchema, ct);
+        await database.ExecuteAsync("INSERT dbo.Kullanicilar (KullaniciAdi, Sifre, Rol) VALUES (N'eski', N'gizli1', N'Kullanici')", ct);
+
+        await using var provider = database.BuildServices();
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+        var setup = provider.GetRequiredService<ISetupService>();
+        const string Admins = "SELECT COUNT(*) FROM dbo.Kullanicilar WHERE Rol = N'Admin'";
+
+        Assert.False(await setup.IsSetupRequiredAsync(ct));
+        Assert.True(await setup.IsAdminMissingAsync(ct));
+        var key = TestServices.ReadSetupKey(provider);
+        var refused = await Assert.ThrowsAsync<BusinessRuleException>(() => setup.CreateFirstAdminAsync(null, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct));
+        Assert.Equal(SetupService.SetupKeyInvalid, refused.Message);
+        Assert.Equal(0, await database.ScalarAsync(Admins, ct));
+
+        Assert.True((await setup.CreateFirstAdminAsync(key, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct)).IsAdmin);
+        Assert.Equal(1, await database.ScalarAsync(Admins, ct));
+        Assert.False((await provider.GetRequiredService<IAuthService>().SignInAsync("eski", "gizli1", ct)).IsAdmin);
     }
 
     /// <summary>
