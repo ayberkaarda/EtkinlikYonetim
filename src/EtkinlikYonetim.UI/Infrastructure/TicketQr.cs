@@ -1,3 +1,5 @@
+using System.Drawing.Drawing2D;
+using EtkinlikYonetim.UI.Theming;
 using QRCoder;
 
 namespace EtkinlikYonetim.UI.Infrastructure;
@@ -24,5 +26,31 @@ internal static class TicketQr
         using var stream = new MemoryStream(bytes);
         using var image = Image.FromStream(stream);
         return new Bitmap(image);
+    }
+}
+
+/// <summary>
+/// Shows a QR code scaled to its box with hard module edges (no smoothing, which would blur them for a
+/// scanner), always dark on white whatever the theme, as scanners expect.
+/// </summary>
+internal sealed class QrView : PictureBox
+{
+    public QrView()
+    {
+        SizeMode = PictureBoxSizeMode.Zoom;
+        BackColor = Color.White;
+        Size = new Size(Sizes.QrCode, Sizes.QrCode);
+        Margin = Padding.Empty;
+        TabStop = false;
+        AccessibleRole = AccessibleRole.Graphic;
+        AccessibleName = "Biletin QR kodu";
+    }
+
+    protected override void OnPaint(PaintEventArgs pe)
+    {
+        ArgumentNullException.ThrowIfNull(pe);
+        pe.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+        pe.Graphics.PixelOffsetMode = PixelOffsetMode.Half;
+        base.OnPaint(pe);
     }
 }

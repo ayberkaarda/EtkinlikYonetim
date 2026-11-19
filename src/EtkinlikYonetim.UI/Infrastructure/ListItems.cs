@@ -48,6 +48,22 @@ internal sealed record RegistrationItem(RegistrationDetails Registration)
         $"{Registration.EventName} - {DisplayFormat.Date(Registration.EventDate)} - "
         + $"{Registration.ParticipantName ?? "Ad Bilinmiyor"} - {State(Registration)}";
 
+    /// <summary>
+    /// The row: the event, then the date and the participant, and a pill that tells a seat with a ticket, a
+    /// place on the waiting list and a cancelled event apart. The ticket code itself stays off the list.
+    /// </summary>
+    public ListRow Row()
+    {
+        var details = $"{DisplayFormat.Date(Registration.EventDate)} · {Registration.ParticipantName ?? "Ad Bilinmiyor"}";
+        var (status, tone) = Registration.Status switch
+        {
+            RegistrationStatus.Waiting => (string.Create(DisplayFormat.Turkish, $"Bekleme listesi · {Registration.QueuePosition}. sıra"), RowTone.Warm),
+            RegistrationStatus.EventCancelled => ("Etkinlik iptal edildi", RowTone.Warning),
+            _ => (Registration.TicketCode is { Length: > 0 } ? "Bilet hazır" : "Kayıtlı", RowTone.Accent),
+        };
+        return new ListRow(Registration.EventName, details, RowTone.Neutral, status, tone);
+    }
+
     private static string State(RegistrationDetails registration) => registration.Status switch
     {
         RegistrationStatus.Waiting => $"Bekleme listesi, sıra: {registration.QueuePosition}",
