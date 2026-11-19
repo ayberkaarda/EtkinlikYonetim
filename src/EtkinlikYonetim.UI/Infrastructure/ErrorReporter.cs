@@ -15,6 +15,9 @@ internal static class ErrorReporter
 
     internal const string UnexpectedErrorMessage = "Beklenmeyen bir hata oluştu. İşleminiz tamamlanamamış olabilir.";
 
+    /// <summary>Another change of the same event or of the accounts held the database lock too long; nothing was written.</summary>
+    internal const string BusyMessage = "Veritabanı şu anda aynı kayıtlar üzerindeki başka bir işlemle meşgul; hiçbir değişiklik yapılmadı. Lütfen birkaç saniye sonra tekrar deneyin.";
+
     public static void Show(Exception? exception, IWin32Window? owner = null)
     {
         if (exception is null)
@@ -106,6 +109,11 @@ internal static class ErrorReporter
         {
             return "Veritabanı hazırlanamadı. SQL Server'ın çalıştığından, bağlantı ayarlarının doğru olduğundan "
                 + "ve veritabanı oluşturma yetkiniz bulunduğundan emin olun.";
+        }
+
+        if (Find<DatabaseBusyException>(exception) is not null)
+        {
+            return BusyMessage;
         }
 
         if (Find<DbException>(exception) is not null)
