@@ -43,6 +43,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The admin participant list shows the state of each registration (checked in, waiting, cancelled) instead of its
   ticket code, and an admin sees ticket codes only of participants it added.
 - Refused operations no longer write an "Operation refused" line to the log file.
+- A change that waits more than 10 seconds for another change of the same event or of the accounts is refused with
+  "nothing was changed, try again in a few seconds" instead of a message about the server. Statements get 60
+  seconds before the client cancels them, and the start-up (legacy upgrade and migrations) five minutes, so the
+  client never gives up before the lock's own wait.
 
 ### Security
 

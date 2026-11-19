@@ -43,6 +43,10 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) esas alınara
 - Yöneticinin katılımcı listesi bilet kodu yerine kaydın durumunu (giriş yaptı, bekliyor, iptal) gösterir; yönetici
   bilet kodlarını yalnızca kendi eklediği katılımcıların görür.
 - Reddedilen işlemler log dosyasına artık "Operation refused" satırı yazmaz.
+- Aynı etkinliğin veya hesapların başka bir değişikliğini 10 saniyeden fazla bekleyen bir değişiklik, sunucuyla
+  ilgili bir mesaj yerine "hiçbir değişiklik yapılmadı, birkaç saniye sonra tekrar deneyin" diye reddedilir. Komutlar
+  istemci tarafından iptal edilmeden önce 60 saniye, açılıştaki işlemler (eski veritabanı yükseltmesi ve
+  migration'lar) beş dakika alır; böylece istemci, kilidin kendi bekleme süresinden önce vazgeçmez.
 
 ### Güvenlik
 
