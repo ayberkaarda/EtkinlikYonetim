@@ -16,7 +16,7 @@ public sealed class ListingTests
     {
         var participants = new ControlledParticipantService();
         var events = new ControlledEventService();
-        using var form = new KatilimciGoruntule(events, participants, Sessions.Admin);
+        using var form = new KatilimciGoruntule(events, participants, new ControlledExportService(), Sessions.Admin);
         var picker = Find<ComboBox>(form, "cmbEtkinlikSec");
         var list = Find<ListBox>(form, "lstKatilimcilar");
         picker.Items.Add(events.Events[0]);
@@ -38,7 +38,7 @@ public sealed class ListingTests
     {
         var participants = new ControlledParticipantService();
         var events = new ControlledEventService();
-        using var form = new KatilimciGoruntule(events, participants, Sessions.Admin);
+        using var form = new KatilimciGoruntule(events, participants, new ControlledExportService(), Sessions.Admin);
         var picker = Find<ComboBox>(form, "cmbEtkinlikSec");
         var list = Find<ListBox>(form, "lstKatilimcilar");
         picker.Items.Add(events.Events[0]);

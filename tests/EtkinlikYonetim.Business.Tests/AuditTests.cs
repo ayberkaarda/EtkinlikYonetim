@@ -56,6 +56,7 @@ public sealed class AuditTests
         { AuditEvent.TicketCheckedIn, 21, "ticket.checked_in" },
         { AuditEvent.TicketAlreadyUsed, 22, "ticket.already_used" },
         { AuditEvent.TicketRejected, 23, "ticket.rejected" },
+        { AuditEvent.ParticipantListExported, 24, "participant.list_exported" },
     };
 
     [Theory]

@@ -54,6 +54,14 @@ internal static class ServiceFactory
     public static CheckInService CheckIn(ITicketRepository tickets, TimeProvider time, IAuditLog? audit = null, ISessionGuard? sessions = null) =>
         new(tickets, time, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
 
+    public static Exports.ParticipantExportService Export(
+        IEventRepository events,
+        IParticipantRepository participants,
+        TimeProvider time,
+        IAuditLog? audit = null,
+        ISessionGuard? sessions = null) =>
+        new(events, participants, time, sessions ?? AcceptAllSessions.Instance, audit ?? NullAuditLog.Instance);
+
     /// <summary>The real guard over <paramref name="users"/>.</summary>
     public static SessionGuard Guard(IUserRepository users, IAuditLog? audit = null) => new(users, audit ?? NullAuditLog.Instance);
 

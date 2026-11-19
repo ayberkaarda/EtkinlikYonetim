@@ -102,17 +102,19 @@ internal sealed class ParticipantService(
         await sessions.RequireAdminAsync(session, audit, cancellationToken).ConfigureAwait(false);
 
         var rows = await participants.GetByEventAsync(eventId, cancellationToken).ConfigureAwait(false);
-        return rows
-            .Select(p => new ParticipantView(
-                string.IsNullOrWhiteSpace(p.FullName) ? UnknownName : p.FullName,
-                NationalIdNumber.Mask(p.NationalId),
-                string.IsNullOrWhiteSpace(p.Email) ? UnknownEmail : p.Email,
-                p.Status switch
-                {
-                    RegistrationStatus.Waiting => string.Create(CultureInfo.InvariantCulture, $"{WaitingPrefix}{p.QueuePosition}"),
-                    RegistrationStatus.EventCancelled => EventCancelled,
-                    _ => p.CheckedInAt is null ? NotCheckedIn : CheckedIn,
-                }))
-            .ToList();
+        return rows.Select(View).ToList();
     }
+
+    /// <summary>The admin's view of a registration: masked national id, filled in gaps and the state; never the ticket code.</summary>
+    internal static ParticipantView View(EventParticipant p) =>
+        new(
+            string.IsNullOrWhiteSpace(p.FullName) ? UnknownName : p.FullName,
+            NationalIdNumber.Mask(p.NationalId),
+            string.IsNullOrWhiteSpace(p.Email) ? UnknownEmail : p.Email,
+            p.Status switch
+            {
+                RegistrationStatus.Waiting => string.Create(CultureInfo.InvariantCulture, $"{WaitingPrefix}{p.QueuePosition}"),
+                RegistrationStatus.EventCancelled => EventCancelled,
+                _ => p.CheckedInAt is null ? NotCheckedIn : CheckedIn,
+            });
 }

@@ -27,7 +27,7 @@ public sealed class BrandingTests
         using var panel = new Form1(events, new NoFormsFactory(), Sessions.Admin);
         using var addParticipant = new KatilimciEkleForm(participants, new NoFormsFactory(), Sessions.User);
         using var register = new KayitEkleForm(events, registrations, Sessions.User);
-        using var listing = new KatilimciGoruntule(events, participants, Sessions.Admin);
+        using var listing = new KatilimciGoruntule(events, participants, new ControlledExportService(), Sessions.Admin);
         using var setup = new IlkKurulumForm(new PendingSetupService());
 
         foreach (Form form in new Form[] { signIn, signUp, panel, addParticipant, register, listing, setup })

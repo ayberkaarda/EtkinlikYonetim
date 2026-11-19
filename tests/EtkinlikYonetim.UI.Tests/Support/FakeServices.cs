@@ -1,4 +1,5 @@
 using EtkinlikYonetim.Business;
+using EtkinlikYonetim.Business.Exports;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.UI.Infrastructure;
@@ -235,6 +236,35 @@ internal sealed class ControlledCheckInService : ICheckInService
         var answer = new TaskCompletionSource<CheckInCount>();
         CountRequests.Add((eventId, answer));
         return answer.Task;
+    }
+}
+
+/// <summary>Exports stay pending until the test answers them.</summary>
+internal sealed class ControlledExportService : IParticipantExportService
+{
+    public List<(string Format, int EventId, TaskCompletionSource<ExportFile> Answer)> Requests { get; } = [];
+
+    public Task<ExportFile> ExportCsvAsync(UserSession session, int eventId, CancellationToken cancellationToken = default) => Request("csv", eventId);
+
+    public Task<ExportFile> ExportHtmlAsync(UserSession session, int eventId, CancellationToken cancellationToken = default) => Request("html", eventId);
+
+    private Task<ExportFile> Request(string format, int eventId)
+    {
+        var answer = new TaskCompletionSource<ExportFile>();
+        Requests.Add((format, eventId, answer));
+        return answer.Task;
+    }
+}
+
+/// <summary>Answers the save dialog with a fixed path (or a cancel) instead of showing it.</summary>
+internal sealed class FixedSavePrompt(string? path) : ISaveFilePrompt
+{
+    public List<(string SuggestedName, string Filter)> Questions { get; } = [];
+
+    public string? AskSavePath(string suggestedName, string filter)
+    {
+        Questions.Add((suggestedName, filter));
+        return path;
     }
 }
 

@@ -1,4 +1,5 @@
 using EtkinlikYonetim.Business.Auditing;
+using EtkinlikYonetim.Business.Exports;
 using EtkinlikYonetim.Business.Security;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Business.Validation;
@@ -40,6 +41,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IRegistrationService, RegistrationService>();
         services.AddSingleton<IAccountService, AccountService>();
         services.AddSingleton<ICheckInService, CheckInService>();
+        services.AddSingleton<IParticipantExportService, ParticipantExportService>();
         return services;
     }
 }
