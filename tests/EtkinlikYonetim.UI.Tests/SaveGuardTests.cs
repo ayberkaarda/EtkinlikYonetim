@@ -11,7 +11,7 @@ public sealed class SaveGuardTests
     public void SignIn_WhilePending_IsNotSentTwice() => Run(() =>
     {
         var auth = new PendingAuthService();
-        using var form = new GirisYapForm(auth, new NoFormsFactory());
+        using var form = new GirisYapForm(auth, new NoFormsFactory()) { OfferAdminSetup = true };
         Find<TextBox>(form, "txtKullaniciAdi").Text = "ornek";
         Find<TextBox>(form, "txtSifre").Text = "Demo.Kullanici1";
 
@@ -24,6 +24,8 @@ public sealed class SaveGuardTests
         Assert.Null(second.Result);
         Assert.False(Find<Control>(form, "btnGiris2").Enabled);
         Assert.False(Find<Button>(form, "btnkayitol").Enabled);
+        Assert.True(form.OfferAdminSetup);
+        Assert.False(Find<Button>(form, "btnKurulum").Enabled);
     });
 
     [Fact]

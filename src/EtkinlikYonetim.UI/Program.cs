@@ -41,11 +41,14 @@ namespace EtkinlikYonetim.UI
             using var serviceProvider = ConfigureServices(connectionString, options);
 
             bool setupRequired;
+            bool adminMissing;
             try
             {
                 // No synchronization context exists yet, so blocking here cannot deadlock.
                 serviceProvider.GetRequiredService<IDatabaseInitializer>().InitializeAsync().GetAwaiter().GetResult();
-                setupRequired = serviceProvider.GetRequiredService<ISetupService>().IsSetupRequiredAsync().GetAwaiter().GetResult();
+                var setupService = serviceProvider.GetRequiredService<ISetupService>();
+                setupRequired = setupService.IsSetupRequiredAsync().GetAwaiter().GetResult();
+                adminMissing = setupRequired || setupService.IsAdminMissingAsync().GetAwaiter().GetResult();
             }
 #pragma warning disable CA1031 // Startup boundary: report and exit instead of crashing.
             catch (Exception ex)
@@ -57,8 +60,9 @@ namespace EtkinlikYonetim.UI
 
             var formFactory = serviceProvider.GetRequiredService<IFormFactory>();
 
-            // While no admin exists the first one is created with a password of the installer's own
-            // choosing; there is no default account. Closing the setup ends the application.
+            // On an empty database the first admin is created with a password of the installer's own
+            // choosing; there is no default account. Closing the setup ends the application. A database
+            // with accounts but no admin keeps its sign-in, which offers the setup with the local setup key.
             if (setupRequired)
             {
                 using var setup = formFactory.Create<IlkKurulumForm>();
@@ -68,7 +72,9 @@ namespace EtkinlikYonetim.UI
                 }
             }
 
-            Application.Run(formFactory.Create<GirisYapForm>());
+            var signIn = formFactory.Create<GirisYapForm>();
+            signIn.OfferAdminSetup = adminMissing && !setupRequired;
+            Application.Run(signIn);
         }
 
         private static IConfiguration BuildConfiguration() =>

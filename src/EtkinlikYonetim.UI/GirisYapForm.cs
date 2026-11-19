@@ -31,6 +31,21 @@ namespace EtkinlikYonetim.UI
         }
 
         /// <summary>
+        /// Whether the database has accounts but no admin, so the sign-in offers the first-run setup.
+        /// That setup asks for the local setup key; having no admin alone grants nothing.
+        /// </summary>
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        public bool OfferAdminSetup
+        {
+            get => btnKurulum.Tag is true;
+            set
+            {
+                btnKurulum.Tag = value;
+                btnKurulum.Visible = value;
+            }
+        }
+
+        /// <summary>
         /// Signs the account in; ignored while a previous attempt is still running. Returns the session,
         /// or <see langword="null"/> when the attempt failed (the reason has been shown) or was ignored.
         /// </summary>
@@ -56,7 +71,8 @@ namespace EtkinlikYonetim.UI
                     }
                 },
                 btnGiris2,
-                btnkayitol);
+                btnkayitol,
+                btnKurulum);
             return session;
         }
 
@@ -106,6 +122,20 @@ namespace EtkinlikYonetim.UI
             using var register = _forms.Create<KayitOlForm>();
             register.StartPosition = FormStartPosition.CenterParent;
             register.ShowDialog(this);
+        }
+
+        private void btnKurulum_Click(object? sender, EventArgs e)
+        {
+            using var setup = _forms.Create<IlkKurulumForm>();
+            setup.RequireSetupKey = true;
+            setup.StartPosition = FormStartPosition.CenterParent;
+            if (setup.ShowDialog(this) == DialogResult.OK)
+            {
+                // The new admin signs in here with the password just chosen.
+                OfferAdminSetup = false;
+                txtKullaniciAdi.Text = setup.Session?.UserName ?? string.Empty;
+                txtSifre.Focus();
+            }
         }
 
         private void btnkapat_Click(object? sender, EventArgs e) => Close();

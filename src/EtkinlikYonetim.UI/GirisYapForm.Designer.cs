@@ -37,6 +37,7 @@
             this.btnAsagial = new System.Windows.Forms.Button();
             this.btnkayitol = new System.Windows.Forms.Button();
             this.btnGiris2 = new ReaLTaiizor.Controls.HopeButton();
+            this.btnKurulum = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // txtKullaniciAdi
@@ -149,13 +150,30 @@
             this.btnGiris2.TextColor = System.Drawing.Color.White;
             this.btnGiris2.WarningColor = System.Drawing.Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(162)))), ((int)(((byte)(60)))));
             this.btnGiris2.Click += new System.EventHandler(this.btnGiris2_Click);
-            // 
+            //
+            // btnKurulum
+            //
+            this.btnKurulum.BackColor = System.Drawing.Color.Transparent;
+            this.btnKurulum.FlatAppearance.BorderColor = System.Drawing.Color.White;
+            this.btnKurulum.FlatAppearance.BorderSize = 0;
+            this.btnKurulum.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnKurulum.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.btnKurulum.Location = new System.Drawing.Point(171, 272);
+            this.btnKurulum.Name = "btnKurulum";
+            this.btnKurulum.Size = new System.Drawing.Size(240, 25);
+            this.btnKurulum.TabIndex = 11;
+            this.btnKurulum.Text = "İlk yönetici hesabını oluştur";
+            this.btnKurulum.UseVisualStyleBackColor = false;
+            this.btnKurulum.Visible = false;
+            this.btnKurulum.Click += new System.EventHandler(this.btnKurulum_Click);
+            //
             // GirisYapForm
-            // 
+            //
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.ClientSize = new System.Drawing.Size(519, 304);
+            this.Controls.Add(this.btnKurulum);
             this.Controls.Add(this.btnGiris2);
             this.Controls.Add(this.btnkayitol);
             this.Controls.Add(this.btnAsagial);
@@ -187,5 +205,6 @@
         private System.Windows.Forms.Button btnAsagial;
         private System.Windows.Forms.Button btnkayitol;
         private ReaLTaiizor.Controls.HopeButton btnGiris2;
+        private System.Windows.Forms.Button btnKurulum;
     }
 }
