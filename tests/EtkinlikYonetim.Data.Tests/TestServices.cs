@@ -27,17 +27,29 @@ internal static class TestServices
     public const string NewNationalId = "10000000450";
 
     /// <summary>
-    /// Adds the business services with a fake clock and a cheaper password hash (new hashes only; the
-    /// seeded hashes keep their own iteration count).
+    /// Adds the business services with a fake clock, a cheaper password hash (new hashes only; the
+    /// seeded hashes keep their own iteration count) and a setup key kept in a new temporary folder
+    /// instead of the user's application data.
     /// </summary>
     public static IServiceCollection AddTestBusinessServices(this IServiceCollection services, FakeTimeProvider clock)
     {
         services.AddSingleton<TimeProvider>(clock);
         services.AddSingleton<IPasswordHasher>(new PasswordHasher(iterations: 1_000));
+        services.AddSingleton<ISetupKeyStore>(NewSetupKeyStore(clock));
         services.AddBusinessServices();
         return services;
     }
 
+    /// <summary>A setup key store in a new temporary folder, without an environment key.</summary>
+    public static FileSetupKeyStore NewSetupKeyStore(TimeProvider clock) =>
+        new(Path.Combine(Path.GetTempPath(), "etkinlik-tests", Guid.NewGuid().ToString("N")), null, clock);
+
+    /// <summary>Issues the setup key of <paramref name="provider"/> and returns it, as the installer reads it from the file.</summary>
+    public static string ReadSetupKey(IServiceProvider provider)
+    {
+        provider.GetRequiredService<ISetupService>().IssueSetupKey();
+        return File.ReadAllText(provider.GetRequiredService<ISetupKeyStore>().KeyFilePath!).Trim();
+    }
     public static UserSession User(int id) => new(id, "kullanici" + id, UserRole.User);
 
     public static UserSession Admin(int id) => new(id, "yonetici" + id, UserRole.Admin);

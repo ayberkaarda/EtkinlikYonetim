@@ -178,7 +178,7 @@ public sealed class SqlServerConcurrencyTests
 
             var results = await RaceAsync(
                 names,
-                name => providers[name[^1] % 2].GetRequiredService<ISetupService>().CreateFirstAdminAsync(name, "Gizli.Sifre1", "Gizli.Sifre1", ct),
+                name => providers[name[^1] % 2].GetRequiredService<ISetupService>().CreateFirstAdminAsync(null, name, "Gizli.Sifre1", "Gizli.Sifre1", ct),
                 ct);
 
             Assert.Single(results, r => r is null);

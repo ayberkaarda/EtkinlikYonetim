@@ -30,6 +30,8 @@ namespace EtkinlikYonetim.UI
         {
             this.lblBaslik = new System.Windows.Forms.Label();
             this.lblAciklama = new System.Windows.Forms.Label();
+            this.lblAnahtar = new System.Windows.Forms.Label();
+            this.txtAnahtar = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
             this.txtKullaniciAdi = new System.Windows.Forms.TextBox();
             this.label2 = new System.Windows.Forms.Label();
@@ -54,66 +56,83 @@ namespace EtkinlikYonetim.UI
             //
             this.lblAciklama.Location = new System.Drawing.Point(13, 42);
             this.lblAciklama.Name = "lblAciklama";
-            this.lblAciklama.Size = new System.Drawing.Size(392, 52);
+            this.lblAciklama.Size = new System.Drawing.Size(392, 84);
             this.lblAciklama.TabIndex = 1;
             this.lblAciklama.Text = "Henüz bir yönetici hesabı yok. İlk yönetici hesabını kendi belirleyeceğiniz bir şifreyle oluşturun.";
+            //
+            // lblAnahtar
+            //
+            this.lblAnahtar.AutoSize = true;
+            this.lblAnahtar.Location = new System.Drawing.Point(13, 135);
+            this.lblAnahtar.Name = "lblAnahtar";
+            this.lblAnahtar.Size = new System.Drawing.Size(99, 15);
+            this.lblAnahtar.TabIndex = 2;
+            this.lblAnahtar.Text = "Kurulum Anahtarı";
+            //
+            // txtAnahtar
+            //
+            this.txtAnahtar.Location = new System.Drawing.Point(140, 132);
+            this.txtAnahtar.Name = "txtAnahtar";
+            this.txtAnahtar.Size = new System.Drawing.Size(265, 23);
+            this.txtAnahtar.TabIndex = 3;
+            this.txtAnahtar.UseSystemPasswordChar = true;
             //
             // label1
             //
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(13, 103);
+            this.label1.Location = new System.Drawing.Point(13, 167);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(80, 15);
-            this.label1.TabIndex = 2;
+            this.label1.TabIndex = 4;
             this.label1.Text = "Kullanıcı Adı";
             //
             // txtKullaniciAdi
             //
-            this.txtKullaniciAdi.Location = new System.Drawing.Point(140, 100);
+            this.txtKullaniciAdi.Location = new System.Drawing.Point(140, 164);
             this.txtKullaniciAdi.Name = "txtKullaniciAdi";
             this.txtKullaniciAdi.Size = new System.Drawing.Size(265, 23);
-            this.txtKullaniciAdi.TabIndex = 3;
+            this.txtKullaniciAdi.TabIndex = 5;
             //
             // label2
             //
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(13, 135);
+            this.label2.Location = new System.Drawing.Point(13, 199);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(32, 15);
-            this.label2.TabIndex = 4;
+            this.label2.TabIndex = 6;
             this.label2.Text = "Şifre";
             //
             // txtSifre
             //
-            this.txtSifre.Location = new System.Drawing.Point(140, 132);
+            this.txtSifre.Location = new System.Drawing.Point(140, 196);
             this.txtSifre.Name = "txtSifre";
             this.txtSifre.Size = new System.Drawing.Size(265, 23);
-            this.txtSifre.TabIndex = 5;
+            this.txtSifre.TabIndex = 7;
             this.txtSifre.UseSystemPasswordChar = true;
             //
             // label3
             //
             this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(13, 167);
+            this.label3.Location = new System.Drawing.Point(13, 231);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(76, 15);
-            this.label3.TabIndex = 6;
+            this.label3.TabIndex = 8;
             this.label3.Text = "Şifre (Tekrar)";
             //
             // txtSifreTekrar
             //
-            this.txtSifreTekrar.Location = new System.Drawing.Point(140, 164);
+            this.txtSifreTekrar.Location = new System.Drawing.Point(140, 228);
             this.txtSifreTekrar.Name = "txtSifreTekrar";
             this.txtSifreTekrar.Size = new System.Drawing.Size(265, 23);
-            this.txtSifreTekrar.TabIndex = 7;
+            this.txtSifreTekrar.TabIndex = 9;
             this.txtSifreTekrar.UseSystemPasswordChar = true;
             //
             // btnOlustur
             //
-            this.btnOlustur.Location = new System.Drawing.Point(185, 204);
+            this.btnOlustur.Location = new System.Drawing.Point(185, 268);
             this.btnOlustur.Name = "btnOlustur";
             this.btnOlustur.Size = new System.Drawing.Size(120, 30);
-            this.btnOlustur.TabIndex = 8;
+            this.btnOlustur.TabIndex = 10;
             this.btnOlustur.Text = "Hesabı Oluştur";
             this.btnOlustur.UseVisualStyleBackColor = true;
             this.btnOlustur.Click += new System.EventHandler(this.btnOlustur_Click);
@@ -121,10 +140,10 @@ namespace EtkinlikYonetim.UI
             // btnIptal
             //
             this.btnIptal.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnIptal.Location = new System.Drawing.Point(311, 204);
+            this.btnIptal.Location = new System.Drawing.Point(311, 268);
             this.btnIptal.Name = "btnIptal";
             this.btnIptal.Size = new System.Drawing.Size(94, 30);
-            this.btnIptal.TabIndex = 9;
+            this.btnIptal.TabIndex = 11;
             this.btnIptal.Text = "İptal";
             this.btnIptal.UseVisualStyleBackColor = true;
             //
@@ -132,7 +151,7 @@ namespace EtkinlikYonetim.UI
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(420, 250);
+            this.ClientSize = new System.Drawing.Size(420, 314);
             this.Controls.Add(this.btnIptal);
             this.Controls.Add(this.btnOlustur);
             this.Controls.Add(this.txtSifreTekrar);
@@ -141,6 +160,8 @@ namespace EtkinlikYonetim.UI
             this.Controls.Add(this.label2);
             this.Controls.Add(this.txtKullaniciAdi);
             this.Controls.Add(this.label1);
+            this.Controls.Add(this.txtAnahtar);
+            this.Controls.Add(this.lblAnahtar);
             this.Controls.Add(this.lblAciklama);
             this.Controls.Add(this.lblBaslik);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
@@ -159,6 +180,8 @@ namespace EtkinlikYonetim.UI
 
         private System.Windows.Forms.Label lblBaslik;
         private System.Windows.Forms.Label lblAciklama;
+        private System.Windows.Forms.Label lblAnahtar;
+        private System.Windows.Forms.TextBox txtAnahtar;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.TextBox txtKullaniciAdi;
         private System.Windows.Forms.Label label2;

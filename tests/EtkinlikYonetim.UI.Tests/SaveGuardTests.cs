@@ -64,6 +64,30 @@ public sealed class SaveGuardTests
         Assert.False(Find<Button>(form, "btnIptal").Enabled);
     });
 
+    /// <summary>An empty database sends no key; a database without admins asks for it and shows only where it is.</summary>
+    [Fact]
+    public void FirstRunSetup_SetupKeyMode_SendsTheTypedKeyOnly() => Run(() =>
+    {
+        var setup = new PendingSetupService();
+        using var form = new IlkKurulumForm(setup) { Prompts = new RecordingPrompts() };
+        var emptyHeight = form.ClientSize.Height;
+        Find<TextBox>(form, "txtAnahtar").Text = "ABCDE-FGHJK";
+        Find<TextBox>(form, "txtKullaniciAdi").Text = "kurucu";
+        _ = form.CreateAsync();
+        Assert.Null(setup.LastSetupKey);
+
+        using var keyed = new IlkKurulumForm(setup) { Prompts = new RecordingPrompts(), RequireSetupKey = true };
+        Find<TextBox>(keyed, "txtAnahtar").Text = "ABCDE-FGHJK";
+        Find<TextBox>(keyed, "txtKullaniciAdi").Text = "kurucu";
+        _ = keyed.CreateAsync();
+
+        Assert.Equal("ABCDE-FGHJK", setup.LastSetupKey);
+        Assert.Contains(setup.IssueSetupKey()!, Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("ABCDE", Find<Label>(keyed, "lblAciklama").Text, StringComparison.Ordinal);
+        Assert.Equal(emptyHeight + 64, keyed.ClientSize.Height);
+        Assert.True(Find<TextBox>(keyed, "txtAnahtar").UseSystemPasswordChar);
+    });
+
     [Fact]
     public void CreateEvent_WhilePending_IsNotSentTwice() => Run(() =>
     {

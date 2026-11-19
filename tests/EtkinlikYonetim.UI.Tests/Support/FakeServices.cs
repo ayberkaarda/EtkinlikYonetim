@@ -46,14 +46,24 @@ internal sealed class PendingSetupService : ISetupService
 
     public int CreateCalls { get; private set; }
 
+    public string? LastSetupKey { get; private set; }
+
     public Task<bool> IsSetupRequiredAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
 
-    public Task<UserSession> CreateFirstAdminAsync(string? userName, string? password, string? passwordRepeat, CancellationToken cancellationToken = default)
+    public Task<bool> IsAdminMissingAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+    public string? IssueSetupKey() => @"C:\Kurulum\setup-key.txt";
+
+    public Task<UserSession> CreateFirstAdminAsync(string? setupKey, string? userName, string? password, string? passwordRepeat, CancellationToken cancellationToken = default)
     {
         CreateCalls++;
+        LastSetupKey = setupKey;
         _create = new TaskCompletionSource<UserSession>();
         return _create.Task;
     }
+
+    /// <summary>Completes the pending setup with a new admin session.</summary>
+    public void CompleteCreate() => _create.SetResult(new UserSession(1, "kurucu", UserRole.Admin));
 }
 
 /// <summary>Event listings answered at once; event creation stays pending.</summary>

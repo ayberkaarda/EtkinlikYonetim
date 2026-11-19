@@ -16,13 +16,19 @@ public interface IUserRepository
     /// <summary>Whether any account has the admin role.</summary>
     Task<bool> AnyAdminAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Whether any account exists, of any role.</summary>
+    Task<bool> AnyUserAsync(CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Stores <paramref name="admin"/> as the first admin account, only while no admin exists. The
-    /// check and the insert are one atomic step, so of concurrent setups exactly one succeeds.
+    /// check and the insert are one atomic step, so of concurrent setups exactly one succeeds. When the
+    /// database already has accounts, <paramref name="authorize"/> is the final decision about the
+    /// caller's right to create the first admin: it is called inside the write transaction, after the
+    /// checks found no admin and a free user name and while concurrent setups wait, and nothing is
+    /// written when it returns <see langword="false"/>. An empty database needs no authorization.
     /// </summary>
-    /// <returns>The new account id, or <see langword="null"/> when an admin already exists.</returns>
     /// <exception cref="DuplicateUserNameException">The user name is taken by another account.</exception>
-    Task<int?> AddFirstAdminAsync(User admin, CancellationToken cancellationToken = default);
+    Task<FirstAdminResult> AddFirstAdminAsync(User admin, Func<bool> authorize, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Counts a failed sign-in atomically. When the count reaches <paramref name="maxAttempts"/> the
@@ -47,6 +53,22 @@ public interface IUserRepository
         string? newPasswordHash,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>Outcome of <see cref="IUserRepository.AddFirstAdminAsync"/>.</summary>
+public enum FirstAdminStatus
+{
+    /// <summary>The admin was stored; its id is in <see cref="FirstAdminResult.AdminId"/>.</summary>
+    Created = 0,
+
+    /// <summary>An admin existed already; nothing was written.</summary>
+    AdminExists = 1,
+
+    /// <summary>The database has accounts and the authorization was refused; nothing was written.</summary>
+    NotAuthorized = 2,
+}
+
+/// <summary>Result of an attempt to store the first admin.</summary>
+public readonly record struct FirstAdminResult(FirstAdminStatus Status, int AdminId);
 
 /// <summary>Raised when a user name is already registered.</summary>
 public sealed class DuplicateUserNameException : Exception

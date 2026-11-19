@@ -328,7 +328,7 @@ public sealed class LegacyUpgradeTests
         await using (var plain = database.BuildServices())
         {
             await plain.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
-            await plain.GetRequiredService<ISetupService>().CreateFirstAdminAsync("kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct);
+            await plain.GetRequiredService<ISetupService>().CreateFirstAdminAsync(null, "kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct);
         }
 
         await using var provider = database.BuildServices(demo: true);

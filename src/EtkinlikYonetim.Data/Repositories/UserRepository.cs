@@ -69,21 +69,46 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return await db.Users.AnyAsync(u => u.Role == UserRole.Admin, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<int?> AddFirstAdminAsync(User admin, CancellationToken cancellationToken = default)
+    public async Task<bool> AnyUserAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await db.Users.AnyAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<FirstAdminResult> AddFirstAdminAsync(User admin, Func<bool> authorize, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(admin);
+        ArgumentNullException.ThrowIfNull(authorize);
 
         try
         {
             await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-            // Serializable: the admin check holds a range lock until the commit, so two concurrent
-            // setups can never both insert. On SQL Server the check takes an update lock, which a second
-            // setup has to wait for, so the loser sees the winner's row instead of becoming a deadlock victim.
+            // Serializable: the account check holds a range lock on the whole table until the commit, so
+            // two concurrent setups can never both insert and no account can appear between the check and
+            // the insert. On SQL Server the check takes an update lock, which a second setup has to wait
+            // for, so the loser sees the winner's row instead of becoming a deadlock victim.
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
-            if (await AnyAdminLockedAsync(db, cancellationToken).ConfigureAwait(false))
+            var state = await AccountStateLockedAsync(db, cancellationToken).ConfigureAwait(false);
+            if (state == AccountState.AdminExists)
             {
-                return null;
+                return new FirstAdminResult(FirstAdminStatus.AdminExists, 0);
+            }
+
+            if (state == AccountState.UsersOnly)
+            {
+                // A taken name is refused before the authority is asked, so it does not use up the key.
+                var name = admin.UserName;
+                if (await db.Users.AnyAsync(u => u.UserName == name, cancellationToken).ConfigureAwait(false))
+                {
+                    throw new DuplicateUserNameException("The user name is already registered.");
+                }
+
+                // Decided while the lock is held: only the setup that gets here first can use the authority.
+                if (!authorize())
+                {
+                    return new FirstAdminResult(FirstAdminStatus.NotAuthorized, 0);
+                }
             }
 
             var entity = new User
@@ -96,7 +121,7 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
             db.Users.Add(entity);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return entity.Id;
+            return new FirstAdminResult(FirstAdminStatus.Created, entity.Id);
         }
         catch (Exception ex) when (ex is DbUpdateException or DbException || ex.InnerException is DbUpdateException or DbException)
         {
@@ -104,7 +129,7 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
             // the unique index rejected a name that another account already has.
             if (await AnyAdminAsync(CancellationToken.None).ConfigureAwait(false))
             {
-                return null;
+                return new FirstAdminResult(FirstAdminStatus.AdminExists, 0);
             }
 
             if (await UserNameExistsAsync(admin.UserName, CancellationToken.None).ConfigureAwait(false))
@@ -166,19 +191,33 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return updated == 1;
     }
 
-    private static async Task<bool> AnyAdminLockedAsync(EventDbContext db, CancellationToken cancellationToken)
+    /// <summary>Reads whether the table is empty, has accounts only or has an admin, locking all of it until the commit.</summary>
+    private static async Task<AccountState> AccountStateLockedAsync(EventDbContext db, CancellationToken cancellationToken)
     {
         if (!db.Database.IsSqlServer())
         {
-            return await db.Users.AnyAsync(u => u.Role == UserRole.Admin, cancellationToken).ConfigureAwait(false);
+            if (await db.Users.AnyAsync(u => u.Role == UserRole.Admin, cancellationToken).ConfigureAwait(false))
+            {
+                return AccountState.AdminExists;
+            }
+
+            return await db.Users.AnyAsync(cancellationToken).ConfigureAwait(false) ? AccountState.UsersOnly : AccountState.Empty;
         }
 
+        // One scan of the whole table under UPDLOCK and HOLDLOCK: 0 empty, 1 accounts only, 2 an admin.
 #pragma warning disable EF1002 // Constant statement without any input.
-        var count = await db.Database
-            .SqlQueryRaw<int>("SELECT COUNT(*) AS [Value] FROM dbo.Kullanicilar WITH (UPDLOCK, HOLDLOCK) WHERE Rol = N'Admin'")
+        var state = await db.Database
+            .SqlQueryRaw<int>("SELECT ISNULL(MAX(CASE WHEN Rol = N'Admin' THEN 2 ELSE 1 END), 0) AS [Value] FROM dbo.Kullanicilar WITH (UPDLOCK, HOLDLOCK)")
             .SingleAsync(cancellationToken)
             .ConfigureAwait(false);
 #pragma warning restore EF1002
-        return count > 0;
+        return (AccountState)state;
+    }
+
+    private enum AccountState
+    {
+        Empty = 0,
+        UsersOnly = 1,
+        AdminExists = 2,
     }
 }
