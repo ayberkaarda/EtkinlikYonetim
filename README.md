@@ -10,7 +10,7 @@ Data and UI layers; database access uses EF Core, and the database is created an
 startup.
 
 > The application's user interface is in Turkish. Screen and button names below are given with their Turkish
-> labels followed by an English translation, e.g. "Etkinlik Ekle" (Add Event).
+> labels followed by an English translation, e.g. "Etkinliği ekle" (Add event).
 
 ---
 
@@ -18,53 +18,55 @@ startup.
 
 ### Accounts
 
-- ✅ **Sign-up** ("Kayıt Ol", Sign Up): a user name of letters only (at most 32 characters) and a password of
-  8-64 characters, typed twice ("Şifre (Tekrar)", Password (Again)). New accounts get the user role.
-- ✅ **Sign-in** ("Giriş", Sign In) with the user name and the password ("Kullanıcı Adı", "Şifre"). Admins open
+- ✅ **Sign-up** ("Kayıt ol", Sign up): a user name of letters only (at most 32 characters) and a password of
+  8-64 characters, typed twice ("Şifre tekrar", Password again). New accounts get the user role.
+- ✅ **Sign-in** ("Giriş yap", Sign in) with the user name and the password ("Kullanıcı adı", "Şifre"). Admins open
   the admin panel, users the participant screen.
-- ✅ **First-run setup** ("İlk Kurulum", First-Run Setup): on an empty database the first admin is created with a
+- ✅ **Sign-out** ("Oturumu kapat", Sign out) on the admin panel and on a user's main screen returns to the
+  sign-in, which says why the session ended; closing the window ends the application.
+- ✅ **First-run setup** ("İlk kurulum", First-run setup): on an empty database the first admin is created with a
   password of the installer's own choosing; there is no default account and no published password.
 
 ### User panel
 
-- ✅ **Add a participant** ("Katılımcı Ekle", Add Participant): national identity number ("TC Kimlik No"), full name
-  ("Ad Soyad") and e-mail ("E-posta"). The national id is checked for 11 digits and its checksum; the name may
+- ✅ **Add a participant** ("Katılımcı ekle", Add participant): national identity number ("T.C. kimlik no"), full name
+  ("Ad soyad") and e-mail ("E-posta"). The national id is checked for 11 digits and its checksum; the name may
   contain letters and single spaces (at most 64 characters). A participant belongs to the account that added it,
   and a national id can be added only once per account.
-- ✅ **Register for an event** ("Kayıt Ekle", Add Registration): choose an event that has not passed ("Etkinlik
-  Seçimi", Event Selection) and enter the participant's national id ("Katılımcı TC Kimlik Numarası"). A ticket code
+- ✅ **Register for an event** ("Kayıtlar ve biletler", Registrations and tickets): choose an event that has not passed
+  ("Etkinlik", Event) and enter the participant's national id ("Katılımcının T.C. kimlik no"). A ticket code
   of 130 random bits (`ETK-` and 26 characters) is issued with every seat. A participant can be registered for
   several events.
 - ✅ **Waiting list**: when an event is full the participant joins its waiting list with a queue number instead
   of being refused. When a seat is cancelled, the first one waiting moves up to it at once and gets a ticket.
-- ✅ **My registrations and tickets** ("Kayıtlarım ve Biletlerim", My Registrations and Tickets): the seats and
+- ✅ **My registrations and tickets** ("Kayıtlarım", My registrations): the seats and
   waiting places of the account's own participants, and registrations closed because their event was cancelled
-  ("Etkinlik iptal edildi", Event cancelled). Seats and waiting places can be cancelled ("Kaydı İptal Et", Cancel
-  Registration) up to and including the event day, unless the ticket has already been scanned at the entrance.
-- ✅ **Show the ticket** ("Bileti Göster", Show Ticket): the QR code and the code of a seat, as often as needed.
+  ("Etkinlik iptal edildi", Event cancelled). Seats and waiting places can be cancelled ("Kaydı iptal et", Cancel
+  registration) up to and including the event day, unless the ticket has already been scanned at the entrance.
+- ✅ **Show the ticket** ("Bileti göster", Show ticket): the QR code and the code of a seat, as often as needed.
 
 ### Admin panel
 
-- ✅ **Create an event** ("Etkinlik Ekle", Add Event): name ("Etkinlik Adı", at most 80 characters), date (today or
-  later) and capacity ("Kişi Kapasitesi", 1-1000 seats).
-- ✅ **Event management** ("Etkinlik Yönetimi", Event Management): change the date, capacity and description of an
+- ✅ **Create an event** ("Etkinliği ekle", Add event): name ("Etkinlik adı", at most 80 characters), date (today or
+  later) and capacity ("Kapasite", 1-1000 seats).
+- ✅ **Event management** ("Etkinlik yönetimi", Event management): change the date, capacity and description of an
   event that has not passed; the capacity cannot go below the seats held, and added seats go to the waiting list.
   A save over another admin's change made after the form was loaded is refused and the current values are shown.
-  Cancelling an event ("Etkinliği İptal Et", Cancel Event) keeps it listed as cancelled and closes its
+  Cancelling an event ("Etkinliği iptal et", Cancel event) keeps it listed as cancelled and closes its
   registrations and waiting places (soft delete).
-- ✅ **Add participants** ("Katılımcı Ekleme") and **issue tickets** ("Bilet Oluştur", Create Ticket) for the
+- ✅ **Add participants** ("Katılımcı ekle") and **issue tickets** ("Kayıt ve bilet", Registration and ticket) for the
   participants of every account; an admin sees and cancels every registration, but sees the ticket codes only of
   the participants it added.
-- ✅ **Entrance check-in** ("Bilet Kontrol", Ticket Check): choose the event and type or scan ticket codes. A valid
+- ✅ **Entrance check-in** ("Giriş kontrolü", Entrance check): choose the event and type or scan ticket codes. A valid
   unused ticket is checked in ("GİRİŞ YAPILDI"), a second scan says "ZATEN KULLANILDI" (already used) on the same
   screen, and unknown or cancelled tickets and those of other events get one refusal ("GEÇERSİZ BİLET"); a counter
   shows the check-ins against the seats. A check-in shows the participant's name to compare with an identity
   document, tickets are used only on the event's day ("ETKİNLİK GÜNÜ DEĞİL" otherwise, and the ticket stays
   valid), and the code field stays open so a scanner can read the next ticket while one is being checked.
-- ✅ **Participant list** ("Katılımcı Görüntüle", View Participants): the participants of a chosen event ("Etkinlik
-  Seçin", Select Event) with name, masked national id, e-mail and state (checked in, waiting, cancelled), saved as
-  CSV ("CSV Olarak Kaydet") or as a printable HTML page ("Yazdırılabilir Liste"). Exports contain no ticket codes.
-- ✅ **Accounts** ("Kullanıcılar", Users): enable or disable accounts and make them admins or users. An admin
+- ✅ **Participant list** ("Katılımcı listesi", Participant list): the participants of a chosen event ("Etkinlik",
+  Event) with name, masked national id, e-mail and state (checked in, waiting, cancelled), saved as
+  CSV ("CSV olarak kaydet") or as a printable HTML page ("Yazdırılabilir liste"). Exports contain no ticket codes.
+- ✅ **Accounts** ("Hesaplar", Accounts): enable or disable accounts and make them admins or users. An admin
   cannot change their own account, and the last enabled admin is kept.
 
 ### Rules and protection
@@ -102,25 +104,32 @@ startup.
 
 ## 🖼️ Screenshots
 
-These images show the screens of the original application; they will be replaced by the design update.
+The screens are drawn offscreen from an invented event season (made-up people and accounts, example.com addresses,
+masked national ids and a visibly sample ticket code), so they show no real data. Each image links to its 2x
+version. To draw them again: `dotnet run --project tools/Screenshots -c Release -- screenshots`.
 
-### Sign-in ("Giriş Yap")
-![Sign-in](screenshots/login.png)
+| | |
+|---|---|
+| [![Sign-in](screenshots/giris.png)](screenshots/giris-2x.png)<br>**Sign-in** ("Giriş yap") with the brand panel | [![Sign-up](screenshots/kayit-ol.png)](screenshots/kayit-ol-2x.png)<br>**Sign-up** ("Kayıt ol") |
+| [![First-run setup](screenshots/ilk-kurulum.png)](screenshots/ilk-kurulum-2x.png)<br>**First-run setup** ("İlk kurulum") on an empty database | [![Admin panel](screenshots/yonetim-paneli.png)](screenshots/yonetim-paneli-2x.png)<br>**Admin panel** ("Yönetim paneli"): a new event, the season with its seats, shortcuts |
+| [![Add participant](screenshots/katilimci-ekle.png)](screenshots/katilimci-ekle-2x.png)<br>**Add participant** ("Katılımcı ekle"), the main screen of a user | [![Registrations and tickets](screenshots/kayitlar-ve-biletler.png)](screenshots/kayitlar-ve-biletler-2x.png)<br>**Registrations and tickets** ("Kayıtlar ve biletler") after a place on the waiting list |
+| [![Ticket](screenshots/bilet.png)](screenshots/bilet-2x.png)<br>**Ticket** ("Bilet") with its QR code | [![Entrance check-in](screenshots/giris-kontrolu.png)](screenshots/giris-kontrolu-2x.png)<br>**Entrance check-in** ("Giriş kontrolü") right after a scan |
+| [![Participant list](screenshots/katilimci-listesi.png)](screenshots/katilimci-listesi-2x.png)<br>**Participant list** ("Katılımcı listesi") with CSV and HTML export | [![Event management](screenshots/etkinlik-yonetimi.png)](screenshots/etkinlik-yonetimi-2x.png)<br>**Event management** ("Etkinlik yönetimi") |
+| [![Accounts](screenshots/hesaplar.png)](screenshots/hesaplar-2x.png)<br>**Accounts** ("Hesaplar") | [![Confirmation](screenshots/onay-penceresi.png)](screenshots/onay-penceresi-2x.png)<br>**Confirmation** ("Onay") before an event is cancelled |
 
-### Sign-up ("Kayıt Ol")
-![Sign-up](screenshots/user_register.png)
+### Design
 
-### Event registration ("Kayıt Ekle")
-![Event registration](screenshots/event_register.png)
-
-### Admin panel ("Yönetim Paneli")
-![Admin panel](screenshots/admin_panel.png)
-
-### Participant list ("Katılımcı Görüntüle")
-![Participant list](screenshots/shows_members.png)
+- **Identity:** an original logo (an admission ticket with a magenta stub and a check mark on a cobalt tile,
+  `assets/logo.svg`), a cobalt accent with a magenta spotlight mark on cool ink-grey neutrals, Bahnschrift SemiBold
+  headings (Segoe UI Semibold where it is missing) and Segoe UI body text. No third-party brand is used.
+- **Themes:** light (default), dark and Windows high contrast. `Appearance:Theme` in `appsettings.json` takes
+  `Light`, `Dark` or `System` (follows the Windows app mode); high contrast always wins and uses the system colours.
+  Open windows follow a change of the contrast or app mode while the application runs.
+- **Layout:** every screen shares one frame (header, inline message strip, scrolling body, footer with the actions),
+  is per-monitor DPI aware and opens no larger than the working area of its screen. Results and rule refusals are
+  shown inside the window; only questions open a themed message window.
 
 ---
-
 ## 🔑 Permission Matrix
 
 | Action | User | Admin |
@@ -148,7 +157,7 @@ These images show the screens of the original application; they will be replaced
 | Area | Used |
 |---|---|
 | Platform | .NET 10 (`net10.0-windows` UI, `net10.0` libraries) |
-| UI | Windows Forms |
+| UI | Windows Forms, own theming (light, dark, high contrast), per-monitor DPI |
 | Data access | Entity Framework Core 10 (SQL Server provider) |
 | Database | Microsoft SQL Server (Express is enough) |
 | Password hashing | PBKDF2-HMAC-SHA256 (`Rfc2898DeriveBytes.Pbkdf2`) |
@@ -169,12 +178,13 @@ EtkinlikYonetim/
 │   ├── EtkinlikYonetim.Domain/     # Entities (User, Event, Participant, Registration, SetupKey) and repository contracts
 │   ├── EtkinlikYonetim.Business/   # Auth, setup, account, event, participant, registration and check-in services, Exports/ (CSV, HTML), Security/ (PBKDF2, lockout, setup keys), Validation/ (FluentValidation), Auditing/
 │   ├── EtkinlikYonetim.Data/       # EF Core DbContext, configurations, Migrations/, legacy upgrade, demo data, repositories
-│   └── EtkinlikYonetim.UI/         # WinForms screens, Infrastructure/ (errors, logging, dialogs, write guard, session end, QR codes, export files), Program.cs (composition root)
+│   └── EtkinlikYonetim.UI/         # WinForms screens, Theming/ (palettes, type ramp, painted controls, theme watcher), Infrastructure/ (screen frame, layout, message dialog, errors, logging, write guard, session end, QR codes, export files), Program.cs (composition root)
 ├── tests/
 │   ├── EtkinlikYonetim.Business.Tests/  # Validators, national id, hashing, lockout, capacity, dates and ownership (Moq)
 │   ├── EtkinlikYonetim.Data.Tests/      # Services on SQLite; races, setup keys and the legacy upgrade on SQL Server
-│   └── EtkinlikYonetim.UI.Tests/        # Configuration, errors, logs, focus and write guards (no windows shown)
-├── assets/                         # Original logo, background and icon with their SVG sources
+│   └── EtkinlikYonetim.UI.Tests/        # Screens, layout on small screens and with large text, themes, configuration, errors, logs, focus and write guards (no windows shown)
+├── assets/                         # Original logo (logo.svg) with the icon and PNG rasterized from it
+├── tools/Screenshots/              # Offscreen screenshots and the icon tool (no window is shown)
 ├── docs/
 │   ├── issue-setup-key.sql         # Setup key, run by the database owner
 │   ├── grant-app-login.sql         # Rights of the application's own login
@@ -228,9 +238,14 @@ Provide a connection string named `EtkinlikYonetim`. Any of the following works 
      },
      "Seed": {
        "Demo": false
+     },
+     "Appearance": {
+       "Theme": "Light"
      }
    }
    ```
+
+   `Appearance:Theme` is `Light` (default), `Dark` or `System`; Windows high contrast always takes precedence.
 
 2. **User secrets**:
 
@@ -382,7 +397,7 @@ dotnet test -c Release
 |---|---|---|
 | `tests/EtkinlikYonetim.Business.Tests` | Unit | Validator limits (user name 32, password 8/64 and 100 at sign-in, name 64, event name 80, capacity 0/1/1000/1001, description 500, past dates), national id checksum, PBKDF2 and format upgrade, lockout, setup key checks, database checked sessions, account rules, ticket codes and check-in outcomes, CSV and HTML exports, ownership and audit events with strict Moq mocks |
 | `tests/EtkinlikYonetim.Data.Tests` | Integration | Services and repositories on SQLite in-memory (capacity limits, waiting list order, cancellation and registering again, event changes and cancellation, check-in, exports, demoted and disabled sessions, IDOR answers, lockout timing); capacity, waiting list, duplicate, check-in, account, lockout and first-admin races, setup keys with the restricted login, the migrations, the legacy upgrade and its lock on SQL Server |
-| `tests/EtkinlikYonetim.UI.Tests` | Unit | Example configuration, error messages, log content, neutral codes and retention, focus after unlock, write guards, latest-wins loading, event management, entrance and account windows, ticket QR view, export files, session end, neutral branding |
+| `tests/EtkinlikYonetim.UI.Tests` | Unit | Every screen built without being shown: theme, layout on 1024x600, 1366x768 and 1920x1040 working areas at text scales 1-2, tab order, inline messages, palettes and contrast, live high contrast switch; example configuration, error messages, log content, focus after unlock, write guards, latest-wins loading, event management, entrance and account windows, ticket QR view, export files, session end, neutral branding |
 
 The SQL Server tests use throw-away databases on the server in `ETKINLIK_TEST_SQLSERVER` (default: local SQL
 Express with Windows authentication). They are skipped when `ETKINLIK_SKIP_SQL_TESTS=1` is set or no server is
@@ -395,7 +410,7 @@ $env:ETKINLIK_SKIP_SQL_TESTS = "1"; dotnet test -c Release
 ```
 
 On SQLite the schema is created from the model instead of migrations. The UI tests create forms without showing
-them, replace every message box and run serially, so no window opens.
+them, replace every message window and run serially, so no window opens.
 
 ---
 
@@ -431,8 +446,12 @@ The target machine needs the .NET 10 Desktop Runtime. Put `appsettings.json` nex
 - Validators live in `EtkinlikYonetim.Business/Validation` and stop at the first failure, so the user sees one
   message at a time.
 - New write buttons should go through `ExclusiveOperation` and move the focus with `FocusAfterUnlock`; loads
-  triggered by a selection should use `RequestSequence` so only the latest response is shown. Message boxes go
-  through `Dialogs` or `IUserPrompts`, never `MessageBox` directly.
+  triggered by a selection should use `RequestSequence` so only the latest response is shown. Results and rule
+  refusals go to the screen's message strip through `IUserPrompts`; questions go through `Dialogs` (the themed
+  `MessageDialog`), never `MessageBox` directly.
+- New screens derive from `AppDialog`, build their layout with `FormLayout` and the themed controls, and finish
+  with `FinishLayout()`; colours come from the palette roles only. `LayoutTests` and `ScreenTests` check them on
+  small screens and with large text.
 - Audit events carry only an event kind and a role; do not add identifying data to them.
 
 ---
