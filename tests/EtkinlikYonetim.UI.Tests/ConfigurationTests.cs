@@ -51,4 +51,36 @@ public sealed class ConfigurationTests
 
         Assert.Equal("Server=from-file;", AppConfiguration.ResolveConnectionString(configuration));
     }
+
+    [Theory]
+    [InlineData(null, null, false)]
+    [InlineData("0", null, false)]
+    [InlineData("evet", null, false)]
+    [InlineData(null, "false", false)]
+    [InlineData("1", null, true)]
+    [InlineData(" TRUE ", null, true)]
+    [InlineData(null, "true", true)]
+    public void DemoData_IsOnlyUsedWhenAskedForExplicitly(string? environment, string? setting, bool expected)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [DataServiceCollectionExtensions.DemoEnvironmentVariable] = environment,
+                [AppConfiguration.DemoSettingKey] = setting,
+            })
+            .Build();
+
+        Assert.Equal("ETKINLIK_DEMO", DataServiceCollectionExtensions.DemoEnvironmentVariable);
+        Assert.Equal(expected, AppConfiguration.IsDemoRequested(configuration));
+    }
+
+    [Fact]
+    public void ExampleConfiguration_LeavesDemoDataOff()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddSettingsFile(AppContext.BaseDirectory, ExampleFileName)
+            .Build();
+
+        Assert.False(AppConfiguration.IsDemoRequested(configuration));
+    }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using EtkinlikYonetim.Data.Persistence;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -52,12 +53,13 @@ internal sealed class SqlServerTestDatabase : IAsyncDisposable
 
     /// <summary>
     /// The application's services on this database. Each provider has its own connection pool, so
-    /// two providers behave like two application instances.
+    /// two providers behave like two application instances. <paramref name="demo"/> turns the
+    /// demonstration data on, as ETKINLIK_DEMO=1 does for the application.
     /// </summary>
-    public ServiceProvider BuildServices(Action<IServiceCollection>? configure = null)
+    public ServiceProvider BuildServices(Action<IServiceCollection>? configure = null, bool demo = false)
     {
         var services = new ServiceCollection();
-        services.AddSqlServerDataAccess(ConnectionString);
+        services.AddSqlServerDataAccess(ConnectionString, new DataAccessOptions { SeedDemoData = demo });
         services.AddTestBusinessServices(Clock);
         configure?.Invoke(services);
         return services.BuildServiceProvider();

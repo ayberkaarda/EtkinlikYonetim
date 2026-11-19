@@ -45,6 +45,26 @@ public sealed class SaveGuardTests
     });
 
     [Fact]
+    public void FirstRunSetup_WhilePending_IsNotSentTwice() => Run(() =>
+    {
+        var setup = new PendingSetupService();
+        using var form = new IlkKurulumForm(setup) { Prompts = new RecordingPrompts() };
+        Find<TextBox>(form, "txtKullaniciAdi").Text = "kurucu";
+        Find<TextBox>(form, "txtSifre").Text = "Gizli.Sifre1";
+        Find<TextBox>(form, "txtSifreTekrar").Text = "Gizli.Sifre1";
+
+        var first = form.CreateAsync();
+        var second = form.CreateAsync();
+
+        Assert.Equal(1, setup.CreateCalls);
+        Assert.False(first.IsCompleted);
+        Assert.True(second.IsCompletedSuccessfully);
+        Assert.Null(second.Result);
+        Assert.False(Find<Button>(form, "btnOlustur").Enabled);
+        Assert.False(Find<Button>(form, "btnIptal").Enabled);
+    });
+
+    [Fact]
     public void CreateEvent_WhilePending_IsNotSentTwice() => Run(() =>
     {
         var events = new ControlledEventService();

@@ -28,8 +28,9 @@ public sealed class BrandingTests
         using var addParticipant = new KatilimciEkleForm(participants, new NoFormsFactory(), Sessions.User);
         using var register = new KayitEkleForm(events, registrations, Sessions.User);
         using var listing = new KatilimciGoruntule(events, participants, Sessions.Admin);
+        using var setup = new IlkKurulumForm(new PendingSetupService());
 
-        foreach (Form form in new Form[] { signIn, signUp, panel, addParticipant, register, listing })
+        foreach (Form form in new Form[] { signIn, signUp, panel, addParticipant, register, listing, setup })
         {
             Assert.StartsWith(AppText.Title + " - ", form.Text, StringComparison.Ordinal);
             Assert.Same(AppAssets.Icon, form.Icon);
@@ -75,6 +76,10 @@ public sealed class BrandingTests
         Assert.Equal(PasswordPolicy.SignInMaxLength, Find<TextBox>(signIn, "txtSifre").MaxLength);
         Assert.Equal(PasswordPolicy.MaxLength, Find<TextBox>(signUp, "txtSifre").MaxLength);
         Assert.Equal(InputRules.UserNameMaxLength, Find<TextBox>(signUp, "txtKullaniciAdi").MaxLength);
+        using var setup = new IlkKurulumForm(new PendingSetupService());
+        Assert.Equal(InputRules.UserNameMaxLength, Find<TextBox>(setup, "txtKullaniciAdi").MaxLength);
+        Assert.Equal(PasswordPolicy.MaxLength, Find<TextBox>(setup, "txtSifre").MaxLength);
+        Assert.Equal(PasswordPolicy.MaxLength, Find<TextBox>(setup, "txtSifreTekrar").MaxLength);
         Assert.Equal(NationalIdNumber.Length, Find<TextBox>(addParticipant, "txtTC").MaxLength);
         Assert.Equal(InputRules.PersonNameMaxLength, Find<TextBox>(addParticipant, "txtAdSoyad").MaxLength);
     });

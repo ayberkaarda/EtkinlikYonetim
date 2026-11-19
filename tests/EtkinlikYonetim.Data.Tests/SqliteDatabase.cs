@@ -9,9 +9,11 @@ namespace EtkinlikYonetim.Data.Tests;
 /// <summary>
 /// A private SQLite in-memory database wired through the application's own registrations.
 /// The connection stays open for the lifetime of the instance, which keeps the database alive.
-/// The schema and sample data come from the EF Core model (2 users, 3 events, 3 participants, no registrations).
+/// The schema comes from the EF Core model. With <c>demo</c> on (the default for these tests) the
+/// demonstration data is added as with ETKINLIK_DEMO=1 (2 users, 3 events, 3 participants, no
+/// registrations); without it the database is empty, as in a default installation.
 /// </summary>
-public sealed class SqliteDatabase : IAsyncLifetime
+public sealed class SqliteDatabase(bool demo = true) : IAsyncLifetime
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
     private ServiceProvider? _provider;
@@ -31,7 +33,7 @@ public sealed class SqliteDatabase : IAsyncLifetime
         await _connection.OpenAsync();
 
         var services = new ServiceCollection();
-        services.AddDataAccess(options => options.UseSqlite(_connection));
+        services.AddDataAccess(options => options.UseSqlite(_connection), new DataAccessOptions { SeedDemoData = demo });
         services.AddTestBusinessServices(Clock);
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
 

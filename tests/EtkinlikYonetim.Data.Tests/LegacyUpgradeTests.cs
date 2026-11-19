@@ -199,13 +199,38 @@ public sealed class LegacyUpgradeTests
         Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM sys.default_constraints", ct));
     }
 
+    /// <summary>
+    /// A default installation contains no account at all, so no documented or shared password can
+    /// open it; the first admin is created by the first-run setup with a password of its own.
+    /// </summary>
     [Fact]
-    public async Task Initialize_EmptyDatabase_AppliesMigrationWithFictionalSampleData()
+    public async Task Initialize_DefaultConfiguration_DoesNotCreateDemoCredentials()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
 
         await using var provider = database.BuildServices();
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+
+        var auth = provider.GetRequiredService<IAuthService>();
+        await Assert.ThrowsAsync<BusinessRuleException>(() => auth.SignInAsync("admin", "Demo.Admin1", ct));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => auth.SignInAsync("ornek", "Demo.Kullanici1", ct));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar", ct));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Etkinlikler", ct));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Katilimcilar", ct));
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.__EFMigrationsHistory WHERE MigrationId LIKE N'%_InitialCreate'", ct));
+        await AssertUpgradedSchemaAsync(database, ct);
+    }
+
+    [Fact]
+    public async Task Initialize_DemoRequested_AddsFictionalSampleDataOnce()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+
+        await using var provider = database.BuildServices(demo: true);
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
         await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
 
         var session = await provider.GetRequiredService<IAuthService>().SignInAsync("admin", "Demo.Admin1", ct);
@@ -214,7 +239,28 @@ public sealed class LegacyUpgradeTests
         Assert.Equal(3, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Etkinlikler WHERE KayitSayisi = 0", ct));
         Assert.Equal(3, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Katilimcilar", ct));
         Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kayitlar", ct));
+        Assert.False(await provider.GetRequiredService<ISetupService>().IsSetupRequiredAsync(ct));
         await AssertUpgradedSchemaAsync(database, ct);
+    }
+
+    /// <summary>The demo switch never adds its accounts to a database that already has data.</summary>
+    [Fact]
+    public async Task Initialize_DemoRequested_LeavesADatabaseWithDataAlone()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var database = await SqlServerTestDatabase.ReserveAsync(ct);
+        await using (var plain = database.BuildServices())
+        {
+            await plain.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+            await plain.GetRequiredService<ISetupService>().CreateFirstAdminAsync("kurucu", "Gizli.Sifre1", "Gizli.Sifre1", ct);
+        }
+
+        await using var provider = database.BuildServices(demo: true);
+        await provider.GetRequiredService<IDatabaseInitializer>().InitializeAsync(ct);
+
+        Assert.Equal(1, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Kullanicilar", ct));
+        Assert.Equal(0, await database.ScalarAsync("SELECT COUNT(*) FROM dbo.Etkinlikler", ct));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => provider.GetRequiredService<IAuthService>().SignInAsync("admin", "Demo.Admin1", ct));
     }
 
     /// <summary>

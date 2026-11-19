@@ -8,12 +8,25 @@ public interface IDatabaseInitializer
     /// <summary>
     /// Applies pending EF Core migrations (creating the database when it does not exist). A database
     /// created by the original application is upgraded in place first, keeping its data.
-    /// Providers without migrations get the schema from the model.
+    /// Providers without migrations get the schema from the model. Demonstration data is added only
+    /// when <see cref="DataAccessOptions.SeedDemoData"/> is set.
     /// </summary>
     Task InitializeAsync(CancellationToken cancellationToken = default);
 }
 
-internal sealed class DatabaseInitializer(IDbContextFactory<EventDbContext> contextFactory) : IDatabaseInitializer
+/// <summary>Settings of the data access layer.</summary>
+public sealed class DataAccessOptions
+{
+    /// <summary>
+    /// Adds fictional demonstration accounts, events and participants to an empty database. Off by
+    /// default: a default installation must not contain any account with a known password.
+    /// </summary>
+    public bool SeedDemoData { get; init; }
+}
+
+internal sealed class DatabaseInitializer(
+    IDbContextFactory<EventDbContext> contextFactory,
+    DataAccessOptions options) : IDatabaseInitializer
 {
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -30,6 +43,11 @@ internal sealed class DatabaseInitializer(IDbContextFactory<EventDbContext> cont
             else
             {
                 await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            if (options.SeedDemoData)
+            {
+                await DemoData.SeedIfEmptyAsync(db, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

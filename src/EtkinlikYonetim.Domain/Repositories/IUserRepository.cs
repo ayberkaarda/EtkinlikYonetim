@@ -13,6 +13,17 @@ public interface IUserRepository
     /// <exception cref="DuplicateUserNameException">The user name is taken.</exception>
     Task<int> AddAsync(User user, CancellationToken cancellationToken = default);
 
+    /// <summary>Whether any account has the admin role.</summary>
+    Task<bool> AnyAdminAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores <paramref name="admin"/> as the first admin account, only while no admin exists. The
+    /// check and the insert are one atomic step, so of concurrent setups exactly one succeeds.
+    /// </summary>
+    /// <returns>The new account id, or <see langword="null"/> when an admin already exists.</returns>
+    /// <exception cref="DuplicateUserNameException">The user name is taken by another account.</exception>
+    Task<int?> AddFirstAdminAsync(User admin, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Counts a failed sign-in atomically. When the count reaches <paramref name="maxAttempts"/> the
     /// account is locked until <paramref name="lockoutEnd"/> and the count starts again from zero.

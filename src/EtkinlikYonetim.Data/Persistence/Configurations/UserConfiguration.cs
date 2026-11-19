@@ -35,7 +35,5 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LockoutEnd).HasColumnName("KilitBitis");
 
         builder.HasIndex(u => u.UserName, "IX_Kullanicilar_KullaniciAdi").IsUnique();
-
-        builder.HasData(SeedData.Users);
     }
 }

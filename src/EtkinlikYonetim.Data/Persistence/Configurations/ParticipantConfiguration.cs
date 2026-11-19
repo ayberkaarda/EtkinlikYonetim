@@ -26,7 +26,5 @@ internal sealed class ParticipantConfiguration : IEntityTypeConfiguration<Partic
 
         builder.HasIndex(p => p.NationalId, "IX_Katilimcilar_TcKimlikNo").IsUnique();
         builder.HasIndex(p => p.OwnerUserId, "IX_Katilimcilar_KullaniciId");
-
-        builder.HasData(SeedData.Participants);
     }
 }

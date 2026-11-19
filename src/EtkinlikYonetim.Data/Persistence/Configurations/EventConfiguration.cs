@@ -22,7 +22,5 @@ internal sealed class EventConfiguration : IEntityTypeConfiguration<ScheduledEve
         builder.Property(e => e.RegisteredCount).HasColumnName("KayitSayisi");
 
         builder.HasIndex(e => e.Date, "IX_Etkinlikler_Tarih");
-
-        builder.HasData(SeedData.Events);
     }
 }

@@ -11,11 +11,17 @@ public static class DataServiceCollectionExtensions
     /// <summary>Environment variable that overrides the configured connection string.</summary>
     public const string ConnectionEnvironmentVariable = "ETKINLIK_CONNECTION";
 
+    /// <summary>Environment variable that turns the demonstration data on ("1" or "true").</summary>
+    public const string DemoEnvironmentVariable = "ETKINLIK_DEMO";
+
     /// <summary>Registers the data access layer on SQL Server.</summary>
-    public static IServiceCollection AddSqlServerDataAccess(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddSqlServerDataAccess(
+        this IServiceCollection services,
+        string connectionString,
+        DataAccessOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-        return services.AddDataAccess(options => options.UseSqlServer(connectionString));
+        return services.AddDataAccess(builder => builder.UseSqlServer(connectionString), options);
     }
 
     /// <summary>
@@ -24,12 +30,14 @@ public static class DataServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddDataAccess(
         this IServiceCollection services,
-        Action<DbContextOptionsBuilder> configureProvider)
+        Action<DbContextOptionsBuilder> configureProvider,
+        DataAccessOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configureProvider);
 
         services.AddDbContextFactory<EventDbContext>(configureProvider);
+        services.AddSingleton(options ?? new DataAccessOptions());
         services.AddSingleton<IDatabaseInitializer, DatabaseInitializer>();
         services.AddSingleton<IUserRepository, UserRepository>();
         services.AddSingleton<IEventRepository, EventRepository>();

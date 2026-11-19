@@ -1,3 +1,5 @@
+using System.Data;
+using System.Data.Common;
 using EtkinlikYonetim.Data.Persistence;
 using EtkinlikYonetim.Domain.Entities;
 using EtkinlikYonetim.Domain.Repositories;
@@ -61,6 +63,59 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
         return entity.Id;
     }
 
+    public async Task<bool> AnyAdminAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await db.Users.AnyAsync(u => u.Role == UserRole.Admin, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<int?> AddFirstAdminAsync(User admin, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(admin);
+
+        try
+        {
+            await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+            // Serializable: the admin check holds a range lock until the commit, so two concurrent
+            // setups can never both insert. On SQL Server the check takes an update lock, which a second
+            // setup has to wait for, so the loser sees the winner's row instead of becoming a deadlock victim.
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+            if (await AnyAdminLockedAsync(db, cancellationToken).ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            var entity = new User
+            {
+                UserName = admin.UserName,
+                PasswordHash = admin.PasswordHash,
+                PasswordFormat = admin.PasswordFormat,
+                Role = UserRole.Admin,
+            };
+            db.Users.Add(entity);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return entity.Id;
+        }
+        catch (Exception ex) when (ex is DbUpdateException or DbException || ex.InnerException is DbUpdateException or DbException)
+        {
+            // Lost the race (deadlock victim or a rejected insert): the winner's row decides; otherwise
+            // the unique index rejected a name that another account already has.
+            if (await AnyAdminAsync(CancellationToken.None).ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            if (await UserNameExistsAsync(admin.UserName, CancellationToken.None).ConfigureAwait(false))
+            {
+                throw new DuplicateUserNameException("The user name is already registered.", ex);
+            }
+
+            throw;
+        }
+    }
+
     public async Task RecordFailedLoginAsync(int userId, int maxAttempts, DateTime lockoutEnd, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -109,5 +164,21 @@ internal sealed class UserRepository(IDbContextFactory<EventDbContext> contextFa
             .ConfigureAwait(false);
 
         return updated == 1;
+    }
+
+    private static async Task<bool> AnyAdminLockedAsync(EventDbContext db, CancellationToken cancellationToken)
+    {
+        if (!db.Database.IsSqlServer())
+        {
+            return await db.Users.AnyAsync(u => u.Role == UserRole.Admin, cancellationToken).ConfigureAwait(false);
+        }
+
+#pragma warning disable EF1002 // Constant statement without any input.
+        var count = await db.Database
+            .SqlQueryRaw<int>("SELECT COUNT(*) AS [Value] FROM dbo.Kullanicilar WITH (UPDLOCK, HOLDLOCK) WHERE Rol = N'Admin'")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+#pragma warning restore EF1002
+        return count > 0;
     }
 }

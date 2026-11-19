@@ -39,6 +39,23 @@ internal sealed class PendingAuthService : IAuthService
     public void CompleteRegister() => _register.SetResult();
 }
 
+/// <summary>First-run setup calls that stay pending until the test completes them.</summary>
+internal sealed class PendingSetupService : ISetupService
+{
+    private TaskCompletionSource<UserSession> _create = new();
+
+    public int CreateCalls { get; private set; }
+
+    public Task<bool> IsSetupRequiredAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+    public Task<UserSession> CreateFirstAdminAsync(string? userName, string? password, string? passwordRepeat, CancellationToken cancellationToken = default)
+    {
+        CreateCalls++;
+        _create = new TaskCompletionSource<UserSession>();
+        return _create.Task;
+    }
+}
+
 /// <summary>Event listings answered at once; event creation stays pending.</summary>
 internal sealed class ControlledEventService : IEventService
 {

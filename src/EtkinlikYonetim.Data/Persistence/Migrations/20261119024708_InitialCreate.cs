@@ -3,8 +3,6 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
-
 namespace EtkinlikYonetim.Data.Persistence.Migrations
 {
     /// <inheritdoc />
@@ -123,35 +121,6 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         principalTable: "Kayitlar",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.InsertData(
-                table: "Etkinlikler",
-                columns: new[] { "Id", "Kapasite", "Tarih", "EtkinlikAdi", "KayitSayisi" },
-                values: new object[,]
-                {
-                    { 1, 150, new DateOnly(2027, 4, 17), "Bahar Konseri", 0 },
-                    { 2, 30, new DateOnly(2027, 5, 8), "Yazılım Atölyesi", 0 },
-                    { 3, 2, new DateOnly(2027, 6, 12), "Kısa Film Gösterimi", 0 }
-                });
-
-            migrationBuilder.InsertData(
-                table: "Kullanicilar",
-                columns: new[] { "Id", "BasarisizGiris", "KilitBitis", "SifreBicimi", "Sifre", "Rol", "KullaniciAdi" },
-                values: new object[,]
-                {
-                    { 1, 0, null, 0, "PBKDF2-SHA256$600000$YpX54aoSvQPCiUKqlMMoGA==$MH93hF8SQ80mWaKR6Y+dpuj10DcfJLUBryuy8ZdEnhY=", "Admin", "admin" },
-                    { 2, 0, null, 0, "PBKDF2-SHA256$600000$Xm3uBwS1RHIIhXfHqUMdzw==$gfpLWUifJbAP+nhdV43Lr5lHCog4znWXgpJF+kyjiRw=", "Kullanici", "ornek" }
-                });
-
-            migrationBuilder.InsertData(
-                table: "Katilimcilar",
-                columns: new[] { "Id", "Email", "AdSoyad", "TcKimlikNo", "KullaniciId" },
-                values: new object[,]
-                {
-                    { 1, "deniz@example.com", "Deniz Örnek", "10000000146", 2 },
-                    { 2, "ece@example.com", "Ece Taslak", "10000000214", 2 },
-                    { 3, "mert@example.com", "Mert Deneme", "10000000382", 1 }
                 });
 
             migrationBuilder.CreateIndex(

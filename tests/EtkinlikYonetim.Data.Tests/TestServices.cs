@@ -13,7 +13,7 @@ internal static class TestServices
     /// <summary>Monday 2 March 2026, 10:10; the fake clock's local time zone is UTC.</summary>
     public static readonly DateTimeOffset Start = new(2026, 3, 2, 10, 10, 0, TimeSpan.Zero);
 
-    // Seed data (see SeedData): "admin" (1, admin) and "ornek" (2, user); events 1-3 in 2027, event 3
+    // Demonstration data (see DemoData, used with demo mode on): "admin" (1, admin) and "ornek" (2, user); events 1-3 in 2027, event 3
     // with two seats; participants 1 and 2 owned by "ornek", participant 3 owned by "admin".
     public const int SeedAdminId = 1;
     public const int SeedUserId = 2;

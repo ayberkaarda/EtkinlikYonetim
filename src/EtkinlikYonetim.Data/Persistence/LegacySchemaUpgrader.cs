@@ -18,7 +18,7 @@ namespace EtkinlikYonetim.Data.Persistence;
 /// Katilimcilar.EtkinlikAdi; each such assignment becomes an active registration with a ticket in
 /// Kayitlar and Biletler, the events' seat counters are filled in and the name column is removed. The
 /// remaining columns, constraints and indexes of <see cref="InitialCreate"/> are added and the
-/// migration is recorded as applied, so the sample data is never inserted into such a database.
+/// migration is recorded as applied.
 /// </summary>
 /// <remarks>
 /// Every step checks the current schema first, and the whole upgrade runs in one transaction under

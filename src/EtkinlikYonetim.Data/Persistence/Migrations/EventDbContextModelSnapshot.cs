@@ -60,32 +60,6 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Katilimcilar", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Email = "deniz@example.com",
-                            FullName = "Deniz Örnek",
-                            NationalId = "10000000146",
-                            OwnerUserId = 2
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Email = "ece@example.com",
-                            FullName = "Ece Taslak",
-                            NationalId = "10000000214",
-                            OwnerUserId = 2
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Email = "mert@example.com",
-                            FullName = "Mert Deneme",
-                            NationalId = "10000000382",
-                            OwnerUserId = 1
-                        });
                 });
 
             modelBuilder.Entity("EtkinlikYonetim.Domain.Entities.Registration", b =>
@@ -169,32 +143,6 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                             t.HasCheckConstraint("CK_Etkinlikler_Kapasite", "[Kapasite] > 0");
 
                             t.HasCheckConstraint("CK_Etkinlikler_KayitSayisi", "[KayitSayisi] >= 0 AND [KayitSayisi] <= [Kapasite]");
-                        });
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Capacity = 150,
-                            Date = new DateOnly(2027, 4, 17),
-                            Name = "Bahar Konseri",
-                            RegisteredCount = 0
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Capacity = 30,
-                            Date = new DateOnly(2027, 5, 8),
-                            Name = "Yazılım Atölyesi",
-                            RegisteredCount = 0
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Capacity = 2,
-                            Date = new DateOnly(2027, 6, 12),
-                            Name = "Kısa Film Gösterimi",
-                            RegisteredCount = 0
                         });
                 });
 
@@ -285,26 +233,6 @@ namespace EtkinlikYonetim.Data.Persistence.Migrations
                             t.HasCheckConstraint("CK_Kullanicilar_Rol", "[Rol] IN ('Kullanici', 'Admin')");
 
                             t.HasCheckConstraint("CK_Kullanicilar_SifreBicimi", "[SifreBicimi] IN (0, 1)");
-                        });
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            FailedLoginCount = 0,
-                            PasswordFormat = 0,
-                            PasswordHash = "PBKDF2-SHA256$600000$YpX54aoSvQPCiUKqlMMoGA==$MH93hF8SQ80mWaKR6Y+dpuj10DcfJLUBryuy8ZdEnhY=",
-                            Role = "Admin",
-                            UserName = "admin"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            FailedLoginCount = 0,
-                            PasswordFormat = 0,
-                            PasswordHash = "PBKDF2-SHA256$600000$Xm3uBwS1RHIIhXfHqUMdzw==$gfpLWUifJbAP+nhdV43Lr5lHCog4znWXgpJF+kyjiRw=",
-                            Role = "Kullanici",
-                            UserName = "ornek"
                         });
                 });
 

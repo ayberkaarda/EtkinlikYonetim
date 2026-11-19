@@ -1,4 +1,5 @@
 ﻿using EtkinlikYonetim.Business;
+using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Data;
 using EtkinlikYonetim.Data.Persistence;
 using EtkinlikYonetim.UI.Infrastructure;
@@ -21,7 +22,8 @@ namespace EtkinlikYonetim.UI
 
             ApplicationConfiguration.Initialize();
 
-            var connectionString = AppConfiguration.ResolveConnectionString(BuildConfiguration());
+            var configuration = BuildConfiguration();
+            var connectionString = AppConfiguration.ResolveConnectionString(configuration);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 Dialogs.Show(
@@ -35,12 +37,15 @@ namespace EtkinlikYonetim.UI
                 return;
             }
 
-            using var serviceProvider = ConfigureServices(connectionString);
+            var options = new DataAccessOptions { SeedDemoData = AppConfiguration.IsDemoRequested(configuration) };
+            using var serviceProvider = ConfigureServices(connectionString, options);
 
+            bool setupRequired;
             try
             {
                 // No synchronization context exists yet, so blocking here cannot deadlock.
                 serviceProvider.GetRequiredService<IDatabaseInitializer>().InitializeAsync().GetAwaiter().GetResult();
+                setupRequired = serviceProvider.GetRequiredService<ISetupService>().IsSetupRequiredAsync().GetAwaiter().GetResult();
             }
 #pragma warning disable CA1031 // Startup boundary: report and exit instead of crashing.
             catch (Exception ex)
@@ -51,6 +56,18 @@ namespace EtkinlikYonetim.UI
             }
 
             var formFactory = serviceProvider.GetRequiredService<IFormFactory>();
+
+            // While no admin exists the first one is created with a password of the installer's own
+            // choosing; there is no default account. Closing the setup ends the application.
+            if (setupRequired)
+            {
+                using var setup = formFactory.Create<IlkKurulumForm>();
+                if (setup.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+            }
+
             Application.Run(formFactory.Create<GirisYapForm>());
         }
 
@@ -61,10 +78,10 @@ namespace EtkinlikYonetim.UI
                 .AddEnvironmentVariables()
                 .Build();
 
-        private static ServiceProvider ConfigureServices(string connectionString)
+        private static ServiceProvider ConfigureServices(string connectionString, DataAccessOptions options)
         {
             var services = new ServiceCollection();
-            services.AddSqlServerDataAccess(connectionString);
+            services.AddSqlServerDataAccess(connectionString, options);
             services.AddBusinessServices();
             services.AddSingleton<IFormFactory, FormFactory>();
             return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
@@ -75,6 +92,9 @@ namespace EtkinlikYonetim.UI
     internal static class AppConfiguration
     {
         public const string SettingsFileName = "appsettings.json";
+
+        /// <summary>Settings key of the demonstration data switch.</summary>
+        public const string DemoSettingKey = "Seed:Demo";
 
         /// <summary>Adds an optional JSON settings file located in <paramref name="basePath"/>.</summary>
         public static IConfigurationBuilder AddSettingsFile(this IConfigurationBuilder builder, string basePath, string fileName) =>
@@ -95,5 +115,21 @@ namespace EtkinlikYonetim.UI
                 ? configuration.GetConnectionString(Program.ConnectionStringName)
                 : fromEnvironment;
         }
+
+        /// <summary>
+        /// Whether the demonstration data was asked for, through ETKINLIK_DEMO ("1" or "true") or the
+        /// Seed:Demo setting. Anything else, including a missing or malformed value, means no.
+        /// </summary>
+        public static bool IsDemoRequested(IConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+
+            return IsYes(configuration[DataServiceCollectionExtensions.DemoEnvironmentVariable])
+                || IsYes(configuration[DemoSettingKey]);
+        }
+
+        private static bool IsYes(string? value) =>
+            value is not null
+            && (value.Trim() == "1" || string.Equals(value.Trim(), "true", StringComparison.OrdinalIgnoreCase));
     }
 }
