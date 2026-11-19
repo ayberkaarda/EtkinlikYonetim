@@ -1,6 +1,7 @@
 using System.Globalization;
 using EtkinlikYonetim.Business.Services;
 using EtkinlikYonetim.Domain.Entities;
+using EtkinlikYonetim.UI.Theming;
 
 namespace EtkinlikYonetim.UI.Infrastructure;
 
@@ -10,6 +11,34 @@ internal static class DisplayFormat
     public static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
     public static string Date(DateOnly value) => value.ToString("dd.MM.yyyy", Turkish);
+}
+
+/// <summary>How an event appears in the lists: its name, then the date and the seats, and a pill for its state.</summary>
+internal static class EventRows
+{
+    /// <summary>
+    /// The row of <paramref name="summary"/>. The pill says whether seats are free, the event is full (new
+    /// registrations wait) or cancelled; with <paramref name="today"/> an event that took place says so.
+    /// </summary>
+    public static ListRow Describe(EventSummary summary, DateOnly? today = null)
+    {
+        ArgumentNullException.ThrowIfNull(summary);
+
+        var details = string.Create(DisplayFormat.Turkish, $"{DisplayFormat.Date(summary.Date)} · {summary.RegisteredCount}/{summary.Capacity} kayıt");
+        if (summary.WaitingCount > 0)
+        {
+            details += string.Create(DisplayFormat.Turkish, $" · {summary.WaitingCount} kişi bekliyor");
+        }
+
+        var (status, tone) = summary switch
+        {
+            { Cancelled: true } => ("İptal edildi", RowTone.Warning),
+            _ when today is { } day && summary.Date < day => ("Geçti", RowTone.Neutral),
+            { FreeSeats: 0 } => ("Dolu", RowTone.Warm),
+            _ => (string.Create(DisplayFormat.Turkish, $"{summary.FreeSeats} boş yer"), RowTone.Accent),
+        };
+        return new ListRow(summary.Name, details, RowTone.Neutral, status, tone);
+    }
 }
 
 /// <summary>A registration in "my registrations": event, date, participant and ticket code or waiting place.</summary>

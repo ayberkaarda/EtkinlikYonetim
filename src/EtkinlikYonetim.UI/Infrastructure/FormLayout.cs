@@ -200,6 +200,9 @@ internal static class FormLayout
     /// <summary>A number box framed at the shared control height.</summary>
     public static NumberField Number(NumericUpDown box) => new(box);
 
+    /// <summary>A date box framed at the shared control height.</summary>
+    public static DateField Date(DatePicker box) => new(box);
+
     /// <summary>
     /// The read-only field of a ticket code: a large monospaced text in a framed box, selectable so it can be
     /// copied.
@@ -234,7 +237,7 @@ internal static class FormLayout
         field.Controls.Add(Caption(caption));
         if (input.Dock == DockStyle.None)
         {
-            input.Anchor = input is ThemedComboBox or TextField or TextBox or NumberField
+            input.Anchor = input is ThemedComboBox or TextField or TextBox or NumberField or DateField
                 ? AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
                 : AnchorStyles.Left | AnchorStyles.Top;
         }
@@ -244,6 +247,7 @@ internal static class FormLayout
         {
             TextField framed => framed.Input,
             NumberField number => number.Input,
+            DateField date => date.Input,
             _ => input,
         };
         accessible.AccessibleName ??= caption.Replace("&", string.Empty, StringComparison.Ordinal);

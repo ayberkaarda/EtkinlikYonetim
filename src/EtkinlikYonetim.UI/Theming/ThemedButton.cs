@@ -158,17 +158,21 @@ internal sealed class ThemedButton : Button, IThemeAware
 
         var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis
             | (ShowKeyboardCues ? 0 : TextFormatFlags.HidePrefix);
+        var alignLeft = TextAlign is ContentAlignment.MiddleLeft or ContentAlignment.TopLeft or ContentAlignment.BottomLeft;
         if (!DrawsGlyph)
         {
-            TextRenderer.DrawText(g, Text, Font, ClientRectangle, text, flags | TextFormatFlags.HorizontalCenter);
+            var area = alignLeft ? Rectangle.FromLTRB(Theme.Px(this, Spacing.M), 0, Width, Height) : ClientRectangle;
+            TextRenderer.DrawText(g, Text, Font, area, text, flags | (alignLeft ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter));
             return;
         }
 
-        // Glyph and text are centered together as one group.
+        // Glyph and text are centered together as one group, or start at the left padding for a left aligned button.
         var glyphWidth = Theme.Px(this, 16);
         var gap = Theme.Px(this, 6);
         var textWidth = TextRenderer.MeasureText(g, Text, Font, Size.Empty, TextFormatFlags.SingleLine | (ShowKeyboardCues ? 0 : TextFormatFlags.HidePrefix)).Width;
-        var left = Math.Max(Theme.Px(this, Spacing.S), (Width - (glyphWidth + gap + textWidth)) / 2);
+        var left = alignLeft
+            ? Theme.Px(this, Spacing.M)
+            : Math.Max(Theme.Px(this, Spacing.S), (Width - (glyphWidth + gap + textWidth)) / 2);
         var glyphColor = !Enabled ? p.TextDisabled : Kind switch
         {
             ButtonKind.Primary => text,
